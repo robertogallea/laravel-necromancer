@@ -35,13 +35,17 @@ jobs:
           extensions: mbstring, dom, fileinfo
           coverage: none
 
+      - name: Remove laravel/ai for Laravel 11 (incompatible)
+        if: matrix.laravel == '11.*'
+        run: composer remove --dev laravel/ai --no-interaction --no-update
+
       - name: Install dependencies
         run: |
           composer require \
             "illuminate/support:${{ matrix.laravel }}" \
             "orchestra/testbench:${{ matrix.testbench }}" \
-            --no-interaction --no-update
-          composer update --prefer-dist --no-interaction
+            --dev --no-interaction --no-update
+          composer update --prefer-dist --no-interaction --no-audit
 
       - name: Run tests
         run: vendor/bin/pest --test-directory tests --configuration phpunit.xml
