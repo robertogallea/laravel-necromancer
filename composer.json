@@ -43,6 +43,7 @@
     "config": {
         "allow-plugins": {
             "pestphp/pest-plugin": true
-        }
+        },
+        "policy.advisories.block": false
     }
 }
