@@ -3,3 +3,4 @@ docs
 bootstrap
 improvements.md
 vendor
+composer.lock
