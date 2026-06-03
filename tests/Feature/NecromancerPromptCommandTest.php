@@ -61,10 +61,6 @@ function aiAbsentForPrompt(): AiDetector
 }
 
 beforeEach(function () {
-    if (! class_exists(AiServiceProvider::class)) {
-        $this->markTestSkipped('laravel/ai is not installed');
-    }
-
     $this->app->register(AiServiceProvider::class);
     $this->instance(AiDetector::class, aiAbsentForPrompt());
     CodebaseAnswerAgent::fake(['reformulated question text']);

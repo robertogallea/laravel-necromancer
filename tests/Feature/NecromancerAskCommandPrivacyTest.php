@@ -25,10 +25,6 @@ function privacyManifest(): string
 }
 
 beforeEach(function () {
-    if (! class_exists(AiServiceProvider::class)) {
-        $this->markTestSkipped('laravel/ai is not installed');
-    }
-
     $this->app->register(AiServiceProvider::class);
     $this->instance(AiDetector::class, new AiDetector(ServiceProvider::class));
     CodebaseAnswerAgent::fake(['fake-ai-answer']);

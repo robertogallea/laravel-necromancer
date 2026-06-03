@@ -15,12 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         php: ['8.3', '8.4', '8.5']
-        laravel: ['11.*', '12.*', '13.*']
+        laravel: ['13.*']
         include:
-          - laravel: '11.*'
-            testbench: '9.*'
-          - laravel: '12.*'
-            testbench: '10.*'
           - laravel: '13.*'
             testbench: '11.*'
 
@@ -34,10 +30,6 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: mbstring, dom, fileinfo
           coverage: none
-
-      - name: Remove laravel/ai for Laravel 11 (incompatible)
-        if: matrix.laravel == '11.*'
-        run: composer remove --dev laravel/ai --no-interaction --no-update
 
       - name: Install dependencies
         run: |
