@@ -1,0 +1,47 @@
+{
+    "name": "robertogallea/laravel-necromancer",
+    "description": "A Laravel package that generates AI-readable application inventory and context.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.1",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "LaravelNecromancer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LaravelNecromancer\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "LaravelNecromancer\\NecromancerServiceProvider"
+            ]
+        }
+    },
+    "suggest": {
+        "laravel/ai": "Enables AI-powered ADR inference and audit commands."
+    },
+    "scripts": {
+        "test": [
+            "vendor/bin/pest --test-directory tests --configuration phpunit.xml"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
