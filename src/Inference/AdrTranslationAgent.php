@@ -24,7 +24,7 @@ final class AdrTranslationAgent implements AdrTranslator
                         $schema->object([
                             'title' => $schema->string()->required(),
                             'slug' => $schema->string()->required(),
-                            'status' => $schema->string()->enum(['proposed', 'accepted'])->required(),
+                            'status' => $schema->string()->enum(['proposed', 'inferred'])->required(),
                             'context' => $schema->string()->required(),
                             'decision' => $schema->string()->required(),
                             'consequences' => $schema->string()->required(),
@@ -75,7 +75,7 @@ final class AdrTranslationAgent implements AdrTranslator
         Rules:
         - Translate only the narrative fields: title, context, decision, consequences.
         - Keep the 'slug' field exactly as-is (it is used as a filename).
-        - Keep the 'status' field exactly as-is ('accepted' or 'proposed').
+        - Keep the 'status' field exactly as-is ('inferred' or 'proposed').
         - Keep the 'dimension' field exactly as-is (it is an English category identifier).
         - Keep the 'confidence' field exactly as-is ('high', 'medium', or 'low').
         - Return exactly the same number of records in the same order.

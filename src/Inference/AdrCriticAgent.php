@@ -24,7 +24,7 @@ final class AdrCriticAgent implements AdrCritic
                         $schema->object([
                             'title' => $schema->string()->required(),
                             'slug' => $schema->string()->required(),
-                            'status' => $schema->string()->enum(['proposed', 'accepted'])->required(),
+                            'status' => $schema->string()->enum(['proposed', 'inferred'])->required(),
                             'context' => $schema->string()->required(),
                             'decision' => $schema->string()->required(),
                             'consequences' => $schema->string()->required(),

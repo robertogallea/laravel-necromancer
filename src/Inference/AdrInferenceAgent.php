@@ -21,7 +21,7 @@ final class AdrInferenceAgent implements AdrInferrer
                         $schema->object([
                             'title' => $schema->string()->required(),
                             'slug' => $schema->string()->required(),
-                            'status' => $schema->string()->enum(['proposed', 'accepted'])->required(),
+                            'status' => $schema->string()->enum(['proposed', 'inferred'])->required(),
                             'context' => $schema->string()->required(),
                             'decision' => $schema->string()->required(),
                             'consequences' => $schema->string()->required(),
@@ -90,7 +90,7 @@ final class AdrInferenceAgent implements AdrInferrer
         - If a dimension shows only default Laravel behaviour with no trade-off, omit it entirely.
         - Set confidence: "high" = multiple artifacts confirm the decision; "medium" = single artifact;
           "low" = inferred, no direct artifact evidence.
-        - Set status: "proposed" for low-confidence decisions; "accepted" otherwise.
+        - Set status: "proposed" for low-confidence decisions; "inferred" otherwise.
         - slug: English kebab-case, always — even if writing in another language.
         - counter_evidence: Cite specific manifest entries that CONTRADICT or weaken the decision.
           Name artifact classes, route names, or config keys. If no contradicting evidence exists,

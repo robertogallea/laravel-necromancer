@@ -201,7 +201,7 @@ ADRs are written to `docs/adr/necromancer/` (canonical locale, flat) and `docs/a
 ```markdown
 # ADR 0001: Async Email Delivery via Dedicated Queue
 
-**Status:** Accepted
+**Status:** Inferred
 **Dimension:** Async Processing
 **Confidence:** High
 **Date:** 2026-05-29
