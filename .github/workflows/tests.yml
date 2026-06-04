@@ -37,5 +37,8 @@ jobs:
           composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
           composer update --prefer-dist --no-interaction
 
+      - name: Check code style
+        run: vendor/bin/pint --test
+
       - name: Run tests
         run: vendor/bin/pest --test-directory tests --configuration phpunit.xml
