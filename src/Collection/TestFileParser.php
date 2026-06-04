@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Collection;
 
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use ReflectionMethod;
 use Throwable;
@@ -117,12 +118,13 @@ final readonly class TestFileParser
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             if (str_starts_with($method->getName(), 'test')) {
                 $methods[] = $method->getName();
+
                 continue;
             }
 
             // Use getAttributes() for presence detection only — does not call newInstance(),
             // so PHPUnit\Framework\Attributes\Test does not need to be loadable.
-            if ($method->getAttributes(\PHPUnit\Framework\Attributes\Test::class) !== []) {
+            if ($method->getAttributes(Test::class) !== []) {
                 $methods[] = $method->getName();
             }
         }

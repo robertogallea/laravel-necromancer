@@ -10,7 +10,6 @@ use JsonException;
 use JsonSerializable;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\EnumCollector;
-use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
@@ -21,6 +20,7 @@ use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\RouteCollector;
 use LaravelNecromancer\Collection\RouteNoiseFilter;
 use LaravelNecromancer\Collection\SafeInventoryCollector;
+use LaravelNecromancer\Collection\TestCollector;
 use stdClass;
 use Throwable;
 
