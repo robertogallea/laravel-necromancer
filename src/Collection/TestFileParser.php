@@ -55,10 +55,14 @@ final readonly class TestFileParser
     public function usesSubject(): ?string
     {
         $content = $this->content();
+        $imports = $this->importMap($content);
 
         preg_match_all('/uses\s*\(\s*\\\\?([A-Za-z][A-Za-z0-9\\\\]*?)::class/m', $content, $matches);
 
-        foreach ($matches[1] as $fqcn) {
+        foreach ($matches[1] as $captured) {
+            // Resolve short name via import map if available
+            $fqcn = $imports[$captured] ?? $captured;
+
             if ($this->isTestCaseOrTrait($fqcn)) {
                 continue;
             }
@@ -67,6 +71,27 @@ final readonly class TestFileParser
         }
 
         return null;
+    }
+
+    /**
+     * Returns a map of short name → FQCN for all `use` import statements in the content.
+     *
+     * @return array<string,string>
+     */
+    private function importMap(string $content): array
+    {
+        $map = [];
+
+        // Match: use Foo\Bar\Baz; and use Foo\Bar\Baz as Alias;
+        preg_match_all('/^use\s+([\w\\\\]+?)(?:\s+as\s+(\w+))?\s*;/m', $content, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $fqcn = $match[1];
+            $alias = ($match[2] ?? '') !== '' ? $match[2] : class_basename($fqcn);
+            $map[$alias] = $fqcn;
+        }
+
+        return $map;
     }
 
     /**
