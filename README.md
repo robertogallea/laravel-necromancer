@@ -397,6 +397,25 @@ This PR introduces a subscription model with activation workflow.
 
 ---
 
+### Step 3h — Benchmark AI context effectiveness
+
+Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, and token cost compared to a hand-written `CLAUDE.md` or no context at all:
+
+```bash
+php artisan necromancer:benchmark
+```
+
+The command runs a bundled task suite (Q&A, code generation, and mini end-to-end tasks) in three conditions — no context, manual `CLAUDE.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run.
+
+```bash
+php artisan necromancer:benchmark --no-judge              # automated checks only (single provider)
+php artisan necromancer:benchmark --format=markdown --output=benchmark.md
+```
+
+> See **[BENCHMARK.md](BENCHMARK.md)** for full setup instructions, config reference, and bias mitigations.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -410,6 +429,7 @@ This PR introduces a subscription model with activation workflow.
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
+| `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
 
 ## Configuration
 
