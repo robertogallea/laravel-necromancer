@@ -21,7 +21,7 @@ final class GenerateCommand extends Command
         {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, policies, enums)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'policies', 'enums'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'policies', 'enums', 'tests'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -93,6 +93,7 @@ final class GenerateCommand extends Command
             'commands' => $this->buildCommands($manifest['artifacts']['commands'] ?? []),
             'policies' => $this->buildPolicies($manifest['artifacts']['policies'] ?? []),
             'enums' => $this->buildEnums($manifest['artifacts']['enums'] ?? []),
+            'tests' => $this->buildTests($manifest['artifacts']['tests'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -735,6 +736,42 @@ final class GenerateCommand extends Command
             $row = "| {$basename} | {$type} | {$cases}";
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($enum);
+            }
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $tests
+     */
+    private function buildTests(array $tests): string
+    {
+        if (empty($tests)) {
+            return '';
+        }
+
+        $count = count($tests);
+        $hasSources = $this->hasSources($tests);
+
+        $header = '| File | Type | Subject | Tests';
+        $divider = '|---|---|---|---';
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Tests ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($tests as $test) {
+            $file = (string) ($test['file'] ?? '');
+            $type = (string) ($test['type'] ?? '');
+            $subject = isset($test['subject']) ? class_basename((string) $test['subject']) : '';
+            $methods = implode(', ', (array) ($test['methods'] ?? []));
+            $row = "| {$file} | {$type} | {$subject} | {$methods}";
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($test);
             }
             $lines[] = $row.' |';
         }

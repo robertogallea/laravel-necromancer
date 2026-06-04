@@ -11,6 +11,7 @@ use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
+use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Commands\ScanCommand;
 use LaravelNecromancer\Tests\Fixtures\Commands\NecromancerFixtureCommand;
 use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerPriority;
@@ -427,6 +428,67 @@ test('the --only=enums scan restricts to enum artifacts', function () {
     expect(array_keys((array) $manifest->artifacts))->toBe(['enums']);
 });
 
+test('the scan command writes test artifacts with file, type, and methods', function () {
+    $path = necromancerScanTestPath('necromancer-tests-basic.json');
+
+    useNecromancerFixtureTests();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $functional = findManifestTestByFilename($manifest, 'NecromancerFunctionalTest.php');
+
+    expect($functional->type)->toBe('unit')
+        ->and(isset($functional->class))->toBeFalse()
+        ->and($functional->methods)->toContain('it creates an order', 'calculates the total');
+});
+
+test('the --only=tests scan restricts to test artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-tests.json');
+
+    useNecromancerFixtureTests();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'tests'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['tests']);
+});
+
+test('the scan command captures the subject for a uses() fixture test', function () {
+    $path = necromancerScanTestPath('necromancer-tests-uses.json');
+
+    useNecromancerFixtureTests();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $usesTest = findManifestTestByFilename($manifest, 'NecromancerUsesTest.php');
+
+    expect($usesTest->subject)->toBe('LaravelNecromancer\\Tests\\Fixtures\\Models\\NecromancerOrder');
+});
+
+test('the scan command captures class-based test artifacts with the class FQCN', function () {
+    $path = necromancerScanTestPath('necromancer-tests-class-based.json');
+
+    useNecromancerFixtureTests();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $classBased = findManifestTestByFilename($manifest, 'NecromancerClassBasedTest.php');
+
+    expect($classBased->class)->toBe('LaravelNecromancer\\Tests\\Fixtures\\Tests\\NecromancerClassBasedTest')
+        ->and($classBased->methods)->toContain('test_it_creates_an_order', 'test_it_calculates_total');
+});
+
 test('the scan command captures guarded on model artifacts', function () {
     $path = necromancerScanTestPath('necromancer-models-guarded.json');
 
@@ -792,6 +854,7 @@ function expectScanManifest(string $path): stdClass
         'models',
         'policies',
         'routes',
+        'tests',
     ]);
 
     return $manifest;
@@ -829,6 +892,17 @@ function manifestRouteNames(stdClass $manifest): array
     return array_map(
         static fn (stdClass $route): ?string => $route->name,
         $manifest->artifacts->routes ?? [],
+    );
+}
+
+function useNecromancerFixtureTests(): void
+{
+    app()->bind(
+        TestCollector::class,
+        fn ($app): TestCollector => new TestCollector($app, [[
+            'path' => base_path('tests/Fixtures/Tests'),
+            'type' => 'unit',
+        ]]),
     );
 }
 
@@ -1015,6 +1089,17 @@ function findManifestPolicy(stdClass $manifest, string $class): stdClass
     Assert::fail("Expected policy artifact [{$class}] was not found.");
 }
 
+function findManifestTestByFilename(stdClass $manifest, string $filename): stdClass
+{
+    foreach ($manifest->artifacts->tests ?? [] as $test) {
+        if (str_ends_with((string) ($test->file ?? ''), $filename)) {
+            return $test;
+        }
+    }
+
+    Assert::fail("Expected test artifact with filename [{$filename}] was not found.");
+}
+
 function necromancerScanTestPath(string $filename): string
 {
     return storage_path("framework/testing/{$filename}");
@@ -1050,6 +1135,10 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-diff-no-write.json'),
         necromancerScanTestPath('necromancer-enums-backed.json'),
         necromancerScanTestPath('necromancer-only-enums.json'),
+        necromancerScanTestPath('necromancer-tests-basic.json'),
+        necromancerScanTestPath('necromancer-tests-uses.json'),
+        necromancerScanTestPath('necromancer-tests-class-based.json'),
+        necromancerScanTestPath('necromancer-only-tests.json'),
         necromancerScanTestPath('necromancer-policies-basic.json'),
         necromancerScanTestPath('necromancer-only-policies.json'),
         necromancerScanTestPath('necromancer-models-guarded.json'),

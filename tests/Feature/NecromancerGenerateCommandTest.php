@@ -1907,3 +1907,66 @@ test('generate includes route authorization when present', function () {
     $content = File::get(base_path('NECROMANCER.md'));
     expect($content)->toContain('view-orders');
 });
+
+test('a manifest with tests produces a tests section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'tests' => [
+                [
+                    'file' => 'tests/Unit/Models/OrderTest.php',
+                    'type' => 'unit',
+                    'subject' => 'App\\Models\\Order',
+                    'methods' => ['it creates an order', 'it calculates total'],
+                ],
+                [
+                    'file' => 'tests/Feature/OrderCheckoutTest.php',
+                    'type' => 'feature',
+                    'methods' => ['it completes checkout'],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Tests (2)');
+    expect($content)->toContain('| File | Type | Subject | Tests |');
+});
+
+test('the tests section shows file, type, subject basename, and method names', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'tests' => [
+                [
+                    'file' => 'tests/Unit/Models/OrderTest.php',
+                    'type' => 'unit',
+                    'subject' => 'App\\Models\\Order',
+                    'methods' => ['it creates an order', 'it calculates total'],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('tests/Unit/Models/OrderTest.php')
+        ->and($content)->toContain('unit')
+        ->and($content)->toContain('Order')
+        ->and($content)->toContain('it creates an order');
+});
+
+test('a manifest with no tests does not include a tests section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->not->toContain('## Tests');
+});

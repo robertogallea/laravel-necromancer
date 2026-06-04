@@ -190,7 +190,7 @@ test('write routes covered by form requests give 100 percent validation coverage
             'routes' => [
                 ['method' => 'POST', 'uri' => '/orders', 'name' => 'orders.store', 'controller' => 'OrderController', 'middleware' => []],
             ],
-            'requests' => [
+            'form_requests' => [
                 ['class' => 'App\\Http\\Requests\\StoreOrderRequest', 'rules' => ['name' => 'required']],
             ],
         ],
@@ -350,4 +350,164 @@ test('doctor async clarity scores higher when all jobs have backoff configured',
     $fullScore = json_decode(Artisan::output(), true)['dimensions'][0]['score'] ?? 0;
 
     expect($fullScore)->toBeGreaterThan($partialScore);
+});
+
+test('test presence returns N/A when tests key is absent from manifest', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['detail'])->toBe('N/A')
+        ->and($decoded['dimensions'][0]['score'])->toBe(100);
+});
+
+test('test presence scores 0 percent when tests key is present but empty and models exist', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+            ],
+            'tests' => [],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['score'])->toBe(0)
+        ->and($decoded['dimensions'][0]['detail'])->toBe('0/1 models');
+});
+
+test('test presence returns N/A when tests are present but no models or jobs exist', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'tests' => [
+                ['file' => 'tests/Unit/SomeTest.php', 'type' => 'unit', 'subject' => 'App\\Services\\SomeService', 'methods' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['detail'])->toBe('N/A')
+        ->and($decoded['dimensions'][0]['score'])->toBe(100);
+});
+
+test('test presence scores 100 percent when all models and jobs have matching test subjects', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+            ],
+            'jobs' => [
+                ['class' => 'App\\Jobs\\SendInvoice'],
+            ],
+            'tests' => [
+                ['file' => 'tests/Unit/Models/OrderTest.php', 'type' => 'unit', 'subject' => 'App\\Models\\Order', 'methods' => []],
+                ['file' => 'tests/Unit/Jobs/SendInvoiceTest.php', 'type' => 'unit', 'subject' => 'App\\Jobs\\SendInvoice', 'methods' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['score'])->toBe(100)
+        ->and($decoded['dimensions'][0]['detail'])->toBe('1/1 models · 1/1 jobs');
+});
+
+test('test presence scores 50 percent when half of models are covered by tests', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+                ['class' => 'App\\Models\\Customer', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+            ],
+            'tests' => [
+                ['file' => 'tests/Unit/Models/OrderTest.php', 'type' => 'unit', 'subject' => 'App\\Models\\Order', 'methods' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['score'])->toBe(50)
+        ->and($decoded['dimensions'][0]['detail'])->toBe('1/2 models');
+});
+
+test('test presence scores 0 percent when tests exist but all subjects are absent', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+            ],
+            'tests' => [
+                ['file' => 'tests/Unit/SomeTest.php', 'type' => 'unit', 'methods' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['score'])->toBe(0)
+        ->and($decoded['dimensions'][0]['detail'])->toBe('0/1 models');
+});
+
+test('test presence uses only the models ratio when no jobs are present', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+                ['class' => 'App\\Models\\Customer', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
+            ],
+            'tests' => [
+                ['file' => 'tests/Unit/Models/OrderTest.php', 'type' => 'unit', 'subject' => 'App\\Models\\Order', 'methods' => []],
+                ['file' => 'tests/Unit/Models/CustomerTest.php', 'type' => 'unit', 'subject' => 'App\\Models\\Customer', 'methods' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['score'])->toBe(100)
+        ->and($decoded['dimensions'][0]['detail'])->toBe('2/2 models');
+});
+
+test('test presence uses only the jobs ratio when no models are present', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => [],
+        'artifacts' => [
+            'jobs' => [
+                ['class' => 'App\\Jobs\\SendInvoice'],
+                ['class' => 'App\\Jobs\\ProcessPayment'],
+            ],
+            'tests' => [
+                ['file' => 'tests/Unit/Jobs/SendInvoiceTest.php', 'type' => 'unit', 'subject' => 'App\\Jobs\\SendInvoice', 'methods' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'test-presence']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'][0]['score'])->toBe(50)
+        ->and($decoded['dimensions'][0]['detail'])->toBe('1/2 jobs');
 });

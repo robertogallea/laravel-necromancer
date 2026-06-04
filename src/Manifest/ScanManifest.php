@@ -10,6 +10,7 @@ use JsonException;
 use JsonSerializable;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\EnumCollector;
+use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
@@ -36,6 +37,7 @@ final readonly class ScanManifest implements JsonSerializable
         private CommandCollector $commandCollector,
         private PolicyCollector $policyCollector,
         private EnumCollector $enumCollector,
+        private TestCollector $testCollector,
     ) {}
 
     /**
@@ -119,6 +121,7 @@ final readonly class ScanManifest implements JsonSerializable
             'commands' => fn (): array => $this->commandCollector->collect(),
             'policies' => fn (): array => $this->policyCollector->collect(),
             'enums' => fn (): array => $this->enumCollector->collect(),
+            'tests' => fn (): array => $this->testCollector->collect(),
         ];
 
         if ($only !== []) {

@@ -129,6 +129,10 @@ final class ScanCommand extends Command
             return (string) ($item['method'] ?? '').':'.($item['uri'] ?? '');
         }
 
+        if ($type === 'tests') {
+            return (string) ($item['file'] ?? json_encode($item));
+        }
+
         return (string) ($item['class'] ?? $item['signature'] ?? json_encode($item));
     }
 

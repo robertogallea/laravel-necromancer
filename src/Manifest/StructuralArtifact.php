@@ -15,6 +15,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\ListenerPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ModelPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RoutePayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\TestPayload;
 
 final readonly class StructuralArtifact implements JsonSerializable
 {
@@ -249,6 +250,27 @@ final readonly class StructuralArtifact implements JsonSerializable
         return new self('policies', new PolicyPayload(
             class: $class,
             model: $model,
+            methods: $methods,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
+    }
+
+    /**
+     * @param  list<string>  $methods
+     */
+    public static function test(
+        string $file,
+        string $testType,
+        ?string $class = null,
+        ?string $subject = null,
+        array $methods = [],
+        ?SourceLocation $source = null,
+    ): self {
+        return new self('tests', new TestPayload(
+            file: $file,
+            testType: $testType,
+            class: $class,
+            subject: $subject,
             methods: $methods,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));

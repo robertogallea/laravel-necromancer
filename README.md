@@ -39,6 +39,8 @@ Inspects the running application and writes `necromancer.json` to the project ro
 
 Necromancer reads PHP attributes (`#[ObservedBy]`, `#[Queue]`, `#[Aliases]`, `#[Authorize]`, etc.) as primary sources alongside class properties. Codebases using the attribute-based API introduced in Laravel 11+ are fully supported — jobs configured via `#[Queue]`/`#[Tries]`/`#[Timeout]`, models with `#[ObservedBy]`/`#[ScopedBy]`, and commands with `#[Aliases]` all appear correctly in the manifest.
 
+Test files in `tests/Unit/` and `tests/Feature/` are scanned and included as a `tests` artifact type. Both Pest functional-style files (`test()`/`it()` calls) and class-based PHPUnit tests are supported. Subject classes are inferred from `uses()` declarations and filename convention (`OrderTest.php` → `App\Models\Order`).
+
 Check for manifest drift without writing a new file (CI use):
 
 ```bash
@@ -81,7 +83,7 @@ php artisan necromancer:audit --fail-on=warning  # exit 1 if any warnings or err
 
 ### Step 3b — Check the AI readability score
 
-Get a quick percentage score across six weighted dimensions of AI readability:
+Get a quick percentage score across seven weighted dimensions of AI readability:
 
 ```bash
 php artisan necromancer:doctor
@@ -100,6 +102,7 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   Validation Coverage    ████████░░  80%  (8/10 write routes with FormRequest)
   Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
+  Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
 
   Tip: run necromancer:audit for a detailed findings list.
 ```
@@ -120,10 +123,21 @@ Write a Markdown context file your AI tool can load:
 php artisan necromancer:generate
 ```
 
-Produces `NECROMANCER.md` at the project root. Generate only specific sections:
+Produces `NECROMANCER.md` at the project root. The generated file includes a `## Tests` table when test artifacts are present:
+
+```markdown
+## Tests (12)
+| File | Type | Subject | Tests |
+|---|---|---|---|
+| tests/Unit/Models/OrderTest.php | unit | Order | it creates an order, it calculates total |
+| tests/Feature/OrderCheckoutTest.php | feature | | test_it_completes_checkout |
+```
+
+Generate only specific sections (supported types include `tests`):
 
 ```bash
 php artisan necromancer:generate --only=routes,models
+php artisan necromancer:generate --only=tests
 ```
 
 Skip the overwrite confirmation when regenerating:
@@ -391,7 +405,7 @@ This PR introduces a subscription model with activation workflow.
 | `necromancer:map` | Display the manifest in the terminal | `--type=TYPE` |
 | `necromancer:audit` | Run the AI-readability audit (violation list) | `--format=text\|json\|markdown`, `--output=PATH`, `--fail-on=SEVERITY` |
 | `necromancer:doctor` | Show the AI readability score (percentage dashboard) | `--json`, `--min-score=N`, `--only=KEYS` |
-| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--output=PATH`, `--force` |
+| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE` (routes, models, form_requests, jobs, events, listeners, commands, policies, enums, tests), `--output=PATH`, `--force` |
 | `necromancer:ask` | Ask a question about your codebase via AI | `--provider=`, `--model=` |
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
@@ -404,10 +418,19 @@ After publishing the config, edit `config/necromancer.php`:
 ```php
 return [
 
-    // Artifact exclusions — supports wildcard patterns for routes
+    // Artifact exclusions — supports wildcard patterns for routes and glob patterns for tests
     'exclude' => [
         'routes' => ['horizon.*', 'telescope.*', 'debugbar.*'],
         'models' => [],
+        'tests'  => [],   // glob patterns matched against relative file paths, e.g. 'tests/Fixtures/*'
+    ],
+
+    // Test discovery roots — override the default tests/Unit and tests/Feature scan paths
+    'tests' => [
+        'roots' => [
+            // ['path' => base_path('tests/Unit'), 'type' => 'unit'],
+            // ['path' => base_path('tests/Feature'), 'type' => 'feature'],
+        ],
     ],
 
     // Output paths (defaults shown)

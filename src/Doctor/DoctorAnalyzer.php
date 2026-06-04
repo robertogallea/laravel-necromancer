@@ -23,6 +23,7 @@ final class DoctorAnalyzer
             $this->validationCoverage(),
             $this->asyncClarity(),
             $this->codebaseVocabulary(),
+            $this->testPresence(),
         ];
     }
 
@@ -128,7 +129,7 @@ final class DoctorAnalyzer
     private function validationCoverage(): DimensionResult
     {
         $routes = (array) ($this->artifacts['routes'] ?? []);
-        $requests = (array) ($this->artifacts['requests'] ?? []);
+        $requests = (array) ($this->artifacts['form_requests'] ?? []);
 
         $writeRoutes = array_values(array_filter($routes, fn (array $r): bool => in_array(strtoupper((string) ($r['method'] ?? '')), ['POST', 'PUT', 'PATCH'], true)));
         $writeTotal = count($writeRoutes);
@@ -237,5 +238,72 @@ final class DoctorAnalyzer
         }
 
         return new DimensionResult('codebase-vocabulary', 'Codebase Vocabulary', $score, implode(' · ', $detailParts), 0.15);
+    }
+
+    private function testPresence(): DimensionResult
+    {
+        $tests = (array) ($this->artifacts['tests'] ?? []);
+        $models = (array) ($this->artifacts['models'] ?? []);
+        $jobs = (array) ($this->artifacts['jobs'] ?? []);
+
+        $modelTotal = count($models);
+        $jobTotal = count($jobs);
+        $testsScanned = array_key_exists('tests', $this->artifacts);
+
+        if (! $testsScanned || ($modelTotal === 0 && $jobTotal === 0)) {
+            return new DimensionResult('test-presence', 'Test Presence', 1.0, 'N/A', 0.10);
+        }
+
+        $testedSubjects = array_filter(
+            array_column($tests, 'subject'),
+            fn (?string $s): bool => $s !== null,
+        );
+
+        $ratios = [];
+        $detailParts = [];
+
+        if ($modelTotal > 0) {
+            $modelsWithTests = count(array_filter(
+                $models,
+                fn (array $m): bool => $this->hasTestSubject($m['class'] ?? '', $testedSubjects),
+            ));
+            $ratios[] = $modelsWithTests / $modelTotal;
+            $detailParts[] = "{$modelsWithTests}/{$modelTotal} models";
+        }
+
+        if ($jobTotal > 0) {
+            $jobsWithTests = count(array_filter(
+                $jobs,
+                fn (array $j): bool => $this->hasTestSubject($j['class'] ?? '', $testedSubjects),
+            ));
+            $ratios[] = $jobsWithTests / $jobTotal;
+            $detailParts[] = "{$jobsWithTests}/{$jobTotal} jobs";
+        }
+
+        $score = array_sum($ratios) / count($ratios);
+
+        return new DimensionResult('test-presence', 'Test Presence', $score, implode(' · ', $detailParts), 0.10);
+    }
+
+    /**
+     * Returns true when any subject exactly matches the class OR is a namespace prefix of it.
+     * Prefix matching handles the case where a single test file covers an entire namespace
+     * (e.g. ModelsTest.php with subject "App\Models" covers "App\Models\Order").
+     *
+     * @param  list<string>  $subjects
+     */
+    private function hasTestSubject(string $class, array $subjects): bool
+    {
+        foreach ($subjects as $subject) {
+            if ($class === $subject) {
+                return true;
+            }
+
+            if (str_starts_with($class, $subject.'\\')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

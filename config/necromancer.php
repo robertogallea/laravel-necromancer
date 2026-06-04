@@ -4,8 +4,18 @@ declare(strict_types=1);
 
 return [
     'exclude' => [
-        'routes' => ['horizon.*', 'telescope.*', 'debugbar.*'],
+        'routes' => [
+            'horizon.*', 'telescope.*', 'debugbar.*',
+            '*livewire*', 'ignition.*', 'health',
+            'boost.*', 'storage.*',
+            'password.*', 'verification.*', 'login', 'logout', 'register',
+        ],
         'models' => [],
+        'tests' => [],
+    ],
+
+    'tests' => [
+        'roots' => [],
     ],
 
     'output' => [
