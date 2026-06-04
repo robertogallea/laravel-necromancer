@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Collection;
 
 use Closure;
-use Illuminate\Contracts\Events\Dispatcher as DispatcherContract;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Events\Dispatcher;
 use ReflectionClass;
-use ReflectionException;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionType;
@@ -67,12 +66,7 @@ final readonly class EventListenerMap
      */
     private function runtimeListenersByEvent(): array
     {
-        $dispatcher = $this->app->make(DispatcherContract::class);
-
-        if (! method_exists($dispatcher, 'getRawListeners')) {
-            return [];
-        }
-
+        $dispatcher = $this->app->make(Dispatcher::class);
         $listenersByEvent = [];
 
         foreach ($dispatcher->getRawListeners() as $eventClass => $listeners) {
@@ -130,11 +124,7 @@ final readonly class EventListenerMap
             return [];
         }
 
-        try {
-            $reflection = new ReflectionClass($listenerClass);
-        } catch (ReflectionException) {
-            return [];
-        }
+        $reflection = new ReflectionClass($listenerClass);
 
         if ($reflection->isAbstract()) {
             return [];

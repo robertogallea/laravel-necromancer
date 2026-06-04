@@ -10,7 +10,6 @@ use Illuminate\Foundation\Http\Attributes\StopOnFirstFailure;
 use Illuminate\Foundation\Http\FormRequest;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use ReflectionException;
 use Throwable;
 
 final readonly class FormRequestCollector
@@ -72,11 +71,7 @@ final readonly class FormRequestCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($class);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionClass($class);
 
         if ($reflection->isAbstract() || ! $reflection->isSubclassOf(FormRequest::class)) {
             return null;
@@ -92,7 +87,9 @@ final readonly class FormRequestCollector
     }
 
     /**
-     * @param  ReflectionClass<FormRequest>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @return array<string, string>
      */
     private function extractRules(ReflectionClass $reflection): array
@@ -103,8 +100,12 @@ final readonly class FormRequestCollector
 
         try {
             $instance = $reflection->newInstanceWithoutConstructor();
-            $raw = $instance->rules();
+            $raw = $reflection->getMethod('rules')->invoke($instance);
         } catch (Throwable) {
+            return [];
+        }
+
+        if (! is_array($raw)) {
             return [];
         }
 

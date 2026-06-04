@@ -10,6 +10,7 @@
     "require-dev": {
         "laravel/ai": "^0.7.2",
         "laravel/pint": "^1.0",
+        "larastan/larastan": "^3.0",
         "orchestra/testbench": "^11.1",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.1"

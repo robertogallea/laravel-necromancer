@@ -8,7 +8,6 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Foundation\Application;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use ReflectionException;
 use Throwable;
 
 final readonly class EventCollector
@@ -73,11 +72,7 @@ final readonly class EventCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($class);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionClass($class);
 
         if ($reflection->isAbstract()) {
             return null;

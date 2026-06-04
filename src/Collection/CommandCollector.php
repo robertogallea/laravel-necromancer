@@ -11,7 +11,6 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Console\ClosureCommand;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use ReflectionException;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 use Throwable;
 
@@ -63,11 +62,7 @@ final readonly class CommandCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($command);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionClass($command);
 
         if ($reflection->isAbstract() || ! $this->isApplicationLocal($reflection)) {
             return null;
@@ -83,7 +78,9 @@ final readonly class CommandCollector
     }
 
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @template T of SymfonyCommand
+     *
+     * @param  ReflectionClass<T>  $reflection
      */
     private function signature(SymfonyCommand $command, ReflectionClass $reflection): string
     {
@@ -105,7 +102,9 @@ final readonly class CommandCollector
     }
 
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @template T of SymfonyCommand
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @return list<string>
      */
     private function aliases(ReflectionClass $reflection): array
@@ -116,7 +115,9 @@ final readonly class CommandCollector
     }
 
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @template T of SymfonyCommand
+     *
+     * @param  ReflectionClass<T>  $reflection
      */
     private function isApplicationLocal(ReflectionClass $reflection): bool
     {

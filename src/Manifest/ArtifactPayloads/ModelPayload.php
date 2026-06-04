@@ -53,19 +53,19 @@ final readonly class ModelPayload implements JsonSerializable
         ];
 
         if (! empty($this->hidden)) {
-            $data['hidden'] = array_values($this->hidden);
+            $data['hidden'] = $this->hidden;
         }
 
         if (! empty($this->scopes)) {
-            $data['scopes'] = array_values($this->scopes);
+            $data['scopes'] = $this->scopes;
         }
 
         if (! empty($this->observers)) {
-            $data['observers'] = array_values($this->observers);
+            $data['observers'] = $this->observers;
         }
 
         if (! empty($this->globalScopes)) {
-            $data['global_scopes'] = array_values($this->globalScopes);
+            $data['global_scopes'] = $this->globalScopes;
         }
 
         if ($this->policy !== null) {

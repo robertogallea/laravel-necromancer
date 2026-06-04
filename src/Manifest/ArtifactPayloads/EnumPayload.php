@@ -27,7 +27,7 @@ final readonly class EnumPayload implements JsonSerializable
         $data = [
             'class' => $this->class,
             'backing_type' => $this->backingType,
-            'cases' => array_values($this->cases),
+            'cases' => $this->cases,
         ];
 
         if ($this->source !== null) {

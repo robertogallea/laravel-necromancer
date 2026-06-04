@@ -51,11 +51,7 @@ final class ManifestDiffer
             }
         }
 
-        return new ManifestDiff(
-            array_filter($added, fn ($items) => ! empty($items)),
-            array_filter($removed, fn ($items) => ! empty($items)),
-            array_filter($changed, fn ($items) => ! empty($items)),
-        );
+        return new ManifestDiff($added, $removed, $changed);
     }
 
     private function canonicalKey(string $type, array $artifact): string

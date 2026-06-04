@@ -61,8 +61,8 @@ final class ScanCommand extends Command
 
         $new = $manifest->buildPayload(only: $this->parseOnly());
 
-        $oldArtifacts = is_array($old['artifacts'] ?? null) ? $old['artifacts'] : [];
-        $newArtifacts = is_array($new['artifacts'] ?? null) ? $new['artifacts'] : [];
+        $oldArtifacts = is_array($old['artifacts']) ? $old['artifacts'] : [];
+        $newArtifacts = is_array($new['artifacts']) ? $new['artifacts'] : [];
 
         $allTypes = array_unique(array_merge(array_keys($oldArtifacts), array_keys($newArtifacts)));
         sort($allTypes);

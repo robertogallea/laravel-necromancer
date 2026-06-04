@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use ReflectionException;
 use ReflectionMethod;
 use Throwable;
 
@@ -77,11 +76,7 @@ final readonly class ModelCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($class);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionClass($class);
 
         if ($reflection->isAbstract() || ! $reflection->isSubclassOf(Model::class)) {
             return null;
@@ -151,7 +146,9 @@ final readonly class ModelCollector
     }
 
     /**
-     * @param  ReflectionClass<Model>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @return list<string>
      */
     private function localScopes(ReflectionClass $reflection): array
@@ -188,7 +185,9 @@ final readonly class ModelCollector
     }
 
     /**
-     * @param  ReflectionClass<Model>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @return list<string>
      */
     private function observers(ReflectionClass $reflection): array
@@ -205,7 +204,9 @@ final readonly class ModelCollector
     }
 
     /**
-     * @param  ReflectionClass<Model>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @return list<string>
      */
     private function globalScopes(ReflectionClass $reflection): array
@@ -222,7 +223,9 @@ final readonly class ModelCollector
     }
 
     /**
-     * @param  ReflectionClass<Model>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @param  class-string  $attributeClass
      */
     private function attributeClass(ReflectionClass $reflection, string $attributeClass, string $property): ?string
@@ -233,7 +236,9 @@ final readonly class ModelCollector
     }
 
     /**
-     * @param  ReflectionClass<Model>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      * @return list<array{type: string, related: string|null, method: string}>
      */
     private function relationships(ReflectionClass $reflection, Model $model): array

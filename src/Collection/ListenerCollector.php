@@ -8,7 +8,6 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use ReflectionException;
 
 final readonly class ListenerCollector
 {
@@ -72,11 +71,7 @@ final readonly class ListenerCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($class);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionClass($class);
 
         if ($reflection->isAbstract()) {
             return null;

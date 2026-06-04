@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Collection;
 
+use BackedEnum;
 use Illuminate\Contracts\Foundation\Application;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionEnum;
-use ReflectionException;
 
 final readonly class EnumCollector
 {
@@ -58,11 +58,7 @@ final readonly class EnumCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionEnum($class);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionEnum($class);
 
         $backingType = $reflection->isBacked()
             ? (string) $reflection->getBackingType()
@@ -71,7 +67,7 @@ final readonly class EnumCollector
         $cases = array_map(
             fn ($case): array => [
                 'name' => $case->getName(),
-                'value' => $reflection->isBacked() ? $case->getValue()->value : null,
+                'value' => $case->getValue() instanceof BackedEnum ? $case->getValue()->value : null,
             ],
             $reflection->getCases(),
         );

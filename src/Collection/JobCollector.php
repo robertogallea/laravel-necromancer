@@ -17,7 +17,6 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use ReflectionException;
 
 final readonly class JobCollector
 {
@@ -68,11 +67,7 @@ final readonly class JobCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($class);
-        } catch (ReflectionException) {
-            return null;
-        }
+        $reflection = new ReflectionClass($class);
 
         if ($reflection->isAbstract() || ! $this->isJob($reflection)) {
             return null;
@@ -85,17 +80,17 @@ final readonly class JobCollector
         $backoffAttr = AttributeReader::first($reflection, Backoff::class);
         $maxExcAttr = AttributeReader::first($reflection, MaxExceptions::class);
 
-        $rawTimeout = $timeoutAttr?->timeout ?? $this->scalarDefaultProperty($reflection, 'timeout');
+        $rawTimeout = $timeoutAttr !== null ? $timeoutAttr->timeout : $this->scalarDefaultProperty($reflection, 'timeout');
 
         return StructuralArtifact::job(
             class: $class,
-            queue: $queueAttr?->queue ?? $this->stringDefaultProperty($reflection, 'queue'),
-            connection: $connectionAttr?->connection ?? $this->stringDefaultProperty($reflection, 'connection'),
-            tries: $triesAttr?->tries ?? $this->scalarDefaultProperty($reflection, 'tries'),
+            queue: $queueAttr !== null ? $queueAttr->queue : $this->stringDefaultProperty($reflection, 'queue'),
+            connection: $connectionAttr !== null ? $connectionAttr->connection : $this->stringDefaultProperty($reflection, 'connection'),
+            tries: $triesAttr !== null ? $triesAttr->tries : $this->scalarDefaultProperty($reflection, 'tries'),
             timeout: is_int($rawTimeout) ? $rawTimeout : null,
             source: (new SourceLocator)->forClass($reflection),
-            backoff: $backoffAttr?->backoff ?? null,
-            maxExceptions: $maxExcAttr?->maxExceptions ?? null,
+            backoff: $backoffAttr !== null ? $backoffAttr->backoff : null,
+            maxExceptions: $maxExcAttr !== null ? $maxExcAttr->maxExceptions : null,
         );
     }
 

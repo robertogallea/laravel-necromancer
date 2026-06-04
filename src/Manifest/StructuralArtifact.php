@@ -68,12 +68,12 @@ final readonly class StructuralArtifact implements JsonSerializable
             name: $name,
             method: Str::upper($method),
             uri: $uri,
-            middleware: array_values($middleware),
+            middleware: $middleware,
             controller: $controller,
             action: $action,
-            parameters: array_values($parameters),
+            parameters: $parameters,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-            authorization: array_values($authorization),
+            authorization: $authorization,
         ));
     }
 
@@ -107,16 +107,16 @@ final readonly class StructuralArtifact implements JsonSerializable
         return new self('models', new ModelPayload(
             class: $class,
             table: $table,
-            fillable: array_values($fillable),
+            fillable: $fillable,
             casts: $casts,
-            relationships: array_values($relationships),
+            relationships: $relationships,
             softDeletes: $softDeletes,
-            guarded: array_values($guarded),
-            hidden: array_values($hidden),
-            scopes: array_values($scopes),
+            guarded: $guarded,
+            hidden: $hidden,
+            scopes: $scopes,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-            observers: array_values($observers),
-            globalScopes: array_values($globalScopes),
+            observers: $observers,
+            globalScopes: $globalScopes,
             policy: $policy,
             factory: $factory,
             customBuilder: $customBuilder,
@@ -158,9 +158,9 @@ final readonly class StructuralArtifact implements JsonSerializable
     ): self {
         return new self('events', new EventPayload(
             class: $class,
-            listeners: array_values($listeners),
+            listeners: $listeners,
             broadcastable: $broadcastable,
-            channels: array_values($channels),
+            channels: $channels,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }
@@ -176,7 +176,7 @@ final readonly class StructuralArtifact implements JsonSerializable
     ): self {
         return new self('listeners', new ListenerPayload(
             class: $class,
-            handles: array_values($handles),
+            handles: $handles,
             queued: $queued,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
@@ -216,7 +216,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             signature: $signature,
             description: $description,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-            aliases: array_values($aliases),
+            aliases: $aliases,
         ));
     }
 
@@ -232,7 +232,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         return new self('enums', new EnumPayload(
             class: $class,
             backingType: $backingType,
-            cases: array_values($cases),
+            cases: $cases,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }
@@ -249,7 +249,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         return new self('policies', new PolicyPayload(
             class: $class,
             model: $model,
-            methods: array_values($methods),
+            methods: $methods,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }

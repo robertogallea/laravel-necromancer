@@ -26,7 +26,7 @@ final readonly class RouteCollector
     {
         $artifacts = [];
 
-        foreach ($this->router->getRoutes() as $route) {
+        foreach ($this->router->getRoutes()->getRoutes() as $route) {
             $artifacts[] = $this->collectRoute($route);
         }
 
@@ -154,7 +154,7 @@ final readonly class RouteCollector
      */
     private function parameters(Route $route): array
     {
-        $wheres = $route->wheres ?? [];
+        $wheres = $route->wheres;
         $uri = $route->uri();
         $params = [];
 
@@ -207,7 +207,11 @@ final readonly class RouteCollector
     /** @return array{ability: string, models: list<string>} */
     private function authorizeEntry(Authorize $attr): array
     {
-        $middleware = is_string($attr->middleware) ? $attr->middleware : (string) $attr->middleware;
+        if (! is_string($attr->middleware)) {
+            return ['ability' => 'Closure', 'models' => []];
+        }
+
+        $middleware = $attr->middleware;
         $colonPos = strpos($middleware, ':');
         $params = $colonPos !== false ? explode(',', substr($middleware, $colonPos + 1)) : [];
         $ability = $params[0] ?? $middleware;

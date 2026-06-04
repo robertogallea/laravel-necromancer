@@ -33,7 +33,7 @@ final readonly class EventPayload implements JsonSerializable
         ];
 
         if ($this->broadcastable) {
-            $data['channels'] = array_values($this->channels);
+            $data['channels'] = $this->channels;
         }
 
         if ($this->source !== null) {

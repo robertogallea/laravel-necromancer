@@ -27,7 +27,7 @@ final readonly class PolicyPayload implements JsonSerializable
         $data = [
             'class' => $this->class,
             'model' => $this->model,
-            'methods' => array_values($this->methods),
+            'methods' => $this->methods,
         ];
 
         if ($this->source !== null) {

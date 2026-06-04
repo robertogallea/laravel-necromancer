@@ -41,11 +41,11 @@ final readonly class RoutePayload implements JsonSerializable
         ];
 
         if (! empty($this->authorization)) {
-            $data['authorization'] = array_values($this->authorization);
+            $data['authorization'] = $this->authorization;
         }
 
         if (! empty($this->parameters)) {
-            $data['parameters'] = array_values($this->parameters);
+            $data['parameters'] = $this->parameters;
         }
 
         if ($this->source !== null) {

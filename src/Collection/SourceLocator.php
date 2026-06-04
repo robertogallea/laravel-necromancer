@@ -11,7 +11,9 @@ use ReflectionFunctionAbstract;
 final readonly class SourceLocator
 {
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @template T of object
+     *
+     * @param  ReflectionClass<T>  $reflection
      */
     public function forClass(ReflectionClass $reflection): ?SourceLocation
     {
