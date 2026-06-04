@@ -9,6 +9,7 @@ use Laravel\Mcp\Facades\Mcp;
 use Laravel\Mcp\Server;
 use LaravelNecromancer\Commands\AskCommand;
 use LaravelNecromancer\Commands\AuditCommand;
+use LaravelNecromancer\Commands\BenchmarkCommand;
 use LaravelNecromancer\Commands\DiffCommand;
 use LaravelNecromancer\Commands\DoctorCommand;
 use LaravelNecromancer\Commands\GenerateCommand;
@@ -54,6 +55,7 @@ final class NecromancerServiceProvider extends ServiceProvider
                 DiffCommand::class,
                 PromptCommand::class,
                 InspectPayloadCommand::class,
+                BenchmarkCommand::class,
             ]);
         }
 
