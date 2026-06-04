@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Filesystem\Filesystem;
 use LaravelNecromancer\Inference\AdrInferenceCache;
 use LaravelNecromancer\Inference\AdrInferenceResult;
 use LaravelNecromancer\Inference\InferredAdr;
@@ -25,7 +26,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    (new \Illuminate\Filesystem\Filesystem)->deleteDirectory($this->cacheDir);
+    (new Filesystem)->deleteDirectory($this->cacheDir);
 });
 
 test('hasCanonical returns false when no cache file exists', function () {

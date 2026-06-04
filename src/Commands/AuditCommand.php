@@ -73,9 +73,9 @@ final class AuditCommand extends Command
         $outputPath = $this->option('output');
 
         $report = match ($format) {
-            'json'     => $this->renderJson($findings, $score),
+            'json' => $this->renderJson($findings, $score),
             'markdown' => $this->renderMarkdown($findings, $score),
-            default    => $this->renderText($findings, $score),
+            default => $this->renderText($findings, $score),
         };
 
         if (is_string($outputPath) && $outputPath !== '') {
@@ -267,5 +267,4 @@ final class AuditCommand extends Command
 
         return $totalWeight > 0 ? (int) round(($passedWeight / $totalWeight) * 100) : 100;
     }
-
 }

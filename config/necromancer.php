@@ -22,11 +22,11 @@ return [
 
     'inference' => [
         'provider' => null,
-        'model'    => null,
-        'critic'   => [
+        'model' => null,
+        'critic' => [
             'enabled' => true,
         ],
-        'output'   => [
+        'output' => [
             'adrs' => base_path('docs/adr/necromancer'),
         ],
     ],

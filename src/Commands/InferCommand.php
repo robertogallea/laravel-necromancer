@@ -12,6 +12,7 @@ use LaravelNecromancer\Inference\AdrWriter;
 use LaravelNecromancer\Inference\Contracts\AdrCritic;
 use LaravelNecromancer\Inference\Contracts\AdrInferrer;
 use LaravelNecromancer\Inference\Contracts\AdrTranslator;
+use LaravelNecromancer\Inference\InferredAdr;
 use LaravelNecromancer\Inference\ManifestSummarizer;
 use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
@@ -164,7 +165,7 @@ final class InferCommand extends Command
         return self::SUCCESS;
     }
 
-    /** @param list<\LaravelNecromancer\Inference\InferredAdr> $adrs */
+    /** @param list<InferredAdr> $adrs */
     private function writeAdrs(array $adrs, string $outputDir, ?string $localeLabel = null): bool
     {
         if ($this->option('dry-run')) {

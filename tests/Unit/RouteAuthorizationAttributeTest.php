@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Routing\Router;
+use LaravelNecromancer\Collection\RouteCollector;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Tests\Fixtures\Controllers\OrderController;
 use LaravelNecromancer\Tests\TestCase;
 
 uses(TestCase::class)->group('route-authorization');
@@ -30,12 +33,12 @@ test('RoutePayload serializes authorization as structured list', function () {
 });
 
 test('RouteCollector reads class-level #[Authorize] and adds authorization field', function () {
-    app(\Illuminate\Routing\Router::class)
-        ->get('/fixture-orders', [\LaravelNecromancer\Tests\Fixtures\Controllers\OrderController::class, 'index'])
+    app(Router::class)
+        ->get('/fixture-orders', [OrderController::class, 'index'])
         ->name('fixture.orders.index');
 
-    $collector = new \LaravelNecromancer\Collection\RouteCollector(
-        app(\Illuminate\Routing\Router::class)
+    $collector = new RouteCollector(
+        app(Router::class)
     );
 
     $artifacts = array_values(array_filter(
@@ -50,12 +53,12 @@ test('RouteCollector reads class-level #[Authorize] and adds authorization field
 });
 
 test('RouteCollector skips class-level #[Authorize] when action is excluded by only filter', function () {
-    app(\Illuminate\Routing\Router::class)
-        ->put('/fixture-orders/{id}', [\LaravelNecromancer\Tests\Fixtures\Controllers\OrderController::class, 'update'])
+    app(Router::class)
+        ->put('/fixture-orders/{id}', [OrderController::class, 'update'])
         ->name('fixture.orders.update');
 
-    $collector = new \LaravelNecromancer\Collection\RouteCollector(
-        app(\Illuminate\Routing\Router::class)
+    $collector = new RouteCollector(
+        app(Router::class)
     );
 
     $artifacts = array_values(array_filter(
@@ -73,12 +76,12 @@ test('RouteCollector skips class-level #[Authorize] when action is excluded by o
 });
 
 test('RouteCollector includes class-level #[Authorize] when action matches only filter', function () {
-    app(\Illuminate\Routing\Router::class)
-        ->get('/fixture-orders-v2', [\LaravelNecromancer\Tests\Fixtures\Controllers\OrderController::class, 'index'])
+    app(Router::class)
+        ->get('/fixture-orders-v2', [OrderController::class, 'index'])
         ->name('fixture.orders.index.v2');
 
-    $collector = new \LaravelNecromancer\Collection\RouteCollector(
-        app(\Illuminate\Routing\Router::class)
+    $collector = new RouteCollector(
+        app(Router::class)
     );
 
     $artifacts = array_values(array_filter(

@@ -7,6 +7,7 @@ namespace LaravelNecromancer\Inference;
 final class ManifestSummarizer
 {
     private const ROUTE_CAP = 30;
+
     private const MODEL_CAP = 20;
 
     /**

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use LaravelNecromancer\Collection\ModelCollector;
+use LaravelNecromancer\Manifest\StructuralArtifact;
 use LaravelNecromancer\Tests\TestCase;
 
 uses(TestCase::class)->group('model-attributes');
@@ -60,7 +61,7 @@ test('ModelCollector detects #[Scope]-annotated method in scopes alongside scope
 });
 
 test('ModelPayload omits observers from JSON when none declared', function () {
-    $artifact = \LaravelNecromancer\Manifest\StructuralArtifact::model(
+    $artifact = StructuralArtifact::model(
         class: 'App\\Models\\Order',
         table: 'orders',
     );

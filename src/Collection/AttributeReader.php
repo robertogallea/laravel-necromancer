@@ -11,6 +11,7 @@ final class AttributeReader
 {
     /**
      * @template T of object
+     *
      * @param  class-string<T>  $attributeClass
      * @return T|null
      */
@@ -23,6 +24,7 @@ final class AttributeReader
 
     /**
      * @template T of object
+     *
      * @param  class-string<T>  $attributeClass
      * @return list<T>
      */

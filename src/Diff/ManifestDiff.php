@@ -7,9 +7,9 @@ namespace LaravelNecromancer\Diff;
 final readonly class ManifestDiff
 {
     /**
-     * @param  array<string, list<array<string,mixed>>>  $added   artifacts only in head
-     * @param  array<string, list<array<string,mixed>>>  $removed artifacts only in base
-     * @param  array<string, list<array{from: array<string,mixed>, to: array<string,mixed>}>>  $changed artifacts in both but different
+     * @param  array<string, list<array<string,mixed>>>  $added  artifacts only in head
+     * @param  array<string, list<array<string,mixed>>>  $removed  artifacts only in base
+     * @param  array<string, list<array{from: array<string,mixed>, to: array<string,mixed>}>>  $changed  artifacts in both but different
      */
     public function __construct(
         public array $added,

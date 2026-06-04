@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Tests\Fixtures\Controllers;
 
+use App\Models\User;
 use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Routing\Attributes\Controllers\Middleware;
 
@@ -13,6 +14,6 @@ class OrderController
 {
     public function index(): void {}
 
-    #[Authorize('manage-billing', \App\Models\User::class)]
+    #[Authorize('manage-billing', User::class)]
     public function update(): void {}
 }

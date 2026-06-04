@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\ServiceProvider;
 use LaravelNecromancer\Integrations\AiDetector;
 
 test('isAvailable returns true when the service provider class exists', function () {
-    $detector = new AiDetector(\Illuminate\Support\ServiceProvider::class);
+    $detector = new AiDetector(ServiceProvider::class);
 
     expect($detector->isAvailable())->toBeTrue();
 });

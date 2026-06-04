@@ -26,14 +26,14 @@ final class ManifestDiffer
 
             // Find additions (in head but not in base)
             foreach ($headIndexed as $key => $headArtifact) {
-                if (!isset($baseIndexed[$key])) {
+                if (! isset($baseIndexed[$key])) {
                     $added[$type][] = $headArtifact;
                 }
             }
 
             // Find removals (in base but not in head)
             foreach ($baseIndexed as $key => $baseArtifact) {
-                if (!isset($headIndexed[$key])) {
+                if (! isset($headIndexed[$key])) {
                     $removed[$type][] = $baseArtifact;
                 }
             }
@@ -52,17 +52,17 @@ final class ManifestDiffer
         }
 
         return new ManifestDiff(
-            array_filter($added, fn ($items) => !empty($items)),
-            array_filter($removed, fn ($items) => !empty($items)),
-            array_filter($changed, fn ($items) => !empty($items)),
+            array_filter($added, fn ($items) => ! empty($items)),
+            array_filter($removed, fn ($items) => ! empty($items)),
+            array_filter($changed, fn ($items) => ! empty($items)),
         );
     }
 
     private function canonicalKey(string $type, array $artifact): string
     {
         return match ($type) {
-            'routes' => ($artifact['method'] ?? '') . ':' . ($artifact['uri'] ?? ''),
-            default  => $artifact['class'] ?? $artifact['signature'] ?? '',
+            'routes' => ($artifact['method'] ?? '').':'.($artifact['uri'] ?? ''),
+            default => $artifact['class'] ?? $artifact['signature'] ?? '',
         };
     }
 
@@ -72,10 +72,11 @@ final class ManifestDiffer
         foreach ($artifacts as $artifact) {
             $key = $this->canonicalKey($type, $artifact);
             if ($key === '') {
-                throw new \InvalidArgumentException("Artifact of type '$type' has no canonical key (missing 'class', 'signature', 'method', or 'uri'): " . json_encode($artifact, JSON_THROW_ON_ERROR));
+                throw new \InvalidArgumentException("Artifact of type '$type' has no canonical key (missing 'class', 'signature', 'method', or 'uri'): ".json_encode($artifact, JSON_THROW_ON_ERROR));
             }
             $indexed[$key] = $artifact;
         }
+
         return $indexed;
     }
 }

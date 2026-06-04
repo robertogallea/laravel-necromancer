@@ -78,16 +78,16 @@ final class AdrInferenceCache
     {
         return [
             'adrs' => array_map(fn (InferredAdr $adr) => [
-                'title'        => $adr->title,
-                'slug'         => $adr->slug,
-                'status'       => $adr->status,
-                'context'      => $adr->context,
-                'decision'     => $adr->decision,
+                'title' => $adr->title,
+                'slug' => $adr->slug,
+                'status' => $adr->status,
+                'context' => $adr->context,
+                'decision' => $adr->decision,
                 'consequences' => $adr->consequences,
-                'dimension'    => $adr->dimension,
-                'confidence'   => $adr->confidence,
+                'dimension' => $adr->dimension,
+                'confidence' => $adr->confidence,
             ], $result->adrs),
-            'prompt_tokens'     => $result->promptTokens,
+            'prompt_tokens' => $result->promptTokens,
             'completion_tokens' => $result->completionTokens,
         ];
     }

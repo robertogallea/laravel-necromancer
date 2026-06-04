@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Inference;
 
 use Closure;
+use Laravel\Ai\StructuredAnonymousAgent;
 
-final class TemperatureAwareStructuredAgent extends \Laravel\Ai\StructuredAnonymousAgent
+final class TemperatureAwareStructuredAgent extends StructuredAnonymousAgent
 {
     public function __construct(
         string $instructions,

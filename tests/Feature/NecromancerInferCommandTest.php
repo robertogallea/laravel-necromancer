@@ -1,6 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\ServiceProvider;
+use LaravelNecromancer\Inference\AdrCriticResult;
+use LaravelNecromancer\Inference\AdrInferenceResult;
 use LaravelNecromancer\Inference\Contracts\AdrCritic;
 use LaravelNecromancer\Inference\Contracts\AdrInferrer;
 use LaravelNecromancer\Inference\Contracts\AdrTranslator;
@@ -17,11 +20,11 @@ function inferCommandManifest(?string $generatedAt = null): string
 
     return json_encode([
         'meta' => [
-            'app_name'        => 'TestApp',
-            'generated_at'    => $generatedAt ?? now()->toISOString(),
-            'content_hash'    => hash('sha256', json_encode($artifacts, JSON_THROW_ON_ERROR)),
+            'app_name' => 'TestApp',
+            'generated_at' => $generatedAt ?? now()->toISOString(),
+            'content_hash' => hash('sha256', json_encode($artifacts, JSON_THROW_ON_ERROR)),
             'laravel_version' => '13.0',
-            'php_version'     => '8.4',
+            'php_version' => '8.4',
         ],
         'artifacts' => $artifacts,
     ], JSON_THROW_ON_ERROR);
@@ -29,18 +32,21 @@ function inferCommandManifest(?string $generatedAt = null): string
 
 function fakeInferrer(): AdrInferrer
 {
-    return new class implements AdrInferrer {
+    return new class implements AdrInferrer
+    {
         public ?string $lastLocale = 'sentinel';
+
         public mixed $lastTemperature = false;
+
         public int $callCount = 0;
 
-        public function infer(string $prompt, ?string $provider = null, ?string $model = null, ?string $locale = null, ?float $temperature = null): \LaravelNecromancer\Inference\AdrInferenceResult
+        public function infer(string $prompt, ?string $provider = null, ?string $model = null, ?string $locale = null, ?float $temperature = null): AdrInferenceResult
         {
             $this->lastLocale = $locale;
             $this->lastTemperature = $temperature;
             $this->callCount++;
 
-            return new \LaravelNecromancer\Inference\AdrInferenceResult(
+            return new AdrInferenceResult(
                 adrs: [
                     new InferredAdr(
                         title: 'Async Email Delivery',
@@ -60,12 +66,14 @@ function fakeInferrer(): AdrInferrer
 
 function fakeTranslator(): AdrTranslator
 {
-    return new class implements AdrTranslator {
+    return new class implements AdrTranslator
+    {
         public ?string $lastLocale = 'sentinel';
+
         public int $callCount = 0;
 
         /** @param list<InferredAdr> $adrs */
-        public function translate(array $adrs, string $targetLocale, ?string $provider = null, ?string $model = null, ?float $temperature = null): \LaravelNecromancer\Inference\AdrInferenceResult
+        public function translate(array $adrs, string $targetLocale, ?string $provider = null, ?string $model = null, ?float $temperature = null): AdrInferenceResult
         {
             $this->lastLocale = $targetLocale;
             $this->callCount++;
@@ -82,7 +90,7 @@ function fakeTranslator(): AdrTranslator
                 $adrs,
             );
 
-            return new \LaravelNecromancer\Inference\AdrInferenceResult(
+            return new AdrInferenceResult(
                 adrs: $translated,
                 promptTokens: 80,
                 completionTokens: 40,
@@ -93,17 +101,18 @@ function fakeTranslator(): AdrTranslator
 
 function fakeCritic(bool $satisfied = true): AdrCritic
 {
-    return new class ($satisfied) implements AdrCritic {
+    return new class($satisfied) implements AdrCritic
+    {
         public int $callCount = 0;
 
         public function __construct(private readonly bool $satisfied) {}
 
         /** @param list<InferredAdr> $adrs */
-        public function critique(array $adrs, string $manifestSummary, ?string $provider = null, ?string $model = null, ?float $temperature = null): \LaravelNecromancer\Inference\AdrCriticResult
+        public function critique(array $adrs, string $manifestSummary, ?string $provider = null, ?string $model = null, ?float $temperature = null): AdrCriticResult
         {
             $this->callCount++;
 
-            return new \LaravelNecromancer\Inference\AdrCriticResult(
+            return new AdrCriticResult(
                 adrs: $adrs,
                 satisfied: $this->satisfied,
                 promptTokens: 60,
@@ -115,7 +124,7 @@ function fakeCritic(bool $satisfied = true): AdrCritic
 
 function aiAvailable(): AiDetector
 {
-    return new AiDetector(\Illuminate\Support\ServiceProvider::class);
+    return new AiDetector(ServiceProvider::class);
 }
 
 function aiAbsent(): AiDetector

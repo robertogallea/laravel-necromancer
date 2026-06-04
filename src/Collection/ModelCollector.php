@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use LaravelNecromancer\Collection\AttributeReader;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
 use ReflectionException;
