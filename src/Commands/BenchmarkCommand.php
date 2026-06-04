@@ -94,6 +94,10 @@ final class BenchmarkCommand extends Command
             'contextPaths' => $contextPaths,
         ]);
 
+        foreach ($runner->warnings() as $warning) {
+            $this->warn($warning);
+        }
+
         $output = $this->renderReport($report);
 
         $outputPath = $this->option('output');

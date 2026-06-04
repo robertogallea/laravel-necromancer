@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Benchmark;
 
+use Illuminate\Http\Client\ConnectionException;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\TextDelta;
 
 final class BenchmarkRunner
 {
+    /** @var string[] */
+    private array $warnings = [];
+
     public function __construct(
         private readonly TaskSuite $taskSuite,
         private readonly GoldenAnswerResolver $resolver,
         private readonly FactChecker $factChecker,
         private readonly JudgeClient $judgeClient,
     ) {}
+
+    /** @return string[] */
+    public function warnings(): array
+    {
+        return $this->warnings;
+    }
 
     /**
      * @param array{
@@ -72,16 +82,22 @@ final class BenchmarkRunner
         $judgeTokens = null;
 
         if (! $options['noJudge']) {
-            $judged = $this->judgeClient->score(
-                taskPrompt: $task['prompt'],
-                mustContain: $task['assertions']['must_contain'] ?? [],
-                mustNotContain: $task['assertions']['must_not_contain'] ?? [],
-                response: $text,
-                provider: $options['judgeProvider'],
-                model: $options['judgeModel'],
-            );
-            $judgeScore = (float) $judged['total'];
-            $judgeTokens = $judged['tokens'];
+            try {
+                $judged = $this->judgeClient->score(
+                    taskPrompt: $task['prompt'],
+                    mustContain: $task['assertions']['must_contain'] ?? [],
+                    mustNotContain: $task['assertions']['must_not_contain'] ?? [],
+                    response: $text,
+                    provider: $options['judgeProvider'],
+                    model: $options['judgeModel'],
+                );
+                $judgeScore = (float) $judged['total'];
+                $judgeTokens = $judged['tokens'];
+            } catch (ConnectionException $e) {
+                $this->warnings[] = "Judge timed out on task {$task['id']} ({$condition}): {$e->getMessage()}";
+            } catch (\Throwable $e) {
+                $this->warnings[] = "Judge failed on task {$task['id']} ({$condition}): {$e->getMessage()}";
+            }
         }
 
         return new BenchmarkResult(
