@@ -12,6 +12,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\EventPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\FormRequestPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\JobPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ListenerPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\MiddlewarePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ModelPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ObserverPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
@@ -295,6 +296,25 @@ final readonly class StructuralArtifact implements JsonSerializable
             subject: $subject,
             methods: $methods,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $source
+     */
+    public static function middleware(
+        string $alias,
+        string $class,
+        string $scope,
+        ?string $group = null,
+        ?array $source = null,
+    ): self {
+        return new self('middleware', new MiddlewarePayload(
+            alias: $alias,
+            class: $class,
+            scope: $scope,
+            group: $group,
+            source: $source,
         ));
     }
 

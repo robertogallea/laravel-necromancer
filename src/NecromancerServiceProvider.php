@@ -43,6 +43,10 @@ final class NecromancerServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->publishes([
+            __DIR__.'/../config/necromancer.php' => config_path('necromancer.php'),
+        ], 'necromancer-config');
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ScanCommand::class,

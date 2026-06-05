@@ -16,6 +16,7 @@ use LaravelNecromancer\Benchmark\Renderers\TerminalRenderer;
 use LaravelNecromancer\Benchmark\TaskSuite;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
 use LaravelNecromancer\Integrations\AiDetector;
+use LaravelNecromancer\Integrations\BoostDetector;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 
@@ -29,12 +30,13 @@ final class BenchmarkCommand extends Command
         {--no-judge    : Skip the AI-as-judge pass (automated checks only)}
         {--model=      : Generation model override}
         {--judge=      : Judge model override}
+        {--timeout=    : HTTP timeout in seconds for AI requests (default: 120)}
         {--format=     : Output format: text|markdown|json (default: text)}
         {--output=     : Write the report to this file path}';
 
     protected $description = 'Benchmark the impact of Necromancer context on AI coding-assistant effectiveness';
 
-    public function handle(ManifestReader $reader, AiDetector $aiDetector): int
+    public function handle(ManifestReader $reader, AiDetector $aiDetector, BoostDetector $boostDetector): int
     {
         $manifestPath = $this->resolveManifestPath();
 
@@ -59,22 +61,35 @@ final class BenchmarkCommand extends Command
         $noJudge = (bool) $this->option('no-judge');
         $generationModel = $this->option('model') ?: config('necromancer.benchmark.generation_model');
         $judgeModel = $this->option('judge') ?: config('necromancer.benchmark.judge_model');
+        $timeoutOption = $this->option('timeout');
+        $timeout = is_numeric($timeoutOption) ? (int) $timeoutOption : (int) config('necromancer.benchmark.timeout', 120);
         $taskOverride = config('necromancer.benchmark.tasks') ?: null;
 
         $contextPaths = [
             'none' => '',
-            'manual' => (string) config('necromancer.benchmark.manual_context_path', base_path('CLAUDE.md')),
-            'necromancer' => (string) config('necromancer.output.context', base_path('NECROMANCER.md')),
+            'manual' => (string) config('necromancer.benchmark.manual_context_path', base_path('AGENTS.md')),
+            'necromancer' => $this->resolveNecromancerContextPath($boostDetector),
         ];
 
-        $taskCount = count((new TaskSuite($taskOverride ?: null))->tasks($types));
-        $conditionCount = count($conditions);
+        $allTasks = (new TaskSuite($taskOverride ?: null))->tasks($types);
+        $taskCount = count($allTasks);
 
-        $this->line('');
-        $this->line('  Laravel Necromancer — Benchmark');
-        $this->line('  ────────────────────────────────');
-        $this->line("  Tasks: {$taskCount}  ·  Conditions: {$conditionCount}  ·  Model: {$generationModel}".($noJudge ? '  ·  no judge' : "  ·  Judge: {$judgeModel}"));
-        $this->line('');
+        $this->printConfiguration(
+            manifestPath: $manifestPath,
+            conditions: $conditions,
+            contextPaths: $contextPaths,
+            types: $types,
+            allTasks: $allTasks,
+            generationModel: is_string($generationModel) ? $generationModel : '',
+            generationProvider: (string) (config('necromancer.benchmark.generation_provider') ?: 'default'),
+            noJudge: $noJudge,
+            judgeModel: is_string($judgeModel) ? $judgeModel : '',
+            judgeProvider: (string) (config('necromancer.benchmark.judge_provider') ?: 'default'),
+            timeout: $timeout,
+            outputPath: is_string($this->option('output')) && $this->option('output') !== '' ? $this->option('output') : null,
+            format: is_string($this->option('format')) && $this->option('format') !== '' ? $this->option('format') : 'text',
+            boostActive: $boostDetector->isAvailable(),
+        );
 
         $runner = new BenchmarkRunner(
             taskSuite: new TaskSuite($taskOverride ?: null),
@@ -92,6 +107,7 @@ final class BenchmarkCommand extends Command
             'judgeModel' => ! $noJudge && is_string($judgeModel) && $judgeModel !== '' ? $judgeModel : null,
             'judgeProvider' => ! $noJudge ? (config('necromancer.benchmark.judge_provider') ?: null) : null,
             'contextPaths' => $contextPaths,
+            'timeout' => $timeout,
         ]);
 
         foreach ($runner->warnings() as $warning) {
@@ -110,6 +126,127 @@ final class BenchmarkCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  string[]  $conditions
+     * @param  array<string, string>  $contextPaths
+     * @param  string[]|null  $types
+     * @param  array<int, array<string, mixed>>  $allTasks
+     */
+    private function printConfiguration(
+        string $manifestPath,
+        array $conditions,
+        array $contextPaths,
+        ?array $types,
+        array $allTasks,
+        string $generationModel,
+        string $generationProvider,
+        bool $noJudge,
+        string $judgeModel,
+        string $judgeProvider,
+        int $timeout,
+        ?string $outputPath,
+        string $format,
+        bool $boostActive,
+    ): void {
+        $sep = '  '.str_repeat('─', 58);
+        $w = 16;
+
+        $this->line('');
+        $this->line('  Laravel Necromancer — Benchmark');
+        $this->line($sep);
+        $this->line('');
+
+        // Manifest
+        $rel = $this->relativePath($manifestPath);
+        $this->line(sprintf('  %-*s %s', $w, 'Manifest', $rel));
+
+        // Boost
+        $this->line(sprintf('  %-*s %s', $w, 'Boost', $boostActive ? 'active' : 'inactive'));
+
+        $this->line('');
+
+        // Conditions + context files
+        $this->line(sprintf('  %-*s', $w, 'Conditions'));
+
+        $conditionLabels = ['none' => 'No context', 'manual' => 'Manual', 'necromancer' => 'Necromancer'];
+
+        foreach ($conditions as $i => $condition) {
+            $prefix = $i < count($conditions) - 1 ? '├─' : '└─';
+            $label = $conditionLabels[$condition] ?? $condition;
+            $file = $contextPaths[$condition] ?? '';
+
+            if ($condition === 'none' || $file === '') {
+                $fileInfo = 'no context injected';
+            } else {
+                $rel = $this->relativePath($file);
+                $exists = file_exists($file);
+                $fileInfo = $rel.($exists ? '  ✓' : '  ✗ (file not found — condition will use empty context)');
+            }
+
+            $this->line("  {$prefix} {$label}: {$fileInfo}");
+        }
+
+        $this->line('');
+
+        // Tasks
+        $counts = array_count_values(array_column($allTasks, 'type'));
+        ksort($counts);
+        $breakdown = implode(' · ', array_map(fn ($t, $n) => "{$t}: {$n}", array_keys($counts), $counts));
+        $taskSummary = count($allTasks).($breakdown ? "  ({$breakdown})" : '');
+        $this->line(sprintf('  %-*s %s', $w, 'Tasks', $taskSummary));
+
+        // Type filter
+        $typeLabel = $types === null ? 'all' : implode(', ', $types);
+        $this->line(sprintf('  %-*s %s', $w, 'Types', $typeLabel));
+
+        $this->line('');
+
+        // Generation
+        $genInfo = ($generationModel !== '' ? $generationModel : '(config default)')."  (provider: {$generationProvider})";
+        $this->line(sprintf('  %-*s %s', $w, 'Generation', $genInfo));
+
+        // Judge
+        if ($noJudge) {
+            $this->line(sprintf('  %-*s %s', $w, 'Judge', 'disabled  (--no-judge)'));
+        } else {
+            $judgeInfo = ($judgeModel !== '' ? $judgeModel : '(config default)')."  (provider: {$judgeProvider})";
+            $this->line(sprintf('  %-*s %s', $w, 'Judge', $judgeInfo));
+        }
+
+        // Timeout
+        $this->line(sprintf('  %-*s %ds', $w, 'Timeout', $timeout));
+
+        $this->line('');
+
+        // Output
+        $outputInfo = $outputPath !== null
+            ? $this->relativePath($outputPath)."  (format: {$format})"
+            : "terminal  (format: {$format})";
+        $this->line(sprintf('  %-*s %s', $w, 'Output', $outputInfo));
+
+        $this->line('');
+        $this->line($sep);
+        $this->line('');
+    }
+
+    private function relativePath(string $path): string
+    {
+        $base = base_path().DIRECTORY_SEPARATOR;
+
+        return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+    }
+
+    private function resolveNecromancerContextPath(BoostDetector $boostDetector): string
+    {
+        if ($boostDetector->isAvailable()) {
+            $path = (string) config('necromancer.boost.skill_path', base_path('.ai/skills/necromancer.md'));
+        } else {
+            $path = (string) config('necromancer.output.context', base_path('NECROMANCER.md'));
+        }
+
+        return $this->isAbsolutePath($path) ? $path : base_path($path);
     }
 
     /** @return string[] */

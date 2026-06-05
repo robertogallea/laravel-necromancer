@@ -18,6 +18,8 @@ final class JsonRenderer
                 'task_id' => $r->taskId,
                 'task_type' => $r->taskType,
                 'condition' => $r->condition,
+                'skipped' => $r->skipped,
+                'skip_reason' => $r->skipReason,
                 'accuracy' => $r->accuracy,
                 'hallucination_rate' => $r->hallucinationRate,
                 'judge_score' => $r->judgeScore,

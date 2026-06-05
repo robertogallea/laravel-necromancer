@@ -19,5 +19,7 @@ final readonly class BenchmarkResult
         public ?float $judgeScore,
         public ?int $judgeTokens,
         public bool $goldenAnswersTrusted,
+        public bool $skipped = false,
+        public ?string $skipReason = null,
     ) {}
 }

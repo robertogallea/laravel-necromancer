@@ -40,8 +40,14 @@ final class GoldenAnswerResolver
 
         return match (true) {
             $type === 'routes' && $field === 'named' => $this->namedRouteNames($artifacts),
+            $type === 'routes' && $field === 'auth_required' => $this->authRequiredRouteNames($artifacts),
+            $type === 'models' && $field === 'cast_keys' && $identifier !== null => $this->modelCastKeys($artifacts, $identifier),
+            $type === 'models' && $field === 'observer_short_names' && $identifier !== null => $this->modelObserverShortNames($artifacts, $identifier),
             $type === 'models' && $field !== null && $identifier !== null => $this->artifactField('models', $artifacts, $field, $identifier),
+            $type === 'jobs' && $field === 'named' => $this->namedArtifacts('jobs', $artifacts),
             $type === 'jobs' && $field !== null && $identifier !== null => $this->artifactField('jobs', $artifacts, $field, $identifier),
+            $type === 'events' && $field === 'named' => $this->namedArtifacts('events', $artifacts),
+            $type === 'policies' && $field === 'models' => $this->policyModelNames($artifacts),
             default => null,
         };
     }
@@ -80,6 +86,77 @@ final class GoldenAnswerResolver
             array_map(
                 fn (array $r): ?string => filled($r['name'] ?? null) ? (string) $r['name'] : null,
                 (array) ($artifacts['routes'] ?? [])
+            )
+        ));
+    }
+
+    /** @return string[] */
+    private function authRequiredRouteNames(array $artifacts): array
+    {
+        return array_values(array_filter(
+            array_map(
+                function (array $r): ?string {
+                    if (! filled($r['name'] ?? null)) {
+                        return null;
+                    }
+
+                    $hasAuth = array_filter(
+                        (array) ($r['middleware'] ?? []),
+                        fn (string $m): bool => $m === 'auth' || str_starts_with($m, 'auth:')
+                    );
+
+                    return $hasAuth ? (string) $r['name'] : null;
+                },
+                (array) ($artifacts['routes'] ?? [])
+            )
+        ));
+    }
+
+    /** @return string[] */
+    private function namedArtifacts(string $type, array $artifacts): array
+    {
+        return array_values(array_filter(
+            array_map(
+                fn (array $item): ?string => isset($item['class']) ? $this->shortName((string) $item['class']) : null,
+                (array) ($artifacts[$type] ?? [])
+            )
+        ));
+    }
+
+    /** @return string[]|null  null when model absent from manifest, [] when model present but no casts */
+    private function modelCastKeys(array $artifacts, string $identifier): ?array
+    {
+        foreach ((array) ($artifacts['models'] ?? []) as $model) {
+            if ($this->shortName((string) ($model['class'] ?? '')) === $identifier) {
+                return array_keys((array) ($model['casts'] ?? []));
+            }
+        }
+
+        return null;
+    }
+
+    /** @return string[]|null  null when model absent, [] when model present but no observers */
+    private function modelObserverShortNames(array $artifacts, string $identifier): ?array
+    {
+        foreach ((array) ($artifacts['models'] ?? []) as $model) {
+            if ($this->shortName((string) ($model['class'] ?? '')) === $identifier) {
+                return array_values(array_map(
+                    fn (string $fqcn): string => $this->shortName($fqcn),
+                    (array) ($model['observers'] ?? [])
+                ));
+            }
+        }
+
+        return null;
+    }
+
+    /** @return string[] */
+    private function policyModelNames(array $artifacts): array
+    {
+        return array_values(array_filter(
+            array_map(
+                fn (array $p): ?string => isset($p['model']) ? $this->shortName((string) $p['model']) : null,
+                (array) ($artifacts['policies'] ?? [])
             )
         ));
     }

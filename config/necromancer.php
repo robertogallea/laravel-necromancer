@@ -42,11 +42,12 @@ return [
     ],
 
     'benchmark' => [
-        'manual_context_path' => base_path('CLAUDE.md'),
+        'manual_context_path' => base_path('AGENTS.md'),
         'generation_model' => env('NECROMANCER_BENCH_MODEL', 'claude-sonnet-4-6'),
         'generation_provider' => env('NECROMANCER_BENCH_PROVIDER'),
         'judge_model' => env('NECROMANCER_BENCH_JUDGE', 'gpt-4o'),
         'judge_provider' => env('NECROMANCER_BENCH_JUDGE_PROVIDER'),
+        'timeout' => (int) env('NECROMANCER_BENCH_TIMEOUT', 120),
         'tasks' => [],
     ],
 ];

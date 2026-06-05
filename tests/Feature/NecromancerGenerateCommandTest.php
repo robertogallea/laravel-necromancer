@@ -2060,3 +2060,68 @@ test('scheduled tasks with optional columns render them conditionally', function
     expect($content)->toContain('Europe/Rome');
     expect($content)->not->toContain('In Maintenance');
 });
+
+// Middleware section
+
+test('a manifest with middleware produces a middleware section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'middleware' => [
+                [
+                    'alias' => 'auth',
+                    'class' => 'App\\Http\\Middleware\\Authenticate',
+                    'scope' => 'alias',
+                    'group' => null,
+                ],
+                [
+                    'alias' => 'VerifyCsrfToken',
+                    'class' => 'App\\Http\\Middleware\\VerifyCsrfToken',
+                    'scope' => 'group',
+                    'group' => 'web',
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Middleware (2)');
+    expect($content)->toContain('| Alias | Class | Scope | Group |');
+    expect($content)->toContain('| auth | Authenticate | alias |  |');
+    expect($content)->toContain('| VerifyCsrfToken | VerifyCsrfToken | group | web |');
+});
+
+test('a manifest with no middleware does not include a middleware section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['middleware' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Middleware');
+});
+
+test('a middleware section with only alias-scoped entries omits the Group column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'middleware' => [
+                [
+                    'alias' => 'auth',
+                    'class' => 'App\\Http\\Middleware\\Authenticate',
+                    'scope' => 'alias',
+                    'group' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Middleware (1)');
+    expect($content)->not->toContain('Group');
+});

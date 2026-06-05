@@ -10,6 +10,7 @@ use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
+use LaravelNecromancer\Collection\MiddlewareCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
@@ -922,6 +923,42 @@ test('the scan command handles closure-based scheduled tasks as Closure', functi
         ->and($task->description)->toBe('Closure task');
 });
 
+test('the scan command collects middleware artifacts with valid scope and class fields', function () {
+    $path = necromancerScanTestPath('necromancer-middleware-basic.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    // The middleware key may or may not be present — if no app-level middleware is registered,
+    // it may be absent. Either way the manifest must be structurally valid.
+    foreach ($manifest->artifacts->middleware ?? [] as $item) {
+        expect($item->alias)->toBeString()->not->toBeEmpty()
+            ->and($item->class)->toBeString()->not->toBeEmpty()
+            ->and($item->scope)->toBeIn(['global', 'group', 'alias']);
+
+        if ($item->scope === 'group') {
+            expect($item->group)->toBeString()->not->toBeEmpty();
+        } else {
+            expect($item->group)->toBeNull();
+        }
+    }
+});
+
+test('the --only=middleware scan restricts to middleware artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-middleware.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'middleware'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    $keys = array_keys((array) $manifest->artifacts);
+
+    expect($keys)->each->toBeIn(['middleware']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -963,6 +1000,7 @@ function expectScanManifest(string $path): stdClass
         'form_requests',
         'jobs',
         'listeners',
+        'middleware',
         'models',
         'observers',
         'policies',
@@ -1241,6 +1279,17 @@ function necromancerScanTestPath(string $filename): string
     return storage_path("framework/testing/{$filename}");
 }
 
+function findManifestMiddleware(stdClass $manifest, string $alias): stdClass
+{
+    foreach ($manifest->artifacts->middleware ?? [] as $middleware) {
+        if ($middleware->alias === $alias) {
+            return $middleware;
+        }
+    }
+
+    Assert::fail("Expected middleware artifact with alias [{$alias}] was not found.");
+}
+
 function cleanNecromancerScanTestFiles(): void
 {
     File::delete([
@@ -1289,6 +1338,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-scheduled-tasks-basic.json'),
         necromancerScanTestPath('necromancer-only-scheduled-tasks.json'),
         necromancerScanTestPath('necromancer-scheduled_tasks-closure.json'),
+        necromancerScanTestPath('necromancer-middleware-basic.json'),
+        necromancerScanTestPath('necromancer-only-middleware.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

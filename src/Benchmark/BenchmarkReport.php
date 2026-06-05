@@ -17,12 +17,18 @@ final class BenchmarkReport
         $grouped = [];
 
         foreach ($this->results as $result) {
-            $grouped[$result->condition][] = $result;
+            if (! $result->skipped) {
+                $grouped[$result->condition][] = $result;
+            }
         }
 
         $summary = [];
 
         foreach ($grouped as $condition => $conditionResults) {
+            if (empty($conditionResults)) {
+                continue;
+            }
+
             $count = count($conditionResults);
             $judged = array_filter($conditionResults, fn (BenchmarkResult $r): bool => $r->judgeScore !== null);
 

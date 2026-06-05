@@ -67,3 +67,34 @@ test('byCondition averages token counts per condition', function () {
 test('byCondition returns empty array for no results', function () {
     expect((new BenchmarkReport([]))->byCondition())->toBe([]);
 });
+
+test('byCondition excludes skipped results from averages', function () {
+    $report = new BenchmarkReport([
+        makeResult('none', 0.8, 0.1),
+        new BenchmarkResult(
+            taskId: 'qa-002', taskType: 'qa', condition: 'none',
+            prompt: 'p', response: '', promptTokens: 0, completionTokens: 0,
+            accuracy: 0.0, hallucinationRate: 0.0,
+            judgeScore: null, judgeTokens: null, goldenAnswersTrusted: false,
+            skipped: true, skipReason: 'required key absent',
+        ),
+    ]);
+
+    $by = $report->byCondition();
+
+    expect($by['none']['accuracy'])->toBe(0.8);
+});
+
+test('byCondition omits condition entirely when all its results are skipped', function () {
+    $report = new BenchmarkReport([
+        new BenchmarkResult(
+            taskId: 'qa-001', taskType: 'qa', condition: 'none',
+            prompt: 'p', response: '', promptTokens: 0, completionTokens: 0,
+            accuracy: 0.0, hallucinationRate: 0.0,
+            judgeScore: null, judgeTokens: null, goldenAnswersTrusted: false,
+            skipped: true, skipReason: 'required key absent',
+        ),
+    ]);
+
+    expect($report->byCondition())->toBe([]);
+});

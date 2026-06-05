@@ -21,6 +21,7 @@ final class JudgeClient
         string $response,
         ?string $provider = null,
         ?string $model = null,
+        ?int $timeout = null,
     ): array {
         $expectedFacts = $mustContain
             ? implode("\n", array_map(fn (string $s): string => "- {$s}", $mustContain))
@@ -67,7 +68,7 @@ final class JudgeClient
             },
         );
 
-        $result = $agent->prompt($prompt, provider: $provider, model: $model);
+        $result = $agent->prompt($prompt, provider: $provider, model: $model, timeout: $timeout);
 
         return [
             'correctness' => (int) ($result['correctness'] ?? 0),

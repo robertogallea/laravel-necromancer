@@ -57,7 +57,7 @@ final class TerminalRenderer
     {
         return match ($condition) {
             'none' => 'No context',
-            'manual' => 'Manual CLAUDE.md',
+            'manual' => 'Manual AGENTS.md',
             'necromancer' => 'Necromancer',
             default => $condition,
         };

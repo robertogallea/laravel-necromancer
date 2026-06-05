@@ -21,7 +21,7 @@ final class GenerateCommand extends Command
         {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, policies, enums)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -96,6 +96,7 @@ final class GenerateCommand extends Command
             'enums' => $this->buildEnums($manifest['artifacts']['enums'] ?? []),
             'tests' => $this->buildTests($manifest['artifacts']['tests'] ?? []),
             'scheduled_tasks' => $this->buildScheduledTasks($manifest['artifacts']['scheduled_tasks'] ?? []),
+            'middleware' => $this->buildMiddleware($manifest['artifacts']['middleware'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -893,6 +894,55 @@ final class GenerateCommand extends Command
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($task);
+            }
+
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $middleware
+     */
+    private function buildMiddleware(array $middleware): string
+    {
+        if (empty($middleware)) {
+            return '';
+        }
+
+        $count = count($middleware);
+        $hasSources = $this->hasSources($middleware);
+        $hasGroup = ! empty(array_filter($middleware, fn (array $m): bool => isset($m['scope']) && $m['scope'] === 'group'));
+
+        $header = '| Alias | Class | Scope';
+        $divider = '|---|---|---';
+
+        if ($hasGroup) {
+            $header .= ' | Group';
+            $divider .= '|---';
+        }
+
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Middleware ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($middleware as $item) {
+            $alias = (string) ($item['alias'] ?? '');
+            $class = class_basename((string) ($item['class'] ?? ''));
+            $scope = (string) ($item['scope'] ?? '');
+
+            $row = "| {$alias} | {$class} | {$scope}";
+
+            if ($hasGroup) {
+                $row .= ' | '.((string) ($item['group'] ?? ''));
+            }
+
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($item);
             }
 
             $lines[] = $row.' |';
