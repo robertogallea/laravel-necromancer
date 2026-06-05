@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Mail\Mailable;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
+use Throwable;
 
 final readonly class MailableCollector
 {
@@ -63,11 +66,11 @@ final readonly class MailableCollector
             return null;
         }
 
-        if (! $reflection->isSubclassOf(\Illuminate\Mail\Mailable::class)) {
+        if (! $reflection->isSubclassOf(Mailable::class)) {
             return null;
         }
 
-        $queued = $reflection->implementsInterface(\Illuminate\Contracts\Queue\ShouldQueue::class);
+        $queued = $reflection->implementsInterface(ShouldQueue::class);
 
         $queueProperty = $reflection->getDefaultProperties()['queue'] ?? null;
         $queue = is_string($queueProperty) ? $queueProperty : null;
@@ -78,7 +81,7 @@ final readonly class MailableCollector
             $instance = $reflection->newInstanceWithoutConstructor();
             $envelope = $instance->envelope();
             $subject = $envelope->subject ?? null;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $subject = null;
         }
 
@@ -88,7 +91,7 @@ final readonly class MailableCollector
             $instance = $reflection->newInstanceWithoutConstructor();
             $content = $instance->content();
             $view = $content->view ?? $content->markdown ?? null;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $view = null;
         }
 
