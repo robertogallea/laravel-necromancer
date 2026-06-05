@@ -1008,6 +1008,49 @@ test('the --only=livewire_components scan restricts to livewire_components artif
     expect(array_keys((array) $manifest->artifacts))->toBe(['livewire_components']);
 });
 
+test('the scan command collects gate artifacts with correct kind and parameters', function () {
+    $path = necromancerScanTestPath('necromancer-gates-basic.json');
+
+    $gate = new \Illuminate\Auth\Access\Gate(app(), fn () => null);
+    $gate->define('edit-post', function ($user, string $postId): bool {
+        return true;
+    });
+    $gate->define('view-admin', function ($user): bool {
+        return true;
+    });
+    app()->bind(\Illuminate\Auth\Access\Gate::class, fn () => $gate);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $editPost = findManifestGate($manifest, 'edit-post');
+    $viewAdmin = findManifestGate($manifest, 'view-admin');
+
+    expect($editPost->kind)->toBe('closure')
+        ->and($editPost->parameters)->toBe(['string'])
+        ->and($viewAdmin->kind)->toBe('closure')
+        ->and($viewAdmin->parameters)->toBe([]);
+});
+
+test('the --only=gates scan restricts to gate artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-gates.json');
+
+    $gate = new \Illuminate\Auth\Access\Gate(app(), fn () => null);
+    $gate->define('view-admin', function ($user): bool {
+        return true;
+    });
+    app()->bind(\Illuminate\Auth\Access\Gate::class, fn () => $gate);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'gates'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['gates']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1047,6 +1090,7 @@ function expectScanManifest(string $path): stdClass
         'enums',
         'events',
         'form_requests',
+        'gates',
         'jobs',
         'listeners',
         'livewire_components',
@@ -1351,6 +1395,17 @@ function findManifestMiddleware(stdClass $manifest, string $alias): stdClass
     Assert::fail("Expected middleware artifact with alias [{$alias}] was not found.");
 }
 
+function findManifestGate(stdClass $manifest, string $ability): stdClass
+{
+    foreach ($manifest->artifacts->gates ?? [] as $gate) {
+        if ($gate->ability === $ability) {
+            return $gate;
+        }
+    }
+
+    Assert::fail("Expected gate artifact with ability [{$ability}] was not found.");
+}
+
 function cleanNecromancerScanTestFiles(): void
 {
     File::delete([
@@ -1403,6 +1458,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-only-middleware.json'),
         necromancerScanTestPath('necromancer-livewire-basic.json'),
         necromancerScanTestPath('necromancer-only-livewire.json'),
+        necromancerScanTestPath('necromancer-gates-basic.json'),
+        necromancerScanTestPath('necromancer-only-gates.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

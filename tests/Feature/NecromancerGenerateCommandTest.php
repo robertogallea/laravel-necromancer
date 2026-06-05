@@ -2166,3 +2166,34 @@ test('a manifest with no livewire_components does not include a livewire compone
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Livewire Components');
 });
+
+test('a manifest with gates produces a gates section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'gates' => [
+                ['ability' => 'edit-post', 'kind' => 'closure', 'parameters' => ['string']],
+                ['ability' => 'view-admin', 'kind' => 'closure', 'parameters' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Gates (2)');
+    expect($content)->toContain('| Ability | Kind | Parameters |');
+    expect($content)->toContain('| edit-post | closure | string |');
+    expect($content)->toContain('| view-admin | closure |  |');
+});
+
+test('a manifest with no gates does not include a gates section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['gates' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Gates');
+});

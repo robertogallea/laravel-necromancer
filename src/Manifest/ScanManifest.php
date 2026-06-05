@@ -12,6 +12,7 @@ use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
+use LaravelNecromancer\Collection\GateCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\LivewireCollector;
@@ -46,6 +47,7 @@ final readonly class ScanManifest implements JsonSerializable
         private ScheduledTaskCollector $scheduledTaskCollector,
         private MiddlewareCollector $middlewareCollector,
         private LivewireCollector $livewireCollector,
+        private GateCollector $gateCollector,
     ) {}
 
     /**
@@ -171,6 +173,7 @@ final readonly class ScanManifest implements JsonSerializable
             'scheduled_tasks' => fn (): array => $this->scheduledTaskCollector->collect(),
             'middleware' => fn (): array => $this->middlewareCollector->collect(),
             'livewire_components' => fn (): array => $this->livewireCollector->collect(),
+            'gates' => fn (): array => $this->gateCollector->collect(),
         ];
 
         if ($only !== []) {

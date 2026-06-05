@@ -15,6 +15,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\ListenerPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\MiddlewarePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ModelPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ObserverPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\GatePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RoutePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ScheduledTaskPayload;
@@ -256,6 +257,24 @@ final readonly class StructuralArtifact implements JsonSerializable
             model: $model,
             methods: $methods,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
+    }
+
+    /**
+     * @param  list<string>  $parameters
+     * @param  array<string, mixed>|null  $source
+     */
+    public static function gate(
+        string $ability,
+        string $kind,
+        array $parameters = [],
+        ?array $source = null,
+    ): self {
+        return new self('gates', new GatePayload(
+            ability: $ability,
+            kind: $kind,
+            parameters: $parameters,
+            source: $source,
         ));
     }
 

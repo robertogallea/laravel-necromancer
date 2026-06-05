@@ -17,11 +17,11 @@ final class GenerateCommand extends Command
     protected $signature = 'necromancer:generate
         {--output= : Override the Tier 2 output file path}
         {--force : Overwrite existing Tier 2 file without confirmation}
-        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components)}
-        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components)}';
+        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates)}
+        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components', 'gates'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -98,6 +98,7 @@ final class GenerateCommand extends Command
             'scheduled_tasks' => $this->buildScheduledTasks($manifest['artifacts']['scheduled_tasks'] ?? []),
             'middleware' => $this->buildMiddleware($manifest['artifacts']['middleware'] ?? []),
             'livewire_components' => $this->buildLivewireComponents($manifest['artifacts']['livewire_components'] ?? []),
+            'gates' => $this->buildGates($manifest['artifacts']['gates'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -993,6 +994,45 @@ final class GenerateCommand extends Command
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($component);
+            }
+
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $gates
+     */
+    private function buildGates(array $gates): string
+    {
+        if (empty($gates)) {
+            return '';
+        }
+
+        $count = count($gates);
+        $hasSources = $this->hasSources($gates);
+
+        $header = '| Ability | Kind | Parameters';
+        $divider = '|---|---|---';
+
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Gates ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($gates as $gate) {
+            $ability = (string) ($gate['ability'] ?? '');
+            $kind = (string) ($gate['kind'] ?? '');
+            $parameters = implode(', ', (array) ($gate['parameters'] ?? []));
+
+            $row = "| {$ability} | {$kind} | {$parameters}";
+
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($gate);
             }
 
             $lines[] = $row.' |';
