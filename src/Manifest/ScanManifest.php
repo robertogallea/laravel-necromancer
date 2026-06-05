@@ -14,6 +14,7 @@ use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
+use LaravelNecromancer\Collection\LivewireCollector;
 use LaravelNecromancer\Collection\MiddlewareCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ModelExclusionFilter;
@@ -44,6 +45,7 @@ final readonly class ScanManifest implements JsonSerializable
         private ObserverCollector $observerCollector,
         private ScheduledTaskCollector $scheduledTaskCollector,
         private MiddlewareCollector $middlewareCollector,
+        private LivewireCollector $livewireCollector,
     ) {}
 
     /**
@@ -168,6 +170,7 @@ final readonly class ScanManifest implements JsonSerializable
             'observers' => fn (): array => $observerCollector->collect(),
             'scheduled_tasks' => fn (): array => $this->scheduledTaskCollector->collect(),
             'middleware' => fn (): array => $this->middlewareCollector->collect(),
+            'livewire_components' => fn (): array => $this->livewireCollector->collect(),
         ];
 
         if ($only !== []) {

@@ -18,6 +18,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\ObserverPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RoutePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ScheduledTaskPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\LivewirePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\TestPayload;
 
 final readonly class StructuralArtifact implements JsonSerializable
@@ -315,6 +316,29 @@ final readonly class StructuralArtifact implements JsonSerializable
             scope: $scope,
             group: $group,
             source: $source,
+        ));
+    }
+
+    /**
+     * @param  list<array{name: string, type: string|null}>  $properties
+     * @param  list<string>  $actions
+     * @param  list<string>  $listens
+     */
+    public static function livewireComponent(
+        string $class,
+        string $view,
+        array $properties = [],
+        array $actions = [],
+        array $listens = [],
+        ?SourceLocation $source = null,
+    ): self {
+        return new self('livewire_components', new LivewirePayload(
+            class: $class,
+            view: $view,
+            properties: $properties,
+            actions: $actions,
+            listens: $listens,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }
 

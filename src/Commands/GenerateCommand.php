@@ -21,7 +21,7 @@ final class GenerateCommand extends Command
         {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, policies, enums)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -97,6 +97,7 @@ final class GenerateCommand extends Command
             'tests' => $this->buildTests($manifest['artifacts']['tests'] ?? []),
             'scheduled_tasks' => $this->buildScheduledTasks($manifest['artifacts']['scheduled_tasks'] ?? []),
             'middleware' => $this->buildMiddleware($manifest['artifacts']['middleware'] ?? []),
+            'livewire_components' => $this->buildLivewireComponents($manifest['artifacts']['livewire_components'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -943,6 +944,55 @@ final class GenerateCommand extends Command
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($item);
+            }
+
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $livewireComponents
+     */
+    private function buildLivewireComponents(array $livewireComponents): string
+    {
+        if (empty($livewireComponents)) {
+            return '';
+        }
+
+        $count = count($livewireComponents);
+        $hasSources = $this->hasSources($livewireComponents);
+
+        $header = '| Component | View | Properties | Actions | Listens';
+        $divider = '|---|---|---|---|---';
+
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Livewire Components ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($livewireComponents as $component) {
+            $basename = class_basename((string) ($component['class'] ?? ''));
+            $view = (string) ($component['view'] ?? '');
+
+            $propertyParts = array_map(function (array $prop): string {
+                $name = (string) ($prop['name'] ?? '');
+                $type = isset($prop['type']) && $prop['type'] !== null ? (string) $prop['type'] : null;
+
+                return $type !== null ? "{$name}: {$type}" : $name;
+            }, $component['properties'] ?? []);
+            $properties = implode(', ', $propertyParts);
+
+            $actions = implode(', ', $component['actions'] ?? []);
+            $listens = implode(', ', $component['listens'] ?? []);
+
+            $row = "| {$basename} | {$view} | {$properties} | {$actions} | {$listens}";
+
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($component);
             }
 
             $lines[] = $row.' |';

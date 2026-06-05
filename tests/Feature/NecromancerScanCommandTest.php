@@ -10,11 +10,13 @@ use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
+use LaravelNecromancer\Collection\LivewireCollector;
 use LaravelNecromancer\Collection\MiddlewareCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\TestCollector;
+use LaravelNecromancer\Tests\Fixtures\Livewire\NecromancerIssueForm;
 use LaravelNecromancer\Commands\ScanCommand;
 use LaravelNecromancer\Tests\Fixtures\Commands\NecromancerFixtureCommand;
 use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerPriority;
@@ -959,6 +961,53 @@ test('the --only=middleware scan restricts to middleware artifacts', function ()
     expect($keys)->each->toBeIn(['middleware']);
 });
 
+test('the scan command collects livewire_components artifacts with correct properties, actions, listens, and source', function () {
+    $path = necromancerScanTestPath('necromancer-livewire-basic.json');
+
+    app()->bind(
+        LivewireCollector::class,
+        fn ($app): LivewireCollector => new LivewireCollector($app, [[
+            'path' => base_path('tests/Fixtures/Livewire'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Livewire\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $component = findManifestLivewireComponent($manifest, NecromancerIssueForm::class);
+
+    expect($component->class)->toBe(NecromancerIssueForm::class)
+        ->and($component->view)->toBeString()->not->toBeEmpty()
+        ->and($component->properties)->toBeArray()
+        ->and(array_column((array) $component->properties, 'name'))->toContain('title', 'count')
+        ->and($component->actions)->toContain('save')
+        ->and($component->actions)->not->toContain('render')
+        ->and($component->listens)->toContain('issue-updated')
+        ->and($component->source->file)->toContain('Livewire/NecromancerIssueForm.php')
+        ->and($component->source->line)->toBeInt();
+});
+
+test('the --only=livewire_components scan restricts to livewire_components artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-livewire.json');
+
+    app()->bind(
+        LivewireCollector::class,
+        fn ($app): LivewireCollector => new LivewireCollector($app, [[
+            'path' => base_path('tests/Fixtures/Livewire'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Livewire\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'livewire_components'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['livewire_components']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1000,6 +1049,7 @@ function expectScanManifest(string $path): stdClass
         'form_requests',
         'jobs',
         'listeners',
+        'livewire_components',
         'middleware',
         'models',
         'observers',
@@ -1279,6 +1329,17 @@ function necromancerScanTestPath(string $filename): string
     return storage_path("framework/testing/{$filename}");
 }
 
+function findManifestLivewireComponent(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->livewire_components ?? [] as $component) {
+        if ($component->class === $class) {
+            return $component;
+        }
+    }
+
+    Assert::fail("Expected livewire_components artifact [{$class}] was not found.");
+}
+
 function findManifestMiddleware(stdClass $manifest, string $alias): stdClass
 {
     foreach ($manifest->artifacts->middleware ?? [] as $middleware) {
@@ -1340,6 +1401,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-scheduled_tasks-closure.json'),
         necromancerScanTestPath('necromancer-middleware-basic.json'),
         necromancerScanTestPath('necromancer-only-middleware.json'),
+        necromancerScanTestPath('necromancer-livewire-basic.json'),
+        necromancerScanTestPath('necromancer-only-livewire.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

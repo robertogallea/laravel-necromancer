@@ -2125,3 +2125,44 @@ test('a middleware section with only alias-scoped entries omits the Group column
     expect($content)->toContain('## Middleware (1)');
     expect($content)->not->toContain('Group');
 });
+
+// Livewire Components section
+
+test('a manifest with livewire_components produces a livewire components section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'livewire_components' => [
+                [
+                    'class' => 'App\\Livewire\\IssueForm',
+                    'view' => 'livewire.issue-form',
+                    'properties' => [
+                        ['name' => 'title', 'type' => 'string'],
+                        ['name' => 'count', 'type' => 'int'],
+                    ],
+                    'actions' => ['save'],
+                    'listens' => ['issue-updated'],
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Livewire Components (1)');
+    expect($content)->toContain('| Component | View | Properties | Actions | Listens |');
+    expect($content)->toContain('| IssueForm | livewire.issue-form | title: string, count: int | save | issue-updated |');
+});
+
+test('a manifest with no livewire_components does not include a livewire components section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['livewire_components' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Livewire Components');
+});
