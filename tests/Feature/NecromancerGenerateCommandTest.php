@@ -2312,3 +2312,39 @@ test('a manifest with no validation_rules does not include a validation rules se
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Validation Rules');
 });
+
+test('a manifest with service_providers produces a service providers section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'service_providers' => [
+                [
+                    'class' => 'App\\Providers\\AppServiceProvider',
+                    'deferred' => false,
+                    'bindings' => [],
+                    'singletons' => [],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+
+    expect($content)
+        ->toContain('## Service Providers (1)')
+        ->toContain('AppServiceProvider')
+        ->toContain('| Class |');
+});
+
+test('a manifest with no service_providers does not include a service providers section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['service_providers' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Service Providers');
+});

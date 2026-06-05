@@ -1172,6 +1172,38 @@ test('the --only=validation_rules scan restricts to validation rule artifacts', 
     expect(array_keys((array) $manifest->artifacts))->toBe(['validation_rules']);
 });
 
+test('the scan command collects service_provider artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-service-providers-basic.json');
+
+    useNecromancerFixtureProviders();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $provider = findManifestServiceProvider($manifest, \App\Providers\NecromancerFixtureServiceProvider::class);
+
+    expect($provider->class)->toBe(\App\Providers\NecromancerFixtureServiceProvider::class)
+        ->and($provider->deferred)->toBeFalse()
+        ->and($provider->bindings)->toBeArray()
+        ->and($provider->singletons)->toBeArray()
+        ->and($provider->source->file)->toContain('NecromancerFixtureServiceProvider.php');
+});
+
+test('the --only=service_providers scan restricts to service_provider artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-service-providers.json');
+
+    useNecromancerFixtureProviders();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'service_providers'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['service_providers']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1222,6 +1254,7 @@ function expectScanManifest(string $path): stdClass
         'policies',
         'routes',
         'scheduled_tasks',
+        'service_providers',
         'tests',
         'validation_rules',
     ]);
@@ -1573,6 +1606,30 @@ function findManifestValidationRule(stdClass $manifest, string $class): stdClass
     Assert::fail("Expected validation_rule artifact [{$class}] was not found.");
 }
 
+function useNecromancerFixtureProviders(): void
+{
+    $fixtureFile = base_path('tests/Fixtures/Providers/NecromancerFixtureServiceProvider.php');
+    $providersFile = base_path('bootstrap/providers.php');
+
+    // Load the fixture class (not in PSR-4 autoloader since it uses App\ namespace)
+    require_once $fixtureFile;
+
+    File::put($providersFile, "<?php\nreturn [\n    \\App\\Providers\\NecromancerFixtureServiceProvider::class,\n];\n");
+
+    test()->afterEach(fn () => File::delete($providersFile));
+}
+
+function findManifestServiceProvider(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->service_providers ?? [] as $provider) {
+        if ($provider->class === $class) {
+            return $provider;
+        }
+    }
+
+    Assert::fail("Expected service_provider artifact [{$class}] was not found.");
+}
+
 function cleanNecromancerScanTestFiles(): void
 {
     File::delete([
@@ -1633,6 +1690,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-only-mailables.json'),
         necromancerScanTestPath('necromancer-validation-rules-basic.json'),
         necromancerScanTestPath('necromancer-only-validation-rules.json'),
+        necromancerScanTestPath('necromancer-service-providers-basic.json'),
+        necromancerScanTestPath('necromancer-only-service-providers.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

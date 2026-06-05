@@ -22,6 +22,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RoutePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RulePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ScheduledTaskPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\ServiceProviderPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\TestPayload;
 
 final readonly class StructuralArtifact implements JsonSerializable
@@ -415,6 +416,26 @@ final readonly class StructuralArtifact implements JsonSerializable
             evenInMaintenance: $evenInMaintenance,
             timezone: $timezone,
             description: $description,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
+    }
+
+    /**
+     * @param  list<array{abstract: string, concrete: string}>  $bindings
+     * @param  list<array{abstract: string, concrete: string}>  $singletons
+     */
+    public static function serviceProvider(
+        string $class,
+        bool $deferred = false,
+        array $bindings = [],
+        array $singletons = [],
+        ?SourceLocation $source = null,
+    ): self {
+        return new self('service_providers', new ServiceProviderPayload(
+            class: $class,
+            deferred: $deferred,
+            bindings: $bindings,
+            singletons: $singletons,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }

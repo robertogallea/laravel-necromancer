@@ -27,6 +27,7 @@ use LaravelNecromancer\Collection\RouteNoiseFilter;
 use LaravelNecromancer\Collection\RuleCollector;
 use LaravelNecromancer\Collection\SafeInventoryCollector;
 use LaravelNecromancer\Collection\ScheduledTaskCollector;
+use LaravelNecromancer\Collection\ServiceProviderCollector;
 use LaravelNecromancer\Collection\TestCollector;
 use stdClass;
 use Throwable;
@@ -52,6 +53,7 @@ final readonly class ScanManifest implements JsonSerializable
         private GateCollector $gateCollector,
         private MailableCollector $mailableCollector,
         private RuleCollector $ruleCollector,
+        private ServiceProviderCollector $serviceProviderCollector,
     ) {}
 
     /**
@@ -180,6 +182,7 @@ final readonly class ScanManifest implements JsonSerializable
             'gates' => fn (): array => $this->gateCollector->collect(),
             'mailables' => fn (): array => $this->mailableCollector->collect(),
             'validation_rules' => fn (): array => $this->ruleCollector->collect(),
+            'service_providers' => fn (): array => $this->serviceProviderCollector->collect(),
         ];
 
         if ($only !== []) {

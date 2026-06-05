@@ -17,11 +17,11 @@ final class GenerateCommand extends Command
     protected $signature = 'necromancer:generate
         {--output= : Override the Tier 2 output file path}
         {--force : Overwrite existing Tier 2 file without confirmation}
-        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules)}
-        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules)}';
+        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers)}
+        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components', 'gates', 'mailables', 'validation_rules'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components', 'gates', 'mailables', 'validation_rules', 'service_providers'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -101,6 +101,7 @@ final class GenerateCommand extends Command
             'gates' => $this->buildGates($manifest['artifacts']['gates'] ?? []),
             'mailables' => $this->buildMailables($manifest['artifacts']['mailables'] ?? []),
             'validation_rules' => $this->buildValidationRules($manifest['artifacts']['validation_rules'] ?? []),
+            'service_providers' => $this->buildServiceProviders($manifest['artifacts']['service_providers'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -1129,6 +1130,72 @@ final class GenerateCommand extends Command
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($rule);
+            }
+
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $serviceProviders
+     */
+    private function buildServiceProviders(array $serviceProviders): string
+    {
+        if (empty($serviceProviders)) {
+            return '';
+        }
+
+        $count = count($serviceProviders);
+        $hasSources = $this->hasSources($serviceProviders);
+        $hasBindings = ! empty(array_filter($serviceProviders, fn (array $p): bool => ! empty($p['bindings'])));
+        $hasSingletons = ! empty(array_filter($serviceProviders, fn (array $p): bool => ! empty($p['singletons'])));
+
+        $header = '| Class | Deferred';
+        $divider = '|---|---';
+
+        if ($hasBindings) {
+            $header .= ' | Bindings';
+            $divider .= '|---';
+        }
+
+        if ($hasSingletons) {
+            $header .= ' | Singletons';
+            $divider .= '|---';
+        }
+
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Service Providers ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($serviceProviders as $provider) {
+            $basename = class_basename((string) ($provider['class'] ?? ''));
+            $deferred = (bool) ($provider['deferred'] ?? false) ? 'yes' : '';
+
+            $row = "| {$basename} | {$deferred}";
+
+            if ($hasBindings) {
+                $bindingPairs = array_map(
+                    fn (array $b): string => class_basename((string) ($b['abstract'] ?? '')).' → '.class_basename((string) ($b['concrete'] ?? '')),
+                    $provider['bindings'] ?? [],
+                );
+                $row .= ' | '.implode(', ', $bindingPairs);
+            }
+
+            if ($hasSingletons) {
+                $singletonPairs = array_map(
+                    fn (array $s): string => class_basename((string) ($s['abstract'] ?? '')).' → '.class_basename((string) ($s['concrete'] ?? '')),
+                    $provider['singletons'] ?? [],
+                );
+                $row .= ' | '.implode(', ', $singletonPairs);
+            }
+
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($provider);
             }
 
             $lines[] = $row.' |';
