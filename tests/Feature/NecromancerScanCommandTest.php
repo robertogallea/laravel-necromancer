@@ -14,6 +14,7 @@ use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\LivewireCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ObserverCollector;
+use LaravelNecromancer\Collection\MailableCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Commands\ScanCommand;
@@ -36,6 +37,8 @@ use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
 use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
 use LaravelNecromancer\Tests\Fixtures\Policies\NecromancerPostPolicy;
+use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerPasswordResetMail;
+use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerWelcomeMail;
 use LaravelNecromancer\Tests\Fixtures\Requests\NecromancerStoreOrderRequest;
 use PHPUnit\Framework\Assert;
 
@@ -1092,6 +1095,44 @@ test('the --only=gates scan restricts to gate artifacts', function () {
     expect(array_keys((array) $manifest->artifacts))->toBe(['gates']);
 });
 
+test('the scan command collects mailable artifacts with correct subject, queued, queue, and view', function () {
+    $path = necromancerScanTestPath('necromancer-mailables-basic.json');
+
+    useNecromancerFixtureMailables();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $welcome = findManifestMailable($manifest, NecromancerWelcomeMail::class);
+
+    expect($welcome->subject)->toBe('Welcome!')
+        ->and($welcome->queued)->toBeTrue()
+        ->and($welcome->queue)->toBe('notifications')
+        ->and($welcome->view)->toBe('mail.welcome');
+
+    $reset = findManifestMailable($manifest, NecromancerPasswordResetMail::class);
+
+    expect($reset->subject)->toBe('Reset your password')
+        ->and($reset->queued)->toBeFalse()
+        ->and($reset->queue)->toBeNull()
+        ->and($reset->view)->toBe('mail.password-reset');
+});
+
+test('the --only=mailables scan restricts to mailable artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-mailables.json');
+
+    useNecromancerFixtureMailables();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'mailables'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['mailables']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1135,6 +1176,7 @@ function expectScanManifest(string $path): stdClass
         'jobs',
         'listeners',
         'livewire_components',
+        'mailables',
         'middleware',
         'models',
         'observers',
@@ -1447,6 +1489,28 @@ function findManifestGate(stdClass $manifest, string $ability): stdClass
     Assert::fail("Expected gate artifact with ability [{$ability}] was not found.");
 }
 
+function useNecromancerFixtureMailables(): void
+{
+    app()->bind(
+        MailableCollector::class,
+        fn ($app): MailableCollector => new MailableCollector($app, [[
+            'path' => base_path('tests/Fixtures/Mail'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Mail\\',
+        ]]),
+    );
+}
+
+function findManifestMailable(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->mailables ?? [] as $mailable) {
+        if ($mailable->class === $class) {
+            return $mailable;
+        }
+    }
+
+    Assert::fail("Expected mailable artifact [{$class}] was not found.");
+}
+
 function cleanNecromancerScanTestFiles(): void
 {
     File::delete([
@@ -1503,6 +1567,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-only-gates.json'),
         necromancerScanTestPath('necromancer-gates-class.json'),
         necromancerScanTestPath('necromancer-gates-before-hook.json'),
+        necromancerScanTestPath('necromancer-mailables-basic.json'),
+        necromancerScanTestPath('necromancer-only-mailables.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

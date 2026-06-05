@@ -2197,3 +2197,75 @@ test('a manifest with no gates does not include a gates section', function () {
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Gates');
 });
+
+// Mailables section
+
+test('a manifest with mailables produces a mailables section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'mailables' => [
+                [
+                    'class' => 'App\\Mail\\WelcomeMail',
+                    'subject' => 'Welcome!',
+                    'queued' => true,
+                    'queue' => 'notifications',
+                    'view' => 'mail.welcome',
+                    'source' => null,
+                ],
+                [
+                    'class' => 'App\\Mail\\PasswordResetMail',
+                    'subject' => 'Reset your password',
+                    'queued' => false,
+                    'queue' => null,
+                    'view' => 'mail.password-reset',
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Mailables (2)');
+    expect($content)->toContain('| Class | Subject | Queued | Queue | View |');
+    expect($content)->toContain('| WelcomeMail | Welcome! | yes | notifications | mail.welcome |');
+    expect($content)->toContain('| PasswordResetMail | Reset your password |  |  | mail.password-reset |');
+});
+
+test('the mailables section omits the queue column when no entry has a queue', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'mailables' => [
+                [
+                    'class' => 'App\\Mail\\PasswordResetMail',
+                    'subject' => 'Reset your password',
+                    'queued' => false,
+                    'queue' => null,
+                    'view' => 'mail.password-reset',
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Mailables (1)');
+    expect($content)->not->toContain('| Class | Subject | Queued | Queue |');
+    expect($content)->toContain('| Class | Subject | Queued | View |');
+});
+
+test('a manifest with no mailables does not include a mailables section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['mailables' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Mailables');
+});

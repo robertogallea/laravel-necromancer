@@ -1,0 +1,104 @@
+<?php
+
+declare(strict_types=1);
+
+namespace LaravelNecromancer\Collection;
+
+use Illuminate\Contracts\Foundation\Application;
+use LaravelNecromancer\Manifest\StructuralArtifact;
+use ReflectionClass;
+
+final readonly class MailableCollector
+{
+    /**
+     * @param  list<array{path: string, namespace: string}>|null  $roots
+     */
+    public function __construct(
+        private Application $app,
+        private ?array $roots = null,
+    ) {}
+
+    /**
+     * @return list<StructuralArtifact>
+     */
+    public function collect(): array
+    {
+        $artifacts = [];
+
+        foreach ((new ClassDiscovery($this->discoveryRoots()))->classes() as $class) {
+            $artifact = $this->collectClass($class);
+
+            if ($artifact instanceof StructuralArtifact) {
+                $artifacts[] = $artifact;
+            }
+        }
+
+        return $artifacts;
+    }
+
+    /**
+     * @return list<array{path: string, namespace: string}>
+     */
+    private function discoveryRoots(): array
+    {
+        if (is_array($this->roots)) {
+            return $this->roots;
+        }
+
+        return [[
+            'path' => $this->app->basePath('app/Mail'),
+            'namespace' => rtrim($this->app->getNamespace(), '\\').'\\Mail\\',
+        ]];
+    }
+
+    private function collectClass(string $class): ?StructuralArtifact
+    {
+        if (! class_exists($class)) {
+            return null;
+        }
+
+        $reflection = new ReflectionClass($class);
+
+        if ($reflection->isAbstract()) {
+            return null;
+        }
+
+        if (! $reflection->isSubclassOf(\Illuminate\Mail\Mailable::class)) {
+            return null;
+        }
+
+        $queued = $reflection->implementsInterface(\Illuminate\Contracts\Queue\ShouldQueue::class);
+
+        $queueProperty = $reflection->getDefaultProperties()['queue'] ?? null;
+        $queue = is_string($queueProperty) ? $queueProperty : null;
+
+        $subject = null;
+
+        try {
+            $instance = $reflection->newInstanceWithoutConstructor();
+            $envelope = $instance->envelope();
+            $subject = $envelope->subject ?? null;
+        } catch (\Throwable) {
+            $subject = null;
+        }
+
+        $view = null;
+
+        try {
+            $instance = $reflection->newInstanceWithoutConstructor();
+            $content = $instance->content();
+            $view = $content->view ?? $content->markdown ?? null;
+        } catch (\Throwable) {
+            $view = null;
+        }
+
+        return StructuralArtifact::mailable(
+            class: $class,
+            subject: $subject,
+            queued: $queued,
+            queue: $queue,
+            view: $view,
+            source: (new SourceLocator)->forClass($reflection),
+        );
+    }
+}
