@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Collection;
 
 use Closure;
+use Illuminate\Auth\Access\Gate;
 use Illuminate\Contracts\Foundation\Application;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
@@ -22,7 +23,7 @@ final readonly class GateCollector
     public function collect(): array
     {
         try {
-            $gate = $this->app->make(\Illuminate\Auth\Access\Gate::class);
+            $gate = $this->app->make(Gate::class);
         } catch (Throwable) {
             return [];
         }
@@ -36,8 +37,13 @@ final readonly class GateCollector
             $abilitiesProp->setAccessible(true);
             $abilities = $abilitiesProp->getValue($gate);
 
+            $stringCallbacksProp = $reflection->getProperty('stringCallbacks');
+            $stringCallbacksProp->setAccessible(true);
+            $stringCallbacks = $stringCallbacksProp->getValue($gate);
+
             foreach ($abilities as $ability => $callback) {
-                $artifacts[] = $this->collectAbility((string) $ability, $callback);
+                $isClassString = isset($stringCallbacks[$ability]);
+                $artifacts[] = $this->collectAbility((string) $ability, $callback, $isClassString);
             }
         } catch (Throwable) {
             // If reflection fails, skip abilities silently.
@@ -54,7 +60,7 @@ final readonly class GateCollector
                 $artifacts[] = StructuralArtifact::gate(
                     ability: '__before__',
                     kind: 'before_hook',
-                    parameters: [],
+                    parameters: $callback instanceof Closure ? $this->closureParameters($callback) : [],
                     source: null,
                 );
             }
@@ -73,7 +79,7 @@ final readonly class GateCollector
                 $artifacts[] = StructuralArtifact::gate(
                     ability: '__after__',
                     kind: 'after_hook',
-                    parameters: [],
+                    parameters: $callback instanceof Closure ? $this->closureParameters($callback) : [],
                     source: null,
                 );
             }
@@ -84,11 +90,17 @@ final readonly class GateCollector
         return $artifacts;
     }
 
-    /**
-     * @param  Closure|string  $callback
-     */
-    private function collectAbility(string $ability, mixed $callback): StructuralArtifact
+    private function collectAbility(string $ability, mixed $callback, bool $isClassString = false): StructuralArtifact
     {
+        if ($isClassString) {
+            return StructuralArtifact::gate(
+                ability: $ability,
+                kind: 'class',
+                parameters: [],
+                source: null,
+            );
+        }
+
         if ($callback instanceof Closure) {
             return StructuralArtifact::gate(
                 ability: $ability,
@@ -98,7 +110,7 @@ final readonly class GateCollector
             );
         }
 
-        // Class string (invokable class)
+        // Fallback for unexpected callback types
         return StructuralArtifact::gate(
             ability: $ability,
             kind: 'class',

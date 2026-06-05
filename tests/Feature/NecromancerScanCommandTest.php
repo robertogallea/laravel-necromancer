@@ -1,9 +1,10 @@
 <?php
 
+use Illuminate\Auth\Access\Gate;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Console\Scheduling\Schedule;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
@@ -11,21 +12,21 @@ use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\LivewireCollector;
-use LaravelNecromancer\Collection\MiddlewareCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\TestCollector;
-use LaravelNecromancer\Tests\Fixtures\Livewire\NecromancerIssueForm;
 use LaravelNecromancer\Commands\ScanCommand;
 use LaravelNecromancer\Tests\Fixtures\Commands\NecromancerFixtureCommand;
 use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerPriority;
 use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerStatus;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerBroadcastedEvent;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerOrderPlaced;
+use LaravelNecromancer\Tests\Fixtures\Gates\NecromancerManageUsersGate;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerQueuedJob;
 use LaravelNecromancer\Tests\Fixtures\Listeners\RecordNecromancerOrderMetrics;
 use LaravelNecromancer\Tests\Fixtures\Listeners\SendNecromancerReceipt;
+use LaravelNecromancer\Tests\Fixtures\Livewire\NecromancerIssueForm;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerCustomer;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerMember;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerOrder;
@@ -910,14 +911,14 @@ test('the --only=scheduled_tasks scan restricts to scheduled_task artifacts', fu
 test('the scan command handles closure-based scheduled tasks as Closure', function () {
     $path = necromancerScanTestPath('necromancer-scheduled_tasks-closure.json');
 
-    $schedule = new \Illuminate\Console\Scheduling\Schedule;
+    $schedule = new Schedule;
     $schedule->call(fn () => null)->everyMinute()->description('Closure task');
-    app()->bind(\Illuminate\Console\Scheduling\Schedule::class, fn () => $schedule);
+    app()->bind(Schedule::class, fn () => $schedule);
 
     $this->artisan('necromancer:scan', ['--output' => $path])
         ->assertSuccessful();
 
-    $manifest = json_decode((string) \Illuminate\Support\Facades\File::get($path), false, 512, JSON_THROW_ON_ERROR);
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
 
     $task = findManifestScheduledTask($manifest, 'Closure');
 
@@ -1011,14 +1012,14 @@ test('the --only=livewire_components scan restricts to livewire_components artif
 test('the scan command collects gate artifacts with correct kind and parameters', function () {
     $path = necromancerScanTestPath('necromancer-gates-basic.json');
 
-    $gate = new \Illuminate\Auth\Access\Gate(app(), fn () => null);
+    $gate = new Gate(app(), fn () => null);
     $gate->define('edit-post', function ($user, string $postId): bool {
         return true;
     });
     $gate->define('view-admin', function ($user): bool {
         return true;
     });
-    app()->bind(\Illuminate\Auth\Access\Gate::class, fn () => $gate);
+    app()->bind(Gate::class, fn () => $gate);
 
     $this->artisan('necromancer:scan', ['--output' => $path])
         ->assertSuccessful();
@@ -1034,14 +1035,54 @@ test('the scan command collects gate artifacts with correct kind and parameters'
         ->and($viewAdmin->parameters)->toBe([]);
 });
 
+test('the scan command collects a class-string gate with kind=class', function () {
+    $path = necromancerScanTestPath('necromancer-gates-class.json');
+
+    $gate = new Gate(app(), fn () => null);
+    $gate->define('manage-users', NecromancerManageUsersGate::class);
+    app()->bind(Gate::class, fn () => $gate);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $manageUsers = findManifestGate($manifest, 'manage-users');
+
+    expect($manageUsers->kind)->toBe('class');
+});
+
+test('the scan command collects before hook artifacts with kind=before_hook', function () {
+    $path = necromancerScanTestPath('necromancer-gates-before-hook.json');
+
+    $gate = new Gate(app(), fn () => null);
+    $gate->before(function ($user, string $ability): ?bool {
+        return null;
+    });
+    app()->bind(Gate::class, fn () => $gate);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $beforeHooks = array_values(array_filter(
+        $manifest->artifacts->gates ?? [],
+        fn (stdClass $gate): bool => $gate->kind === 'before_hook',
+    ));
+
+    expect($beforeHooks)->toHaveCount(1)
+        ->and($beforeHooks[0]->ability)->toBe('__before__')
+        ->and($beforeHooks[0]->parameters)->toBe(['string']);
+});
+
 test('the --only=gates scan restricts to gate artifacts', function () {
     $path = necromancerScanTestPath('necromancer-only-gates.json');
 
-    $gate = new \Illuminate\Auth\Access\Gate(app(), fn () => null);
+    $gate = new Gate(app(), fn () => null);
     $gate->define('view-admin', function ($user): bool {
         return true;
     });
-    app()->bind(\Illuminate\Auth\Access\Gate::class, fn () => $gate);
+    app()->bind(Gate::class, fn () => $gate);
 
     $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'gates'])
         ->assertSuccessful();
@@ -1460,6 +1501,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-only-livewire.json'),
         necromancerScanTestPath('necromancer-gates-basic.json'),
         necromancerScanTestPath('necromancer-only-gates.json'),
+        necromancerScanTestPath('necromancer-gates-class.json'),
+        necromancerScanTestPath('necromancer-gates-before-hook.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));
