@@ -17,8 +17,8 @@ final class GenerateCommand extends Command
     protected $signature = 'necromancer:generate
         {--output= : Override the Tier 2 output file path}
         {--force : Overwrite existing Tier 2 file without confirmation}
-        {--only= : Comma-separated artifact type(s) to include (routes, models, jobs, events, listeners, commands)}
-        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, policies, enums)}';
+        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components)}
+        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components)}';
 
     /** @var array<int, string> */
     private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components'];

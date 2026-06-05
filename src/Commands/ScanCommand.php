@@ -16,7 +16,7 @@ final class ScanCommand extends Command
 
     protected $signature = 'necromancer:scan
         {--output=        : Write the manifest to this path instead of the configured default}
-        {--only=          : Comma-separated artifact types to collect (routes,models,requests,jobs,events,listeners,commands,policies,enums,tests,observers)}
+        {--only=          : Comma-separated artifact types to collect (routes,models,requests,jobs,events,listeners,commands,policies,enums,tests,observers,scheduled_tasks,middleware,livewire_components)}
         {--diff           : Show changes since the last manifest without writing a new file}
         {--fail-on-drift  : Exit non-zero when --diff detects any changes (for CI use)}';
 

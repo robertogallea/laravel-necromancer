@@ -169,7 +169,11 @@ final readonly class LivewireCollector
                 $args = $attr->getArguments();
 
                 if (isset($args[0])) {
-                    $listens[] = $args[0];
+                    foreach (\Illuminate\Support\Arr::wrap($args[0]) as $event) {
+                        if (is_string($event)) {
+                            $listens[] = $event;
+                        }
+                    }
                 }
             }
         }
@@ -182,6 +186,10 @@ final readonly class LivewireCollector
         $namespace = $this->app->getNamespace().'Livewire\\';
         $shortName = str_replace($namespace, '', $class);
 
-        return 'livewire.'.Str::of($shortName)->kebab()->replace('/', '.')->lower();
+        return 'livewire.'.Str::of($shortName)
+            ->replace('\\', '/')
+            ->explode('/')
+            ->map(fn (string $s) => Str::kebab($s))
+            ->implode('.');
     }
 }
