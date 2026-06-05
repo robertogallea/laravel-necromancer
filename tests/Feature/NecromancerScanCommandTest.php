@@ -904,6 +904,24 @@ test('the --only=scheduled_tasks scan restricts to scheduled_task artifacts', fu
     expect(array_keys((array) $manifest->artifacts))->toBe(['scheduled_tasks']);
 });
 
+test('the scan command handles closure-based scheduled tasks as Closure', function () {
+    $path = necromancerScanTestPath('necromancer-scheduled_tasks-closure.json');
+
+    $schedule = new \Illuminate\Console\Scheduling\Schedule;
+    $schedule->call(fn () => null)->everyMinute()->description('Closure task');
+    app()->bind(\Illuminate\Console\Scheduling\Schedule::class, fn () => $schedule);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) \Illuminate\Support\Facades\File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    $task = findManifestScheduledTask($manifest, 'Closure');
+
+    expect($task->command)->toBe('Closure')
+        ->and($task->description)->toBe('Closure task');
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1270,6 +1288,7 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-only-observers.json'),
         necromancerScanTestPath('necromancer-scheduled-tasks-basic.json'),
         necromancerScanTestPath('necromancer-only-scheduled-tasks.json'),
+        necromancerScanTestPath('necromancer-scheduled_tasks-closure.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));
