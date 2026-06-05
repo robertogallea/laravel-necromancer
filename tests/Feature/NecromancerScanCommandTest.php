@@ -401,11 +401,14 @@ test('the scan command writes observer artifacts with correct hooks, queued=fals
     $manifest = expectScanManifest($path);
     $observer = findManifestObserver($manifest, NecromancerIssueObserver::class);
 
+    // No model fixture has #[ObservedBy] pointing at NecromancerIssueObserver, so
+    // the reverse-lookup map is empty and model must be null.
     expect($observer->hooks)->toContain('created')
         ->and($observer->hooks)->toContain('deleted')
         ->and($observer->hooks)->toContain('updating')
         ->and($observer->queued)->toBeFalse()
-        ->and($observer->source->file)->toBeString();
+        ->and($observer->model)->toBeNull()
+        ->and($observer->source->file)->toBe('tests/Fixtures/Observers/NecromancerIssueObserver.php');
 });
 
 test('the --only=observers scan restricts to observer artifacts', function () {

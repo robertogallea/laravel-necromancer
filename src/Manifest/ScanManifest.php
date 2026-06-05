@@ -82,6 +82,33 @@ final readonly class ScanManifest implements JsonSerializable
         ];
     }
 
+    /**
+     * Build a reverse-lookup map from observer FQCN to model FQCN using the
+     * #[ObservedBy] attributes already captured in the model artifacts.
+     *
+     * @param  list<StructuralArtifact>  $modelArtifacts
+     * @return array<string, string>
+     */
+    private function buildObserverModelMap(array $modelArtifacts): array
+    {
+        $map = [];
+
+        foreach ($modelArtifacts as $modelArtifact) {
+            $serialized = $modelArtifact->jsonSerialize();
+            $modelClass = $serialized['class'] ?? null;
+
+            if ($modelClass === null) {
+                continue;
+            }
+
+            foreach ($serialized['observers'] ?? [] as $observerClass) {
+                $map[$observerClass] = $modelClass;
+            }
+        }
+
+        return $map;
+    }
+
     private function necromancerVersion(): string
     {
         if (! class_exists(InstalledVersions::class)) {
@@ -113,29 +140,19 @@ final readonly class ScanManifest implements JsonSerializable
             $modelExclusions = [];
         }
 
-        // Always collect models first so the observer reverse-lookup map can be built.
-        $modelArtifacts = $this->modelCollector->collect();
-
-        $observerModelMap = [];
-
-        foreach ($modelArtifacts as $modelArtifact) {
-            $serialized = $modelArtifact->jsonSerialize();
-            $modelClass = $serialized['class'] ?? null;
-
-            if ($modelClass === null) {
-                continue;
-            }
-
-            foreach ($serialized['observers'] ?? [] as $observerClass) {
-                $observerModelMap[$observerClass] = $modelClass;
-            }
-        }
-
+        // Only collect models eagerly when observers are being requested, so the
+        // reverse-lookup map (observer FQCN → model FQCN) can be built. When
+        // observers are not requested (e.g. --only=routes) we skip this entirely.
+        $observersRequested = $only === [] || in_array('observers', $only, strict: true);
+        $eagerModelArtifacts = $observersRequested ? $this->modelCollector->collect() : [];
+        $observerModelMap = $this->buildObserverModelMap($eagerModelArtifacts);
         $observerCollector = $this->observerCollector->withModelMap($observerModelMap);
 
         $collectors = [
             'routes' => fn (): array => $this->routeCollector->collect(),
-            'models' => fn (): array => $modelArtifacts,
+            // Reuse the eagerly-collected model list when it was already fetched for the
+            // observer map; otherwise collect on demand.
+            'models' => fn (): array => $eagerModelArtifacts !== [] ? $eagerModelArtifacts : $this->modelCollector->collect(),
             'requests' => fn (): array => $this->formRequestCollector->collect(),
             'jobs' => fn (): array => $this->jobCollector->collect(),
             'events' => fn (): array => $this->eventCollector->collect(),

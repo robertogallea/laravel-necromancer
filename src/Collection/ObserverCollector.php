@@ -97,10 +97,19 @@ final readonly class ObserverCollector
             return null;
         }
 
+        $hooks = $this->observerHooks($reflection);
+
+        // Skip observers that define no recognised lifecycle hooks — they add
+        // noise to the manifest with no information value (mirrors the pattern
+        // used by PolicyCollector for abstract classes).
+        if ($hooks === []) {
+            return null;
+        }
+
         return StructuralArtifact::observer(
             class: $class,
             model: $this->modelMap[$class] ?? null,
-            hooks: $this->observerHooks($reflection),
+            hooks: $hooks,
             queued: $reflection->implementsInterface(ShouldQueue::class),
             source: (new SourceLocator)->forClass($reflection),
         );
