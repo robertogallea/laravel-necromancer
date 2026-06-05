@@ -10,17 +10,18 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\CommandPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EnumPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EventPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\FormRequestPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\GatePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\JobPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ListenerPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\LivewirePayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\MailablePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\MiddlewarePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ModelPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ObserverPayload;
-use LaravelNecromancer\Manifest\ArtifactPayloads\GatePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RoutePayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\RulePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ScheduledTaskPayload;
-use LaravelNecromancer\Manifest\ArtifactPayloads\LivewirePayload;
-use LaravelNecromancer\Manifest\ArtifactPayloads\MailablePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\TestPayload;
 
 final readonly class StructuralArtifact implements JsonSerializable
@@ -376,6 +377,23 @@ final readonly class StructuralArtifact implements JsonSerializable
             queued: $queued,
             queue: $queue,
             view: $view,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $source
+     */
+    public static function validationRule(
+        string $class,
+        bool $implicit = false,
+        ?string $description = null,
+        ?SourceLocation $source = null,
+    ): self {
+        return new self('validation_rules', new RulePayload(
+            class: $class,
+            implicit: $implicit,
+            description: $description,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }

@@ -13,19 +13,20 @@ use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\GateCollector;
-use LaravelNecromancer\Collection\MailableCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\LivewireCollector;
+use LaravelNecromancer\Collection\MailableCollector;
 use LaravelNecromancer\Collection\MiddlewareCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ModelExclusionFilter;
 use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\RouteCollector;
-use LaravelNecromancer\Collection\ScheduledTaskCollector;
 use LaravelNecromancer\Collection\RouteNoiseFilter;
+use LaravelNecromancer\Collection\RuleCollector;
 use LaravelNecromancer\Collection\SafeInventoryCollector;
+use LaravelNecromancer\Collection\ScheduledTaskCollector;
 use LaravelNecromancer\Collection\TestCollector;
 use stdClass;
 use Throwable;
@@ -50,6 +51,7 @@ final readonly class ScanManifest implements JsonSerializable
         private LivewireCollector $livewireCollector,
         private GateCollector $gateCollector,
         private MailableCollector $mailableCollector,
+        private RuleCollector $ruleCollector,
     ) {}
 
     /**
@@ -177,6 +179,7 @@ final readonly class ScanManifest implements JsonSerializable
             'livewire_components' => fn (): array => $this->livewireCollector->collect(),
             'gates' => fn (): array => $this->gateCollector->collect(),
             'mailables' => fn (): array => $this->mailableCollector->collect(),
+            'validation_rules' => fn (): array => $this->ruleCollector->collect(),
         ];
 
         if ($only !== []) {

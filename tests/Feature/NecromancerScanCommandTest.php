@@ -12,10 +12,11 @@ use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\LivewireCollector;
+use LaravelNecromancer\Collection\MailableCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ObserverCollector;
-use LaravelNecromancer\Collection\MailableCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
+use LaravelNecromancer\Collection\RuleCollector;
 use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Commands\ScanCommand;
 use LaravelNecromancer\Tests\Fixtures\Commands\NecromancerFixtureCommand;
@@ -28,6 +29,8 @@ use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerQueuedJob;
 use LaravelNecromancer\Tests\Fixtures\Listeners\RecordNecromancerOrderMetrics;
 use LaravelNecromancer\Tests\Fixtures\Listeners\SendNecromancerReceipt;
 use LaravelNecromancer\Tests\Fixtures\Livewire\NecromancerIssueForm;
+use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerPasswordResetMail;
+use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerWelcomeMail;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerCustomer;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerMember;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerOrder;
@@ -37,9 +40,9 @@ use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
 use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
 use LaravelNecromancer\Tests\Fixtures\Policies\NecromancerPostPolicy;
-use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerPasswordResetMail;
-use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerWelcomeMail;
 use LaravelNecromancer\Tests\Fixtures\Requests\NecromancerStoreOrderRequest;
+use LaravelNecromancer\Tests\Fixtures\Rules\NecromancerRequiredIfMemberRule;
+use LaravelNecromancer\Tests\Fixtures\Rules\NecromancerUniqueInProjectRule;
 use PHPUnit\Framework\Assert;
 
 beforeEach(function () {
@@ -1133,6 +1136,42 @@ test('the --only=mailables scan restricts to mailable artifacts', function () {
     expect(array_keys((array) $manifest->artifacts))->toBe(['mailables']);
 });
 
+test('the scan command collects validation_rules artifacts with correct implicit flag, description, and source', function () {
+    $path = necromancerScanTestPath('necromancer-validation-rules-basic.json');
+
+    useNecromancerFixtureRules();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $unique = findManifestValidationRule($manifest, NecromancerUniqueInProjectRule::class);
+
+    expect($unique->implicit)->toBeFalse()
+        ->and($unique->description)->toBe('Validates that a value is unique within a project.')
+        ->and($unique->source->file)->toContain('Fixtures/Rules/NecromancerUniqueInProjectRule.php')
+        ->and($unique->source->line)->toBeInt();
+
+    $required = findManifestValidationRule($manifest, NecromancerRequiredIfMemberRule::class);
+
+    expect($required->implicit)->toBeTrue()
+        ->and($required->description)->toBeNull();
+});
+
+test('the --only=validation_rules scan restricts to validation rule artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-validation-rules.json');
+
+    useNecromancerFixtureRules();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'validation_rules'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['validation_rules']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1184,6 +1223,7 @@ function expectScanManifest(string $path): stdClass
         'routes',
         'scheduled_tasks',
         'tests',
+        'validation_rules',
     ]);
 
     return $manifest;
@@ -1511,6 +1551,28 @@ function findManifestMailable(stdClass $manifest, string $class): stdClass
     Assert::fail("Expected mailable artifact [{$class}] was not found.");
 }
 
+function useNecromancerFixtureRules(): void
+{
+    app()->bind(
+        RuleCollector::class,
+        fn ($app): RuleCollector => new RuleCollector($app, [[
+            'path' => base_path('tests/Fixtures/Rules'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Rules\\',
+        ]]),
+    );
+}
+
+function findManifestValidationRule(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->validation_rules ?? [] as $rule) {
+        if ($rule->class === $class) {
+            return $rule;
+        }
+    }
+
+    Assert::fail("Expected validation_rule artifact [{$class}] was not found.");
+}
+
 function cleanNecromancerScanTestFiles(): void
 {
     File::delete([
@@ -1569,6 +1631,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-gates-before-hook.json'),
         necromancerScanTestPath('necromancer-mailables-basic.json'),
         necromancerScanTestPath('necromancer-only-mailables.json'),
+        necromancerScanTestPath('necromancer-validation-rules-basic.json'),
+        necromancerScanTestPath('necromancer-only-validation-rules.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

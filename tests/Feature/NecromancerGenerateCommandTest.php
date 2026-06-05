@@ -2269,3 +2269,46 @@ test('a manifest with no mailables does not include a mailables section', functi
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Mailables');
 });
+
+// Validation Rules section
+
+test('a manifest with validation_rules produces a validation rules section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'validation_rules' => [
+                [
+                    'class' => 'App\\Rules\\UniqueInProject',
+                    'implicit' => false,
+                    'description' => 'Validates that a value is unique within a project.',
+                    'source' => null,
+                ],
+                [
+                    'class' => 'App\\Rules\\RequiredIfMember',
+                    'implicit' => true,
+                    'description' => null,
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Validation Rules (2)');
+    expect($content)->toContain('| Class | Implicit | Description |');
+    expect($content)->toContain('| UniqueInProject |  | Validates that a value is unique within a project. |');
+    expect($content)->toContain('| RequiredIfMember | yes |  |');
+});
+
+test('a manifest with no validation_rules does not include a validation rules section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['validation_rules' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Validation Rules');
+});

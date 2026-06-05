@@ -17,11 +17,11 @@ final class GenerateCommand extends Command
     protected $signature = 'necromancer:generate
         {--output= : Override the Tier 2 output file path}
         {--force : Overwrite existing Tier 2 file without confirmation}
-        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables)}
-        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables)}';
+        {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules)}
+        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components', 'gates', 'mailables'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components', 'gates', 'mailables', 'validation_rules'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -100,6 +100,7 @@ final class GenerateCommand extends Command
             'livewire_components' => $this->buildLivewireComponents($manifest['artifacts']['livewire_components'] ?? []),
             'gates' => $this->buildGates($manifest['artifacts']['gates'] ?? []),
             'mailables' => $this->buildMailables($manifest['artifacts']['mailables'] ?? []),
+            'validation_rules' => $this->buildValidationRules($manifest['artifacts']['validation_rules'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -1089,6 +1090,45 @@ final class GenerateCommand extends Command
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($mailable);
+            }
+
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $validationRules
+     */
+    private function buildValidationRules(array $validationRules): string
+    {
+        if (empty($validationRules)) {
+            return '';
+        }
+
+        $count = count($validationRules);
+        $hasSources = $this->hasSources($validationRules);
+
+        $header = '| Class | Implicit | Description';
+        $divider = '|---|---|---';
+
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Validation Rules ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($validationRules as $rule) {
+            $basename = class_basename((string) ($rule['class'] ?? ''));
+            $implicit = (bool) ($rule['implicit'] ?? false) ? 'yes' : '';
+            $description = (string) ($rule['description'] ?? '');
+
+            $row = "| {$basename} | {$implicit} | {$description}";
+
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($rule);
             }
 
             $lines[] = $row.' |';
