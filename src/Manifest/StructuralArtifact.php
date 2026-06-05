@@ -381,9 +381,6 @@ final readonly class StructuralArtifact implements JsonSerializable
         ));
     }
 
-    /**
-     * @param  array<string, mixed>|null  $source
-     */
     public static function validationRule(
         string $class,
         bool $implicit = false,
