@@ -3,6 +3,7 @@
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Console\Scheduling\Schedule;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
@@ -858,6 +859,51 @@ test('the content_hash is identical across consecutive scans of the same codebas
     expect($first->meta->content_hash)->toBe($second->meta->content_hash);
 });
 
+test('the scan command writes scheduled_task artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-scheduled-tasks-basic.json');
+
+    $schedule = new Schedule;
+    $schedule->command('inspire')->daily();
+    $schedule->command('cache:clear')->hourly()->withoutOverlapping()->runInBackground();
+
+    app()->bind(Schedule::class, fn (): Schedule => $schedule);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $task = findManifestScheduledTask($manifest, 'inspire');
+
+    expect($task->command)->toBe('inspire')
+        ->and($task->expression)->toBe('0 0 * * *')
+        ->and($task->human_readable)->toBe('Daily')
+        ->and($task->without_overlapping)->toBeFalse()
+        ->and($task->run_in_background)->toBeFalse()
+        ->and($task->even_in_maintenance)->toBeFalse();
+
+    $cacheTask = findManifestScheduledTask($manifest, 'cache:clear');
+
+    expect($cacheTask->without_overlapping)->toBeTrue()
+        ->and($cacheTask->run_in_background)->toBeTrue()
+        ->and($cacheTask->expression)->toBe('0 * * * *');
+});
+
+test('the --only=scheduled_tasks scan restricts to scheduled_task artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-scheduled-tasks.json');
+
+    $schedule = new Schedule;
+    $schedule->command('inspire')->daily();
+
+    app()->bind(Schedule::class, fn (): Schedule => $schedule);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'scheduled_tasks'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['scheduled_tasks']);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -903,6 +949,7 @@ function expectScanManifest(string $path): stdClass
         'observers',
         'policies',
         'routes',
+        'scheduled_tasks',
         'tests',
     ]);
 
@@ -1160,6 +1207,17 @@ function findManifestObserver(stdClass $manifest, string $class): stdClass
     Assert::fail("Expected observer artifact [{$class}] was not found.");
 }
 
+function findManifestScheduledTask(stdClass $manifest, string $command): stdClass
+{
+    foreach ($manifest->artifacts->scheduled_tasks ?? [] as $task) {
+        if ($task->command === $command) {
+            return $task;
+        }
+    }
+
+    Assert::fail("Expected scheduled task artifact [{$command}] was not found.");
+}
+
 function necromancerScanTestPath(string $filename): string
 {
     return storage_path("framework/testing/{$filename}");
@@ -1210,6 +1268,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-parent-file'),
         necromancerScanTestPath('necromancer-observers-basic.json'),
         necromancerScanTestPath('necromancer-only-observers.json'),
+        necromancerScanTestPath('necromancer-scheduled-tasks-basic.json'),
+        necromancerScanTestPath('necromancer-only-scheduled-tasks.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

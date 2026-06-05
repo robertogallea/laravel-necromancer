@@ -21,7 +21,7 @@ final class GenerateCommand extends Command
         {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, policies, enums)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -95,6 +95,7 @@ final class GenerateCommand extends Command
             'policies' => $this->buildPolicies($manifest['artifacts']['policies'] ?? []),
             'enums' => $this->buildEnums($manifest['artifacts']['enums'] ?? []),
             'tests' => $this->buildTests($manifest['artifacts']['tests'] ?? []),
+            'scheduled_tasks' => $this->buildScheduledTasks($manifest['artifacts']['scheduled_tasks'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -810,6 +811,90 @@ final class GenerateCommand extends Command
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($test);
             }
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $scheduledTasks
+     */
+    private function buildScheduledTasks(array $scheduledTasks): string
+    {
+        if (empty($scheduledTasks)) {
+            return '';
+        }
+
+        $count = count($scheduledTasks);
+        $hasSources = $this->hasSources($scheduledTasks);
+        $hasTimezone = ! empty(array_filter($scheduledTasks, fn (array $t): bool => isset($t['timezone'])));
+        $hasNoOverlap = ! empty(array_filter($scheduledTasks, fn (array $t): bool => ! empty($t['without_overlapping'])));
+        $hasBackground = ! empty(array_filter($scheduledTasks, fn (array $t): bool => ! empty($t['run_in_background'])));
+        $hasInMaintenance = ! empty(array_filter($scheduledTasks, fn (array $t): bool => ! empty($t['even_in_maintenance'])));
+
+        $header = '| Command | Schedule | Description';
+        $divider = '|---|---|---';
+
+        if ($hasTimezone) {
+            $header .= ' | Timezone';
+            $divider .= '|---';
+        }
+
+        if ($hasNoOverlap) {
+            $header .= ' | No Overlap';
+            $divider .= '|---';
+        }
+
+        if ($hasBackground) {
+            $header .= ' | Background';
+            $divider .= '|---';
+        }
+
+        if ($hasInMaintenance) {
+            $header .= ' | In Maintenance';
+            $divider .= '|---';
+        }
+
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Scheduled Tasks ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($scheduledTasks as $task) {
+            $command = (string) ($task['command'] ?? '');
+            // Use class_basename for FQCN-style job commands, otherwise use as-is.
+            if (str_contains($command, '\\')) {
+                $command = class_basename($command);
+            }
+
+            $schedule = (string) ($task['human_readable'] ?? $task['expression'] ?? '');
+            $description = (string) ($task['description'] ?? '');
+
+            $row = "| {$command} | {$schedule} | {$description}";
+
+            if ($hasTimezone) {
+                $row .= ' | '.((string) ($task['timezone'] ?? ''));
+            }
+
+            if ($hasNoOverlap) {
+                $row .= ' | '.(! empty($task['without_overlapping']) ? 'yes' : '');
+            }
+
+            if ($hasBackground) {
+                $row .= ' | '.(! empty($task['run_in_background']) ? 'yes' : '');
+            }
+
+            if ($hasInMaintenance) {
+                $row .= ' | '.(! empty($task['even_in_maintenance']) ? 'yes' : '');
+            }
+
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($task);
+            }
+
             $lines[] = $row.' |';
         }
 

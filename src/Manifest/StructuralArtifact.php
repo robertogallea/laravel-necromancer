@@ -16,6 +16,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\ModelPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ObserverPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\PolicyPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\RoutePayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\ScheduledTaskPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\TestPayload;
 
 final readonly class StructuralArtifact implements JsonSerializable
@@ -293,6 +294,30 @@ final readonly class StructuralArtifact implements JsonSerializable
             class: $class,
             subject: $subject,
             methods: $methods,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
+    }
+
+    public static function scheduledTask(
+        string $command,
+        string $expression,
+        string $humanReadable,
+        bool $withoutOverlapping = false,
+        bool $runInBackground = false,
+        bool $evenInMaintenance = false,
+        ?string $timezone = null,
+        ?string $description = null,
+        ?SourceLocation $source = null,
+    ): self {
+        return new self('scheduled_tasks', new ScheduledTaskPayload(
+            command: $command,
+            expression: $expression,
+            humanReadable: $humanReadable,
+            withoutOverlapping: $withoutOverlapping,
+            runInBackground: $runInBackground,
+            evenInMaintenance: $evenInMaintenance,
+            timezone: $timezone,
+            description: $description,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ));
     }

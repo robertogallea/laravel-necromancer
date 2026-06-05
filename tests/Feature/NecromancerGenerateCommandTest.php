@@ -1994,3 +1994,69 @@ test('a manifest with no tests does not include a tests section', function () {
     $content = File::get(base_path('NECROMANCER.md'));
     expect($content)->not->toContain('## Tests');
 });
+
+// Scheduled Tasks section
+
+test('a manifest with scheduled_tasks produces a section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'scheduled_tasks' => [
+                [
+                    'command' => 'inspire',
+                    'expression' => '0 0 * * *',
+                    'human_readable' => 'Daily',
+                    'without_overlapping' => false,
+                    'run_in_background' => false,
+                    'even_in_maintenance' => false,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Scheduled Tasks (1)');
+    expect($content)->toContain('| Command | Schedule | Description |');
+    expect($content)->toContain('| inspire | Daily |  |');
+});
+
+test('a manifest with no scheduled_tasks does not include a scheduled tasks section', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => ['scheduled_tasks' => []],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Scheduled Tasks');
+});
+
+test('scheduled tasks with optional columns render them conditionally', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'scheduled_tasks' => [
+                [
+                    'command' => 'cache:clear',
+                    'expression' => '0 * * * *',
+                    'human_readable' => 'Hourly',
+                    'without_overlapping' => true,
+                    'run_in_background' => true,
+                    'even_in_maintenance' => false,
+                    'timezone' => 'Europe/Rome',
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('Timezone');
+    expect($content)->toContain('No Overlap');
+    expect($content)->toContain('Background');
+    expect($content)->toContain('Europe/Rome');
+    expect($content)->not->toContain('In Maintenance');
+});

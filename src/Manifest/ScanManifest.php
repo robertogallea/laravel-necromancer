@@ -19,6 +19,7 @@ use LaravelNecromancer\Collection\ModelExclusionFilter;
 use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\RouteCollector;
+use LaravelNecromancer\Collection\ScheduledTaskCollector;
 use LaravelNecromancer\Collection\RouteNoiseFilter;
 use LaravelNecromancer\Collection\SafeInventoryCollector;
 use LaravelNecromancer\Collection\TestCollector;
@@ -40,6 +41,7 @@ final readonly class ScanManifest implements JsonSerializable
         private EnumCollector $enumCollector,
         private TestCollector $testCollector,
         private ObserverCollector $observerCollector,
+        private ScheduledTaskCollector $scheduledTaskCollector,
     ) {}
 
     /**
@@ -162,6 +164,7 @@ final readonly class ScanManifest implements JsonSerializable
             'enums' => fn (): array => $this->enumCollector->collect(),
             'tests' => fn (): array => $this->testCollector->collect(),
             'observers' => fn (): array => $observerCollector->collect(),
+            'scheduled_tasks' => fn (): array => $this->scheduledTaskCollector->collect(),
         ];
 
         if ($only !== []) {
