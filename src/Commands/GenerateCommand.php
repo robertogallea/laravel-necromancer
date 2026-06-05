@@ -21,7 +21,7 @@ final class GenerateCommand extends Command
         {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, policies, enums)}';
 
     /** @var array<int, string> */
-    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'policies', 'enums', 'tests'];
+    private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests'];
 
     protected $description = 'Generate AI-readable context from the Necromancer manifest';
 
@@ -91,6 +91,7 @@ final class GenerateCommand extends Command
             'events' => $this->buildEvents($manifest['artifacts']['events'] ?? []),
             'listeners' => $this->buildListeners($manifest['artifacts']['listeners'] ?? []),
             'commands' => $this->buildCommands($manifest['artifacts']['commands'] ?? []),
+            'observers' => $this->buildObservers($manifest['artifacts']['observers'] ?? []),
             'policies' => $this->buildPolicies($manifest['artifacts']['policies'] ?? []),
             'enums' => $this->buildEnums($manifest['artifacts']['enums'] ?? []),
             'tests' => $this->buildTests($manifest['artifacts']['tests'] ?? []),
@@ -697,6 +698,42 @@ final class GenerateCommand extends Command
             $row = "| {$basename} | {$model} | {$methods}";
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($policy);
+            }
+            $lines[] = $row.' |';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $observers
+     */
+    private function buildObservers(array $observers): string
+    {
+        if (empty($observers)) {
+            return '';
+        }
+
+        $count = count($observers);
+        $hasSources = $this->hasSources($observers);
+
+        $header = '| Class | Model | Hooks | Queued';
+        $divider = '|---|---|---|---';
+        if ($hasSources) {
+            $header .= ' | Source';
+            $divider .= '|---';
+        }
+
+        $lines = ["## Observers ({$count})", '', $header.' |', $divider.'|'];
+
+        foreach ($observers as $observer) {
+            $basename = class_basename((string) ($observer['class'] ?? ''));
+            $model = isset($observer['model']) ? class_basename((string) $observer['model']) : '';
+            $hooks = implode(', ', $observer['hooks'] ?? []);
+            $queued = (bool) ($observer['queued'] ?? false) ? 'yes' : '';
+            $row = "| {$basename} | {$model} | {$hooks} | {$queued}";
+            if ($hasSources) {
+                $row .= ' | '.$this->sourceCell($observer);
             }
             $lines[] = $row.' |';
         }

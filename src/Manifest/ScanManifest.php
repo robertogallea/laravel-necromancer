@@ -16,6 +16,7 @@ use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ModelExclusionFilter;
+use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\RouteCollector;
 use LaravelNecromancer\Collection\RouteNoiseFilter;
@@ -38,6 +39,7 @@ final readonly class ScanManifest implements JsonSerializable
         private PolicyCollector $policyCollector,
         private EnumCollector $enumCollector,
         private TestCollector $testCollector,
+        private ObserverCollector $observerCollector,
     ) {}
 
     /**
@@ -111,9 +113,29 @@ final readonly class ScanManifest implements JsonSerializable
             $modelExclusions = [];
         }
 
+        // Always collect models first so the observer reverse-lookup map can be built.
+        $modelArtifacts = $this->modelCollector->collect();
+
+        $observerModelMap = [];
+
+        foreach ($modelArtifacts as $modelArtifact) {
+            $serialized = $modelArtifact->jsonSerialize();
+            $modelClass = $serialized['class'] ?? null;
+
+            if ($modelClass === null) {
+                continue;
+            }
+
+            foreach ($serialized['observers'] ?? [] as $observerClass) {
+                $observerModelMap[$observerClass] = $modelClass;
+            }
+        }
+
+        $observerCollector = $this->observerCollector->withModelMap($observerModelMap);
+
         $collectors = [
             'routes' => fn (): array => $this->routeCollector->collect(),
-            'models' => fn (): array => $this->modelCollector->collect(),
+            'models' => fn (): array => $modelArtifacts,
             'requests' => fn (): array => $this->formRequestCollector->collect(),
             'jobs' => fn (): array => $this->jobCollector->collect(),
             'events' => fn (): array => $this->eventCollector->collect(),
@@ -122,6 +144,7 @@ final readonly class ScanManifest implements JsonSerializable
             'policies' => fn (): array => $this->policyCollector->collect(),
             'enums' => fn (): array => $this->enumCollector->collect(),
             'tests' => fn (): array => $this->testCollector->collect(),
+            'observers' => fn (): array => $observerCollector->collect(),
         ];
 
         if ($only !== []) {

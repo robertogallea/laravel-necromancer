@@ -10,6 +10,7 @@ use LaravelNecromancer\Collection\FormRequestCollector;
 use LaravelNecromancer\Collection\JobCollector;
 use LaravelNecromancer\Collection\ListenerCollector;
 use LaravelNecromancer\Collection\ModelCollector;
+use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
 use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Commands\ScanCommand;
@@ -28,6 +29,7 @@ use LaravelNecromancer\Tests\Fixtures\Models\NecromancerReport;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerUnguardedModel;
 use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
+use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
 use LaravelNecromancer\Tests\Fixtures\Policies\NecromancerPostPolicy;
 use LaravelNecromancer\Tests\Fixtures\Requests\NecromancerStoreOrderRequest;
 use PHPUnit\Framework\Assert;
@@ -380,6 +382,49 @@ test('the --only=policies scan restricts to policy artifacts', function () {
     $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
 
     expect(array_keys((array) $manifest->artifacts))->toBe(['policies']);
+});
+
+test('the scan command writes observer artifacts with correct hooks, queued=false, and source', function () {
+    $path = necromancerScanTestPath('necromancer-observers-basic.json');
+
+    app()->bind(
+        ObserverCollector::class,
+        fn ($app): ObserverCollector => new ObserverCollector($app, roots: [[
+            'path' => base_path('tests/Fixtures/Observers'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Observers\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $observer = findManifestObserver($manifest, NecromancerIssueObserver::class);
+
+    expect($observer->hooks)->toContain('created')
+        ->and($observer->hooks)->toContain('deleted')
+        ->and($observer->hooks)->toContain('updating')
+        ->and($observer->queued)->toBeFalse()
+        ->and($observer->source->file)->toBeString();
+});
+
+test('the --only=observers scan restricts to observer artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-observers.json');
+
+    app()->bind(
+        ObserverCollector::class,
+        fn ($app): ObserverCollector => new ObserverCollector($app, roots: [[
+            'path' => base_path('tests/Fixtures/Observers'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Observers\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'observers'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['observers']);
 });
 
 test('the scan command writes enum artifacts with backing type and cases', function () {
@@ -852,6 +897,7 @@ function expectScanManifest(string $path): stdClass
         'jobs',
         'listeners',
         'models',
+        'observers',
         'policies',
         'routes',
         'tests',
@@ -1100,6 +1146,17 @@ function findManifestTestByFilename(stdClass $manifest, string $filename): stdCl
     Assert::fail("Expected test artifact with filename [{$filename}] was not found.");
 }
 
+function findManifestObserver(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->observers ?? [] as $observer) {
+        if ($observer->class === $class) {
+            return $observer;
+        }
+    }
+
+    Assert::fail("Expected observer artifact [{$class}] was not found.");
+}
+
 function necromancerScanTestPath(string $filename): string
 {
     return storage_path("framework/testing/{$filename}");
@@ -1148,6 +1205,8 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-only-models-jobs.json'),
         necromancerScanTestPath('necromancer-only-unknown.json'),
         necromancerScanTestPath('necromancer-parent-file'),
+        necromancerScanTestPath('necromancer-observers-basic.json'),
+        necromancerScanTestPath('necromancer-only-observers.json'),
     ]);
 
     File::deleteDirectory(storage_path('framework/testing/missing-necromancer-output'));

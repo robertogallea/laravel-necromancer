@@ -1959,6 +1959,30 @@ test('the tests section shows file, type, subject basename, and method names', f
         ->and($content)->toContain('it creates an order');
 });
 
+test('a manifest with observers produces an observers section with count and table header', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'observers' => [
+                [
+                    'class' => 'App\\Observers\\IssueObserver',
+                    'model' => 'App\\Models\\Issue',
+                    'hooks' => ['created', 'deleted'],
+                    'queued' => false,
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Observers (1)');
+    expect($content)->toContain('| Class | Model | Hooks | Queued |');
+    expect($content)->toContain('| IssueObserver | Issue | created, deleted |  |');
+});
+
 test('a manifest with no tests does not include a tests section', function () {
     File::put(base_path('necromancer.json'), json_encode([
         'meta' => ['app_name' => 'TestApp'],
