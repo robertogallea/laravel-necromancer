@@ -5,12 +5,35 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Mcp\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 
 final class SearchArtifactsTool extends Tool
 {
+    private const SUPPORTED_TYPES = [
+        'routes',
+        'models',
+        'form_requests',
+        'jobs',
+        'events',
+        'listeners',
+        'commands',
+        'observers',
+        'policies',
+        'enums',
+        'tests',
+        'scheduled_tasks',
+        'middleware',
+        'livewire_components',
+        'gates',
+        'mailables',
+        'validation_rules',
+        'service_providers',
+    ];
+
     public function name(): string
     {
         return 'search_artifacts';
@@ -30,28 +53,31 @@ final class SearchArtifactsTool extends Tool
             'query' => $schema->string()->required()
                 ->description('Case-insensitive string to search for across all artifact JSON fields'),
             'type' => $schema->string()
-                ->description('Restrict search to one artifact type: routes, models, jobs, events, listeners, commands, policies, enums, requests'),
+                ->description('Restrict search to one artifact type: routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers'),
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $input
      * @return list<array{type: string, artifact: array<string, mixed>}>
      */
-    public function handle(ManifestReader $reader, array $input): mixed
+    public function handle(ManifestReader $reader, Request $request): mixed
     {
-        $needle = strtolower((string) ($input['query'] ?? ''));
-        $typeFilter = isset($input['type']) ? (string) $input['type'] : null;
+        $needle = strtolower((string) ($request->get('query') ?? ''));
+        $typeFilter = $request->has('type') ? (string) $request->get('type') : null;
         $results = [];
 
         try {
             $path = (string) config('necromancer.output.manifest', base_path('necromancer.json'));
             $artifacts = (array) ($reader->read($path)['artifacts'] ?? []);
         } catch (ManifestNotFoundException) {
-            return [];
+            return Response::json([]);
         }
 
         foreach ($artifacts as $type => $items) {
+            if (! in_array($type, self::SUPPORTED_TYPES, strict: true)) {
+                continue;
+            }
+
             if ($typeFilter !== null && $type !== $typeFilter) {
                 continue;
             }
@@ -63,6 +89,6 @@ final class SearchArtifactsTool extends Tool
             }
         }
 
-        return $results;
+        return Response::json($results);
     }
 }

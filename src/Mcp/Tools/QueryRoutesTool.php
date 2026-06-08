@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Mcp\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
@@ -33,27 +35,26 @@ final class QueryRoutesTool extends Tool
     }
 
     /**
-     * @param  array<string, mixed>  $input
      * @return list<array<string, mixed>>
      */
-    public function handle(ManifestReader $reader, array $input): mixed
+    public function handle(ManifestReader $reader, Request $request): mixed
     {
         $routes = $this->loadArtifacts($reader, 'routes');
 
-        if (isset($input['method'])) {
-            $method = strtoupper((string) $input['method']);
+        if ($request->has('method')) {
+            $method = strtoupper((string) $request->get('method'));
             $routes = array_values(array_filter($routes, fn (array $r): bool => strtoupper((string) ($r['method'] ?? '')) === $method
             ));
         }
 
-        if (isset($input['pattern'])) {
-            $needle = strtolower((string) $input['pattern']);
+        if ($request->has('pattern')) {
+            $needle = strtolower((string) $request->get('pattern'));
             $routes = array_values(array_filter($routes, fn (array $r): bool => str_contains(strtolower((string) ($r['name'] ?? '')), $needle) ||
                 str_contains(strtolower((string) ($r['uri'] ?? '')), $needle)
             ));
         }
 
-        return $routes;
+        return Response::json($routes);
     }
 
     /**

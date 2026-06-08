@@ -48,6 +48,10 @@ return [
         'judge_model' => env('NECROMANCER_BENCH_JUDGE', 'gpt-4o'),
         'judge_provider' => env('NECROMANCER_BENCH_JUDGE_PROVIDER'),
         'timeout' => (int) env('NECROMANCER_BENCH_TIMEOUT', 120),
+        'dump' => [
+            'enabled' => filter_var(env('NECROMANCER_BENCH_DUMP_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            'path' => env('NECROMANCER_BENCH_DUMP_PATH') ?: storage_path('app/necromancer/benchmarks'),
+        ],
         'tasks' => [],
     ],
 ];

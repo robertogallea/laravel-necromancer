@@ -26,6 +26,7 @@ use LaravelNecromancer\Inference\Contracts\AdrInferrer;
 use LaravelNecromancer\Inference\Contracts\AdrTranslator;
 use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Integrations\BoostDetector;
+use LaravelNecromancer\Integrations\McpInstaller;
 use LaravelNecromancer\Mcp\NecromancerServer;
 
 final class NecromancerServiceProvider extends ServiceProvider
@@ -65,6 +66,8 @@ final class NecromancerServiceProvider extends ServiceProvider
 
         if (class_exists(Server::class)) {
             Mcp::local('necromancer', NecromancerServer::class);
+
+            (new McpInstaller(base_path('.mcp.json')))->ensureRegistered();
         }
     }
 }

@@ -9,6 +9,7 @@
     },
     "require-dev": {
         "laravel/ai": "^0.7.2",
+        "laravel/mcp": "~0.7.0",
         "laravel/pint": "^1.0",
         "larastan/larastan": "^3.0",
         "orchestra/testbench": "^11.1",
@@ -33,7 +34,8 @@
         }
     },
     "suggest": {
-        "laravel/ai": "Enables AI-powered ADR inference and audit commands."
+        "laravel/ai": "Enables AI-powered ADR inference and audit commands.",
+        "laravel/mcp": "Exposes the Necromancer manifest as read-only MCP tools."
     },
     "scripts": {
         "test": [

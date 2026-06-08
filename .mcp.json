@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "laravel-necromancer": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "mcp:start",
+                "necromancer"
+            ]
+        }
+    }
+}

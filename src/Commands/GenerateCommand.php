@@ -437,10 +437,10 @@ final class GenerateCommand extends Command
     private function buildTier1Footer(bool $usingBoost): string
     {
         if ($usingBoost) {
-            return '> For complete application context (all route details, model fields, casts, jobs, events, listeners, commands, policies, form requests, enums), use the `necromancer` skill.';
+            return '> For complete application context (all route details, model fields, casts, jobs, events, listeners, commands, policies, form requests, enums, tests, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers), use the `necromancer` skill.';
         }
 
-        return '> For complete application context (all route details, model fields, casts, jobs, events, listeners, commands, policies, form requests, enums), read `NECROMANCER.md`.';
+        return '> For complete application context (all route details, model fields, casts, jobs, events, listeners, commands, policies, form requests, enums, tests, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers), read `NECROMANCER.md`.';
     }
 
     /**

@@ -1,6 +1,33 @@
 # Laravel Necromancer
 
-Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, jobs, events, and more.
+Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, jobs, events, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers, and more.
+
+## What Necromancer Collects
+
+The manifest covers 18 artifact types across the full Laravel application structure:
+
+| Type | What it surfaces |
+|---|---|
+| `routes` | Name, method, URI, controller, action, middleware, authorization |
+| `models` | Table, fillable, casts, relationships, scopes, observers, policy, factory |
+| `jobs` | Queue, connection, tries, timeout, backoff, max_exceptions |
+| `events` | Listeners, broadcastable channels |
+| `listeners` | Handled events, queued status |
+| `commands` | Signature, description, aliases |
+| `form_requests` | Rules, stop_on_first_failure, error_bag |
+| `policies` | Model, policy methods |
+| `enums` | Backing type, cases |
+| `tests` | File, type (unit/feature), subject class, test methods |
+| `observers` | Model, lifecycle hooks, queued status |
+| `scheduled_tasks` | Command, cron expression, human-readable schedule, flags |
+| `middleware` | Alias, class, scope (global/group/alias), group name |
+| `livewire_components` | View, public properties with types, action methods, listened events |
+| `gates` | Ability, kind (closure/class/before_hook/after_hook), parameters |
+| `mailables` | Subject, queued status, queue name, view/markdown template |
+| `validation_rules` | Implicit flag, docblock description |
+| `service_providers` | Deferred flag, source location |
+
+All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
 ## Requirements
 
@@ -35,7 +62,12 @@ Necromancer follows a **scan-first** workflow. Every other command reads the man
 php artisan necromancer:scan
 ```
 
-Inspects the running application and writes `necromancer.json` to the project root. Re-run this command whenever your application changes.
+Inspects the running application and writes `necromancer.json` to the project root. Re-run this command whenever your application changes. Collect only specific artifact types with `--only`:
+
+```bash
+php artisan necromancer:scan --only=routes,models
+php artisan necromancer:scan --only=observers,scheduled_tasks,gates
+```
 
 Necromancer reads PHP attributes (`#[ObservedBy]`, `#[Queue]`, `#[Aliases]`, `#[Authorize]`, etc.) as primary sources alongside class properties. Codebases using the attribute-based API introduced in Laravel 11+ are fully supported — jobs configured via `#[Queue]`/`#[Tries]`/`#[Timeout]`, models with `#[ObservedBy]`/`#[ScopedBy]`, and commands with `#[Aliases]` all appear correctly in the manifest.
 
@@ -133,12 +165,24 @@ Produces `NECROMANCER.md` at the project root. The generated file includes a `##
 | tests/Feature/OrderCheckoutTest.php | feature | | test_it_completes_checkout |
 ```
 
-Generate only specific sections (supported types include `tests`):
+Generate only specific sections:
 
 ```bash
 php artisan necromancer:generate --only=routes,models
-php artisan necromancer:generate --only=tests
+php artisan necromancer:generate --only=observers,scheduled_tasks
+php artisan necromancer:generate --only=gates,middleware,mailables
 ```
+
+Supported types: `routes`, `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`.
+
+Exclude specific sections instead of listing everything you want:
+
+```bash
+php artisan necromancer:generate --except=listeners
+php artisan necromancer:generate --except=listeners,validation_rules,service_providers
+```
+
+`--only` and `--except` are mutually exclusive.
 
 Skip the overwrite confirmation when regenerating:
 
@@ -169,6 +213,20 @@ php artisan necromancer:ask "..." --model=claude-sonnet-4-5        # model overr
 ```
 
 > **Requires** `laravel/ai` installed and an AI provider configured in `config/ai.php`.
+
+### Inspect the AI payload
+
+Before committing to a provider, check exactly what Necromancer sends to the AI and how large the payload is:
+
+```bash
+php artisan necromancer:inspect-payload
+```
+
+Prints the full manifest JSON, the estimated token count, and a breakdown of artifact type counts. Pass `--privacy` to see the condensed privacy-safe summary instead (the payload used when a privacy-conscious provider is configured):
+
+```bash
+php artisan necromancer:inspect-payload --privacy
+```
 
 ---
 
@@ -424,8 +482,9 @@ php artisan necromancer:benchmark --format=markdown --output=benchmark.md
 | `necromancer:map` | Display the manifest in the terminal | `--type=TYPE` |
 | `necromancer:audit` | Run the AI-readability audit (violation list) | `--format=text\|json\|markdown`, `--output=PATH`, `--fail-on=SEVERITY` |
 | `necromancer:doctor` | Show the AI readability score (percentage dashboard) | `--json`, `--min-score=N`, `--only=KEYS` |
-| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE` (routes, models, form_requests, jobs, events, listeners, commands, policies, enums, tests), `--output=PATH`, `--force` |
+| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (18 types: routes, models, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--output=PATH`, `--force` |
 | `necromancer:ask` | Ask a question about your codebase via AI | `--provider=`, `--model=` |
+| `necromancer:inspect-payload` | Show the AI payload size and content for `necromancer:ask` | `--privacy` |
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
@@ -491,9 +550,14 @@ When [Laravel MCP](https://github.com/laravel/mcp) is installed, Necromancer aut
 |---|---|
 | `query_routes` | List routes, optionally filtered by method or name/URI pattern |
 | `query_models` | List Eloquent models, optionally filtered by class name |
+| `query_artifacts` | List artifacts of any current type, optionally filtered by JSON substring |
 | `search_artifacts` | Full-text search across all artifact types |
 
-The server is registered automatically when `laravel/mcp` is present. AI agents connected via Claude Code, Cursor, or any MCP client can then call these tools directly rather than reading `necromancer.json` by hand.
+Use `query_artifacts` when you already know the artifact type (`routes`, `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
+
+When `laravel/mcp` is present, Necromancer also writes its entry into `.mcp.json` automatically on the first `php artisan` run after installation — no manual configuration needed. If `.mcp.json` already exists, the entry is merged without touching other servers.
+
+AI agents connected via Claude Code, Cursor, or any MCP client can then call these tools directly rather than reading `necromancer.json` by hand.
 
 > **Requires** `laravel/mcp` installed. Run `php artisan necromancer:scan` to ensure the manifest is current before connecting an agent.
 

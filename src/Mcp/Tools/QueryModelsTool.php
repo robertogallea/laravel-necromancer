@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Mcp\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
@@ -32,20 +34,19 @@ final class QueryModelsTool extends Tool
     }
 
     /**
-     * @param  array<string, mixed>  $input
      * @return list<array<string, mixed>>
      */
-    public function handle(ManifestReader $reader, array $input): mixed
+    public function handle(ManifestReader $reader, Request $request): mixed
     {
         $models = $this->loadArtifacts($reader, 'models');
 
-        if (isset($input['name'])) {
-            $needle = strtolower((string) $input['name']);
+        if ($request->has('name')) {
+            $needle = strtolower((string) $request->get('name'));
             $models = array_values(array_filter($models, fn (array $m): bool => str_contains(strtolower((string) ($m['class'] ?? '')), $needle)
             ));
         }
 
-        return $models;
+        return Response::json($models);
     }
 
     /**

@@ -167,7 +167,7 @@ final readonly class ScanManifest implements JsonSerializable
             // Reuse the eagerly-collected model list when it was already fetched for the
             // observer map; otherwise collect on demand.
             'models' => fn (): array => $eagerModelArtifacts !== [] ? $eagerModelArtifacts : $this->modelCollector->collect(),
-            'requests' => fn (): array => $this->formRequestCollector->collect(),
+            'form_requests' => fn (): array => $this->formRequestCollector->collect(),
             'jobs' => fn (): array => $this->jobCollector->collect(),
             'events' => fn (): array => $this->eventCollector->collect(),
             'listeners' => fn (): array => $this->listenerCollector->collect(),

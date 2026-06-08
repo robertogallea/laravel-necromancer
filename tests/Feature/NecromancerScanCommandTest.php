@@ -1,5 +1,6 @@
 <?php
 
+use App\Providers\NecromancerFixtureServiceProvider;
 use Illuminate\Auth\Access\Gate;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
@@ -640,6 +641,22 @@ test('the scan command writes form request artifacts with rules and source', fun
         ->and($request->source->line)->toBeInt();
 });
 
+test('the --only=form_requests scan restricts to form request artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-form-requests.json');
+
+    useNecromancerFixtureRequests();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'form_requests'])
+        ->expectsOutputToContain($path)
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['form_requests']);
+
+    findManifestFormRequest($manifest, NecromancerStoreOrderRequest::class);
+});
+
 test('the scan command writes event and listener message-flow artifacts', function () {
     $path = necromancerScanTestPath('necromancer-events-listeners.json');
 
@@ -1182,9 +1199,9 @@ test('the scan command collects service_provider artifacts', function () {
 
     $manifest = expectScanManifest($path);
 
-    $provider = findManifestServiceProvider($manifest, \App\Providers\NecromancerFixtureServiceProvider::class);
+    $provider = findManifestServiceProvider($manifest, NecromancerFixtureServiceProvider::class);
 
-    expect($provider->class)->toBe(\App\Providers\NecromancerFixtureServiceProvider::class)
+    expect($provider->class)->toBe(NecromancerFixtureServiceProvider::class)
         ->and($provider->deferred)->toBeFalse()
         ->and($provider->bindings)->toBeArray()
         ->and($provider->singletons)->toBeArray()
@@ -1653,6 +1670,7 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-models-no-hidden.json'),
         necromancerScanTestPath('necromancer-jobs-basic.json'),
         necromancerScanTestPath('necromancer-form-requests-basic.json'),
+        necromancerScanTestPath('necromancer-only-form-requests.json'),
         necromancerScanTestPath('necromancer-events-listeners.json'),
         necromancerScanTestPath('necromancer-commands-basic.json'),
         necromancerScanTestPath('necromancer-diff-unchanged.json'),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
+use LaravelNecromancer\Benchmark\BenchmarkDumpWriter;
 use LaravelNecromancer\Benchmark\BenchmarkReport;
 use LaravelNecromancer\Benchmark\BenchmarkRunner;
 use LaravelNecromancer\Benchmark\FactChecker;
@@ -28,6 +29,7 @@ final class BenchmarkCommand extends Command
         {--condition=* : Conditions to run: none,manual,necromancer. Default: all three.}
         {--type=*      : Task types to run: qa,codegen,mini. Default: all.}
         {--no-judge    : Skip the AI-as-judge pass (automated checks only)}
+        {--no-dump     : Skip writing the per-run benchmark dump}
         {--model=      : Generation model override}
         {--judge=      : Judge model override}
         {--timeout=    : HTTP timeout in seconds for AI requests (default: 120)}
@@ -64,6 +66,9 @@ final class BenchmarkCommand extends Command
         $timeoutOption = $this->option('timeout');
         $timeout = is_numeric($timeoutOption) ? (int) $timeoutOption : (int) config('necromancer.benchmark.timeout', 120);
         $taskOverride = config('necromancer.benchmark.tasks') ?: null;
+        $dumpEnabled = $this->dumpEnabled();
+        $dumpPath = $this->resolveDumpPath();
+        $startedAt = now()->toISOString();
 
         $contextPaths = [
             'none' => '',
@@ -88,6 +93,8 @@ final class BenchmarkCommand extends Command
             timeout: $timeout,
             outputPath: is_string($this->option('output')) && $this->option('output') !== '' ? $this->option('output') : null,
             format: is_string($this->option('format')) && $this->option('format') !== '' ? $this->option('format') : 'text',
+            dumpEnabled: $dumpEnabled,
+            dumpPath: $dumpPath,
             boostActive: $boostDetector->isAvailable(),
         );
 
@@ -125,6 +132,31 @@ final class BenchmarkCommand extends Command
             $this->line($output);
         }
 
+        if ($dumpEnabled) {
+            try {
+                $dumpDirectory = (new BenchmarkDumpWriter)->write($report, [
+                    'started_at' => $startedAt,
+                    'manifest_path' => $manifestPath,
+                    'conditions' => $conditions,
+                    'types' => $types,
+                    'generation_model' => is_string($generationModel) && $generationModel !== '' ? $generationModel : null,
+                    'generation_provider' => config('necromancer.benchmark.generation_provider') ?: null,
+                    'judge_enabled' => ! $noJudge,
+                    'judge_model' => ! $noJudge && is_string($judgeModel) && $judgeModel !== '' ? $judgeModel : null,
+                    'judge_provider' => ! $noJudge ? (config('necromancer.benchmark.judge_provider') ?: null) : null,
+                    'timeout' => $timeout,
+                    'context_paths' => $contextPaths,
+                    'warnings' => $runner->warnings(),
+                ], $dumpPath);
+            } catch (\Throwable $e) {
+                $this->error('Unable to write benchmark dump: '.$e->getMessage());
+
+                return self::FAILURE;
+            }
+
+            $this->info('Dump written to '.$this->relativePath($dumpDirectory));
+        }
+
         return self::SUCCESS;
     }
 
@@ -148,6 +180,8 @@ final class BenchmarkCommand extends Command
         int $timeout,
         ?string $outputPath,
         string $format,
+        bool $dumpEnabled,
+        string $dumpPath,
         bool $boostActive,
     ): void {
         $sep = '  '.str_repeat('─', 58);
@@ -220,11 +254,16 @@ final class BenchmarkCommand extends Command
 
         $this->line('');
 
-        // Output
-        $outputInfo = $outputPath !== null
+        // Report + dump destinations
+        $reportInfo = $outputPath !== null
             ? $this->relativePath($outputPath)."  (format: {$format})"
             : "terminal  (format: {$format})";
-        $this->line(sprintf('  %-*s %s', $w, 'Output', $outputInfo));
+        $dumpInfo = $dumpEnabled
+            ? $this->relativePath($dumpPath).'  (automatic per-run dump)'
+            : 'disabled';
+
+        $this->line(sprintf('  %-*s %s', $w, 'Report', $reportInfo));
+        $this->line(sprintf('  %-*s %s', $w, 'Dump', $dumpInfo));
 
         $this->line('');
         $this->line($sep);
@@ -245,6 +284,20 @@ final class BenchmarkCommand extends Command
         } else {
             $path = (string) config('necromancer.output.context', base_path('NECROMANCER.md'));
         }
+
+        return $this->isAbsolutePath($path) ? $path : base_path($path);
+    }
+
+    private function dumpEnabled(): bool
+    {
+        $configured = filter_var(config('necromancer.benchmark.dump.enabled', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        return ($configured ?? true) && ! (bool) $this->option('no-dump');
+    }
+
+    private function resolveDumpPath(): string
+    {
+        $path = (string) config('necromancer.benchmark.dump.path', storage_path('app/necromancer/benchmarks'));
 
         return $this->isAbsolutePath($path) ? $path : base_path($path);
     }

@@ -31,11 +31,36 @@ function benchmarkAiAvailable(): AiDetector
     return new AiDetector(ServiceProvider::class);
 }
 
+function benchmarkDumpDirectories(string $path): array
+{
+    return array_values(File::directories($path));
+}
+
+function benchmarkDumpDirectory(string $path): string
+{
+    $directories = benchmarkDumpDirectories($path);
+
+    expect($directories)->toHaveCount(1);
+
+    return $directories[0];
+}
+
 beforeEach(function () {
     $this->app->register(AiServiceProvider::class);
     $this->instance(AiDetector::class, benchmarkAiAvailable());
 
     GenerationAgent::fake(['The route projects.index requires auth middleware.']);
+
+    $this->benchmarkDumpPath = storage_path('framework/testing/necromancer-benchmark-dumps');
+
+    File::delete($this->benchmarkDumpPath);
+    File::deleteDirectory($this->benchmarkDumpPath);
+    File::delete(storage_path('framework/testing/manual-benchmark-context.md'));
+
+    config([
+        'necromancer.benchmark.dump.enabled' => true,
+        'necromancer.benchmark.dump.path' => $this->benchmarkDumpPath,
+    ]);
 
     File::delete(base_path('necromancer.json'));
     File::delete(base_path('benchmark-test-output.md'));
@@ -44,6 +69,9 @@ beforeEach(function () {
 afterEach(function () {
     File::delete(base_path('necromancer.json'));
     File::delete(base_path('benchmark-test-output.md'));
+    File::delete($this->benchmarkDumpPath);
+    File::deleteDirectory($this->benchmarkDumpPath);
+    File::delete(storage_path('framework/testing/manual-benchmark-context.md'));
 });
 
 test('the benchmark command is registered in artisan', function () {
@@ -87,6 +115,9 @@ test('outputs results table in terminal format by default', function () {
     ])
         ->expectsOutputToContain('Benchmark')
         ->expectsOutputToContain('No context')
+        ->expectsOutputToContain('Report')
+        ->expectsOutputToContain('Dump')
+        ->doesntExpectOutputToContain('Output')
         ->assertSuccessful();
 });
 
@@ -135,6 +166,105 @@ test('accepts --timeout option without failing', function () {
         '--type' => ['qa'],
         '--timeout' => '180',
     ])->assertSuccessful();
+});
+
+test('writes an automatic benchmark dump directory for each successful run', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+    ])
+        ->expectsOutputToContain('Dump written to')
+        ->assertSuccessful();
+
+    $dumpDirectory = benchmarkDumpDirectory($this->benchmarkDumpPath);
+
+    expect(basename($dumpDirectory))->toMatch('/^\d{4}-\d{2}-\d{2}-\d{6}/')
+        ->and(File::exists($dumpDirectory.'/run.json'))->toBeTrue()
+        ->and(File::exists($dumpDirectory.'/results.json'))->toBeTrue()
+        ->and(File::isDirectory($dumpDirectory.'/responses'))->toBeTrue()
+        ->and(File::files($dumpDirectory.'/responses'))->not->toBeEmpty();
+});
+
+test('benchmark dump results include prompts and generated responses', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+    ])->assertSuccessful();
+
+    $dumpDirectory = benchmarkDumpDirectory($this->benchmarkDumpPath);
+    $results = json_decode(File::get($dumpDirectory.'/results.json'), true, 512, JSON_THROW_ON_ERROR);
+    $firstResult = $results['results'][0];
+
+    expect($firstResult['prompt'])->not->toBeEmpty()
+        ->and($firstResult['response'])->toContain('projects.index')
+        ->and(File::get(File::files($dumpDirectory.'/responses')[0]->getPathname()))->toContain('## Prompt')
+        ->and(File::get(File::files($dumpDirectory.'/responses')[0]->getPathname()))->toContain('## Response');
+});
+
+test('benchmark dump records context metadata without copying full context text', function () {
+    $manualContextPath = storage_path('framework/testing/manual-benchmark-context.md');
+
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    File::put($manualContextPath, 'SECRET_FULL_CONTEXT_SENTINEL');
+
+    config(['necromancer.benchmark.manual_context_path' => $manualContextPath]);
+
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['manual'],
+        '--type' => ['qa'],
+    ])->assertSuccessful();
+
+    $dumpDirectory = benchmarkDumpDirectory($this->benchmarkDumpPath);
+    $runJson = File::get($dumpDirectory.'/run.json');
+    $run = json_decode($runJson, true, 512, JSON_THROW_ON_ERROR);
+
+    expect($run['contexts']['manual'])->toMatchArray([
+        'path' => $manualContextPath,
+        'exists' => true,
+        'bytes' => strlen('SECRET_FULL_CONTEXT_SENTINEL'),
+        'sha256' => hash('sha256', 'SECRET_FULL_CONTEXT_SENTINEL'),
+    ])->and($runJson)->not->toContain('SECRET_FULL_CONTEXT_SENTINEL');
+
+    File::delete($manualContextPath);
+});
+
+test('--no-dump prevents benchmark dump creation', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--no-dump' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+    ])
+        ->doesntExpectOutputToContain('Dump written to')
+        ->assertSuccessful();
+
+    expect(File::exists($this->benchmarkDumpPath))->toBeFalse();
+});
+
+test('fails clearly when the benchmark dump path cannot be created as a directory', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    File::put($this->benchmarkDumpPath, 'not a directory');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+    ])
+        ->expectsOutputToContain('Unable to write benchmark dump')
+        ->assertFailed();
 });
 
 test('task is skipped and reported when required_key resolves to null', function () {
