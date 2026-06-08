@@ -7,4 +7,5 @@ parameters:
         - src
     scanFiles:
         - stubs/laravel-mcp.php
+        - stubs/livewire.php
     ignoreErrors: []

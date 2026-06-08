@@ -88,7 +88,7 @@ final readonly class LivewireCollector
     }
 
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @param  ReflectionClass<Component>  $reflection
      * @return list<array{name: string, type: string|null}>
      */
     private function collectProperties(ReflectionClass $reflection): array
@@ -113,7 +113,7 @@ final readonly class LivewireCollector
     }
 
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @param  ReflectionClass<Component>  $reflection
      * @return list<string>
      */
     private function collectActions(ReflectionClass $reflection): array
@@ -156,7 +156,7 @@ final readonly class LivewireCollector
     }
 
     /**
-     * @param  ReflectionClass<object>  $reflection
+     * @param  ReflectionClass<Component>  $reflection
      * @return list<string>
      */
     private function collectListens(ReflectionClass $reflection): array

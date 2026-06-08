@@ -984,7 +984,7 @@ final class GenerateCommand extends Command
 
             $propertyParts = array_map(function (array $prop): string {
                 $name = (string) ($prop['name'] ?? '');
-                $type = isset($prop['type']) && $prop['type'] !== null ? (string) $prop['type'] : null;
+                $type = isset($prop['type']) ? (string) $prop['type'] : null;
 
                 return $type !== null ? "{$name}: {$type}" : $name;
             }, $component['properties'] ?? []);
@@ -1055,7 +1055,7 @@ final class GenerateCommand extends Command
 
         $count = count($mailables);
         $hasSources = $this->hasSources($mailables);
-        $hasQueue = ! empty(array_filter($mailables, fn (array $m): bool => isset($m['queue']) && $m['queue'] !== null));
+        $hasQueue = ! empty(array_filter($mailables, fn (array $m): bool => isset($m['queue'])));
 
         $header = '| Class | Subject | Queued';
         $divider = '|---|---|---';

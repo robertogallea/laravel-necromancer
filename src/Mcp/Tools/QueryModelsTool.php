@@ -33,9 +33,6 @@ final class QueryModelsTool extends Tool
         ];
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function handle(ManifestReader $reader, Request $request): mixed
     {
         $models = $this->loadArtifacts($reader, 'models');

@@ -57,9 +57,6 @@ final class SearchArtifactsTool extends Tool
         ];
     }
 
-    /**
-     * @return list<array{type: string, artifact: array<string, mixed>}>
-     */
     public function handle(ManifestReader $reader, Request $request): mixed
     {
         $needle = strtolower((string) ($request->get('query') ?? ''));

@@ -67,7 +67,7 @@ final class FactChecker
         }
 
         if (is_array($value)) {
-            return array_values(array_map('strval', array_is_list($value) ? $value : array_keys($value)));
+            return array_map('strval', array_is_list($value) ? $value : array_keys($value));
         }
 
         return [(string) $value];

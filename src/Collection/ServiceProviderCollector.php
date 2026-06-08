@@ -8,7 +8,6 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Support\DeferrableProvider;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
-use Throwable;
 
 final readonly class ServiceProviderCollector
 {
@@ -57,11 +56,7 @@ final readonly class ServiceProviderCollector
             return null;
         }
 
-        try {
-            $reflection = new ReflectionClass($class);
-        } catch (Throwable) {
-            return null;
-        }
+        $reflection = new ReflectionClass($class);
 
         if ($reflection->isAbstract()) {
             return null;

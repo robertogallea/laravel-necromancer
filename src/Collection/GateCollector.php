@@ -50,8 +50,6 @@ final readonly class GateCollector
         }
 
         try {
-            $reflection ??= new ReflectionClass($gate);
-
             $beforeProp = $reflection->getProperty('beforeCallbacks');
             $beforeProp->setAccessible(true);
             $beforeCallbacks = $beforeProp->getValue($gate);
@@ -69,8 +67,6 @@ final readonly class GateCollector
         }
 
         try {
-            $reflection ??= new ReflectionClass($gate);
-
             $afterProp = $reflection->getProperty('afterCallbacks');
             $afterProp->setAccessible(true);
             $afterCallbacks = $afterProp->getValue($gate);

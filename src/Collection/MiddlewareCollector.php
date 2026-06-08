@@ -95,9 +95,9 @@ final readonly class MiddlewareCollector
             $reflection = new ReflectionClass($kernel);
 
             if ($reflection->hasMethod('getMiddleware')) {
-                $result = $kernel->getMiddleware();
+                $result = $reflection->getMethod('getMiddleware')->invoke($kernel);
 
-                return is_array($result) ? array_values($result) : [];
+                return is_array($result) ? array_values(array_filter($result, 'is_string')) : [];
             }
         } catch (Throwable) {
             // Kernel not bound or reflection failed — skip global middleware

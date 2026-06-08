@@ -22,7 +22,7 @@ final class TaskSuite
     public function tasks(?array $types = null): array
     {
         if ($types === null) {
-            return array_values($this->tasks);
+            return $this->tasks;
         }
 
         return array_values(

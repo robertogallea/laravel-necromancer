@@ -34,9 +34,6 @@ final class QueryRoutesTool extends Tool
         ];
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function handle(ManifestReader $reader, Request $request): mixed
     {
         $routes = $this->loadArtifacts($reader, 'routes');

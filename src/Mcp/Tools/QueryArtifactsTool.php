@@ -61,9 +61,6 @@ final class QueryArtifactsTool extends Tool
         ];
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function handle(ManifestReader $reader, Request $request): mixed
     {
         $type = (string) ($request->get('type') ?? '');

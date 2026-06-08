@@ -121,7 +121,7 @@ final class BenchmarkRunner
             if (empty($judgeMustContain) && $recallKey !== null && isset($resolved[$recallKey])) {
                 $recallValue = $resolved[$recallKey]['value'];
                 $judgeMustContain = is_array($recallValue)
-                    ? array_values(array_is_list($recallValue) ? $recallValue : array_keys($recallValue))
+                    ? (array_is_list($recallValue) ? $recallValue : array_keys($recallValue))
                     : (is_string($recallValue) ? [$recallValue] : []);
             }
 

@@ -283,7 +283,6 @@ final readonly class StructuralArtifact implements JsonSerializable
 
     /**
      * @param  list<string>  $hooks
-     * @param  array<string, mixed>|null  $source
      */
     public static function observer(
         string $class,

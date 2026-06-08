@@ -25,10 +25,6 @@ final class BenchmarkReport
         $summary = [];
 
         foreach ($grouped as $condition => $conditionResults) {
-            if (empty($conditionResults)) {
-                continue;
-            }
-
             $count = count($conditionResults);
             $judged = array_filter($conditionResults, fn (BenchmarkResult $r): bool => $r->judgeScore !== null);
 

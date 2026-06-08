@@ -7,6 +7,8 @@ namespace LaravelNecromancer\Collection;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
 use Throwable;
@@ -78,9 +80,12 @@ final readonly class MailableCollector
         $subject = null;
 
         try {
-            $instance = $reflection->newInstanceWithoutConstructor();
-            $envelope = $instance->envelope();
-            $subject = $envelope->subject ?? null;
+            if ($reflection->hasMethod('envelope')) {
+                $instance = $reflection->newInstanceWithoutConstructor();
+                $envelope = $reflection->getMethod('envelope')->invoke($instance);
+                $subjectVal = $envelope instanceof Envelope ? $envelope->subject : null;
+                $subject = is_string($subjectVal) ? $subjectVal : null;
+            }
         } catch (Throwable) {
             $subject = null;
         }
@@ -88,9 +93,14 @@ final readonly class MailableCollector
         $view = null;
 
         try {
-            $instance = $reflection->newInstanceWithoutConstructor();
-            $content = $instance->content();
-            $view = $content->view ?? $content->markdown ?? null;
+            if ($reflection->hasMethod('content')) {
+                $instance = $reflection->newInstanceWithoutConstructor();
+                $content = $reflection->getMethod('content')->invoke($instance);
+                if ($content instanceof Content) {
+                    $viewVal = $content->view ?? $content->markdown ?? null;
+                    $view = is_string($viewVal) ? $viewVal : null;
+                }
+            }
         } catch (Throwable) {
             $view = null;
         }
