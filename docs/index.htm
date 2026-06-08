@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laravel Necromancer — AI-readable Laravel codebases</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; background: #0a0a0f; }
+    .copy-btn {
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .code-block:hover .copy-btn {
+      opacity: 1;
+    }
+    .copy-btn.copied {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-[#0a0a0f] text-gray-100 antialiased">
+
+  <!-- Navigation -->
+  <nav class="sticky top-0 z-50 bg-[#0a0a0f]/95 backdrop-blur border-b border-gray-800">
+    <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="font-bold text-red-400 tracking-tight">Laravel Necromancer</span>
+        <span class="text-xs text-gray-600 font-mono">v1.0</span>
+      </div>
+      <div class="hidden md:flex items-center gap-6 text-sm text-gray-400">
+        <a href="#artifacts" class="hover:text-red-400 transition-colors">Artifacts</a>
+        <a href="#commands" class="hover:text-red-400 transition-colors">Commands</a>
+        <a href="#install" class="hover:text-red-400 transition-colors">Install</a>
+        <a href="#ci" class="hover:text-red-400 transition-colors">CI</a>
+        <a href="#mcp" class="hover:text-red-400 transition-colors">MCP</a>
+      </div>
+      <a href="https://github.com/robertogallea/laravel-necromancer"
+         target="_blank" rel="noopener"
+         class="text-sm bg-red-900 text-red-100 px-4 py-1.5 rounded-md hover:bg-red-800 transition-colors font-medium border border-red-800">
+        View on GitHub
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="bg-gray-900 border-b border-gray-800 py-20 px-4">
+    <div class="max-w-5xl mx-auto">
+      <div class="max-w-2xl">
+        <h1 class="text-4xl md:text-5xl font-bold tracking-tight text-red-400 mb-5 leading-tight">
+          Unearth what AI needs to know about your Laravel app.
+        </h1>
+        <p class="text-lg text-gray-400 mb-8 leading-relaxed">
+          Laravel Necromancer scans your bootstrapped application and produces a structured manifest of
+          <strong class="text-gray-200">18 artifact types</strong> — routes, models, jobs, events, policies, and more —
+          so AI coding agents always have an accurate picture of your application.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a href="https://github.com/robertogallea/laravel-necromancer"
+             target="_blank" rel="noopener"
+             class="inline-flex items-center gap-2 bg-red-900 text-red-100 px-5 py-2.5 rounded-md hover:bg-red-800 transition-colors font-medium text-sm border border-red-800">
+            View on GitHub →
+          </a>
+          <a href="#install"
+             class="inline-flex items-center gap-2 border border-gray-700 text-gray-300 px-5 py-2.5 rounded-md hover:bg-gray-800 transition-colors font-medium text-sm">
+            Quick Install ↓
+          </a>
+        </div>
+      </div>
+      <div class="mt-10 code-block relative">
+        <pre class="bg-black text-green-400 font-mono text-sm p-6 rounded-xl overflow-x-auto leading-relaxed border border-gray-800"><span class="text-gray-600">$</span> php artisan necromancer:doctor
+
+  Laravel Necromancer — AI Readability Score
+  ──────────────────────────────────────────
+  Score: 74%
+
+  Route Clarity          ████████░░  82%  (12/15 named · 14/15 controller-backed)
+  Model Expressiveness   ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
+  Authorization Coverage ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
+  Validation Coverage    ████████░░  80%  (8/10 write routes with FormRequest)
+  Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
+  Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
+  Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
+
+  Tip: run necromancer:audit for a detailed findings list.</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Artifacts -->
+  <section id="artifacts" class="py-16 px-4 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">What Necromancer Collects</h2>
+      <p class="text-gray-500 mb-8">The manifest covers 18 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">01</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">routes</div>
+          <div class="text-gray-500 text-sm">Name, method, URI, controller, action, middleware, authorization</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">02</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">models</div>
+          <div class="text-gray-500 text-sm">Table, fillable, casts, relationships, scopes, observers, policy, factory</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">03</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">jobs</div>
+          <div class="text-gray-500 text-sm">Queue, connection, tries, timeout, backoff, max_exceptions</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">04</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">events</div>
+          <div class="text-gray-500 text-sm">Listeners, broadcastable channels</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">05</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">listeners</div>
+          <div class="text-gray-500 text-sm">Handled events, queued status</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">06</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">commands</div>
+          <div class="text-gray-500 text-sm">Signature, description, aliases</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">07</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">form_requests</div>
+          <div class="text-gray-500 text-sm">Rules, stop_on_first_failure, error_bag</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">08</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">policies</div>
+          <div class="text-gray-500 text-sm">Model, policy methods</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">09</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">enums</div>
+          <div class="text-gray-500 text-sm">Backing type, cases</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">10</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">tests</div>
+          <div class="text-gray-500 text-sm">File, type (unit/feature), subject class, test methods</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">11</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">observers</div>
+          <div class="text-gray-500 text-sm">Model, lifecycle hooks, queued status</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">12</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">scheduled_tasks</div>
+          <div class="text-gray-500 text-sm">Command, cron expression, human-readable schedule, flags</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">13</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">middleware</div>
+          <div class="text-gray-500 text-sm">Alias, class, scope (global/group/alias), group name</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">14</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">livewire_components</div>
+          <div class="text-gray-500 text-sm">View, public properties with types, action methods, listened events</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">15</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">gates</div>
+          <div class="text-gray-500 text-sm">Ability, kind (closure/class/before_hook/after_hook), parameters</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">16</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">mailables</div>
+          <div class="text-gray-500 text-sm">Subject, queued status, queue name, view/markdown template</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">17</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">validation_rules</div>
+          <div class="text-gray-500 text-sm">Implicit flag, docblock description</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">18</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">service_providers</div>
+          <div class="text-gray-500 text-sm">Deferred flag, source location</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Commands -->
+  <section id="commands" class="py-16 px-4 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">Commands</h2>
+      <p class="text-gray-500 mb-8">
+        Necromancer follows a <strong class="text-gray-200">scan-first</strong> workflow — every other command reads the manifest produced by
+        <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">necromancer:scan</code>.
+      </p>
+
+      <!-- necromancer:scan -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:scan</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--only=TYPE,TYPE</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--diff</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--fail-on-drift</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Bootstraps the application and writes the <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer.json</code> manifest. Re-run whenever your application changes. Supports partial scans and CI drift detection.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:scan
+php artisan necromancer:scan --only=routes,models
+php artisan necromancer:scan --diff --fail-on-drift    <span class="text-gray-600"># CI gate</span></pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:map -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:map</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--type=TYPE</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Terminal-based pretty-printer of the manifest inventory. Read-only; never writes to disk. Shows a stale-manifest warning if source files are newer than the manifest.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:map
+php artisan necromancer:map --type=routes
+php artisan necromancer:map --type=models</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:audit -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:audit</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--format=text|json|markdown</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--fail-on=SEVERITY</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Scored AI-readability report (0–100). Findings grouped by severity: <strong class="text-gray-200">error</strong> (−10), <strong class="text-gray-200">warning</strong> (−5), <strong class="text-gray-200">suggestion</strong> (−1). Checks unnamed routes, missing model casts, dead events, unconfigured jobs, and more.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:audit
+php artisan necromancer:audit --format=markdown --output=audit.md
+php artisan necromancer:audit --fail-on=error      <span class="text-gray-600"># exit 1 on errors (CI)</span>
+php artisan necromancer:audit --fail-on=warning    <span class="text-gray-600"># exit 1 on warnings or errors</span></pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:doctor -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:doctor</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--json</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--min-score=N</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--only=KEYS</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Seven-dimension AI readability percentage dashboard with progress bars. Dimensions: Route Clarity, Model Expressiveness, Authorization Coverage, Validation Coverage, Async Clarity, Codebase Vocabulary, Test Presence.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:doctor
+php artisan necromancer:doctor --json
+php artisan necromancer:doctor --min-score=80         <span class="text-gray-600"># exit 1 when score &lt; 80 (CI)</span>
+php artisan necromancer:doctor --only=route-clarity</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:generate -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:generate</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--only=TYPE,TYPE</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--except=TYPE,TYPE</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--force</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Produces <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">NECROMANCER.md</code> — a full Markdown context file for AI coding agents. When Laravel Boost is installed, writes to <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">.ai/guidelines/necromancer.md</code> automatically.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:generate
+php artisan necromancer:generate --only=routes,models
+php artisan necromancer:generate --except=listeners,validation_rules
+php artisan necromancer:generate --output=.ai/context/app.md --force</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:ask -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:ask</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--provider=</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--model=</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Natural-language codebase Q&amp;A. The manifest is injected verbatim into the AI's context — answers are grounded in your actual application, not the model's prior knowledge. Requires <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">laravel/ai</code>.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:ask "What routes require authentication?"
+php artisan necromancer:ask                              <span class="text-gray-600"># interactive prompt</span>
+php artisan necromancer:ask "..." --provider=anthropic --model=claude-sonnet-4-5</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:prompt -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:prompt</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--top=N</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--no-ai</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Builds a ready-to-paste AI prompt grounded in the most relevant manifest entries for your question. Keyword-searches the manifest, ranks artifacts by relevance, and outputs a prompt block with <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">file:line</code> citations.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:prompt "Where is tenant isolation enforced?"
+php artisan necromancer:prompt "billing" --top=5
+php artisan necromancer:prompt "auth" --no-ai --output=prompt.txt</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:infer -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:infer</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--locale=</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--temperature=</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--max-critic-rounds=N</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--dry-run</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--fresh</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Generates Architecture Decision Records (ADRs) from the manifest using AI. Evaluates nine architectural dimensions (async-processing, authorization, event-driven, api-design, data-modeling, command-scheduling, form-validation, external-services, architecture-pattern). A critic agent reviews and filters the initial ADRs. Requires <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">laravel/ai</code>.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:infer
+php artisan necromancer:infer --dry-run             <span class="text-gray-600"># print without writing files</span>
+php artisan necromancer:infer --temperature=0 --max-critic-rounds=2
+php artisan necromancer:infer --locale=it           <span class="text-gray-600"># add Italian translation</span>
+php artisan necromancer:infer --fresh               <span class="text-gray-600"># clear cache and re-infer</span></pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:diff -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:diff</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--base-manifest=PATH</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--review</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--format=markdown</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Compares the current manifest against a branch or snapshot. Shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts. With <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--review</code>, an AI agent summarises the architectural impact and surfaces risks.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:diff main
+php artisan necromancer:diff main --review --format=markdown
+php artisan necromancer:diff --base-manifest=snapshots/before.json</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:benchmark -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:benchmark</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--generate-suite</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--suite-output=PATH</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--no-judge</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--format=markdown</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Measures how much Necromancer's generated context improves AI accuracy, hallucination rate, and token cost. Runs a task suite in three conditions — no context, manual <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AGENTS.md</code>, and Necromancer-generated <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">NECROMANCER.md</code> — and reports results side by side. Use <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--generate-suite</code> to scaffold a grounded task suite from the current manifest before running the benchmark.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:benchmark
+php artisan necromancer:benchmark --generate-suite   <span class="text-gray-600"># scaffold tasks from manifest → config/benchmark-tasks.php</span>
+php artisan necromancer:benchmark --generate-suite --suite-output=custom/tasks.php
+php artisan necromancer:benchmark --no-judge        <span class="text-gray-600"># automated checks only</span>
+php artisan necromancer:benchmark --format=markdown --output=benchmark.md</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="py-16 px-4 bg-gray-900 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">Getting Started</h2>
+      <p class="text-gray-500 mb-8">Three steps from zero to AI-readable codebase.</p>
+
+      <div class="mb-4 border border-gray-800 bg-[#0a0a0f] rounded-lg p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="bg-red-950 text-red-400 font-mono text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold border border-red-900">1</span>
+          <span class="font-semibold text-red-400">Install</span>
+        </div>
+        <div class="code-block relative mb-3">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">composer require --dev robertogallea/laravel-necromancer</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">The service provider is auto-discovered — no manual registration needed. Optionally publish the configuration:</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan vendor:publish --tag=necromancer-config</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <div class="mb-4 border border-gray-800 bg-[#0a0a0f] rounded-lg p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="bg-red-950 text-red-400 font-mono text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold border border-red-900">2</span>
+          <span class="font-semibold text-red-400">Scan</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">Build the manifest. Re-run whenever your application changes.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:scan</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <div class="mb-6 border border-gray-800 bg-[#0a0a0f] rounded-lg p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="bg-red-950 text-red-400 font-mono text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold border border-red-900">3</span>
+          <span class="font-semibold text-red-400">Audit &amp; Generate</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">Check AI-readability and generate the Markdown context file.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:audit
+php artisan necromancer:generate</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <div class="inline-flex gap-6 bg-[#0a0a0f] border border-gray-800 rounded-lg px-6 py-4 text-sm text-gray-400">
+        <div><span class="text-gray-600 mr-2">PHP</span> <strong class="text-gray-200">≥ 8.3</strong></div>
+        <div class="border-l border-gray-800"></div>
+        <div><span class="text-gray-600 mr-2">Laravel</span> <strong class="text-gray-200">13.x</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CI Integration -->
+  <section id="ci" class="py-16 px-4 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">CI Integration</h2>
+      <p class="text-gray-500 mb-8">Add these steps to your pipeline to enforce manifest freshness and AI-readability quality gates.</p>
+      <div class="code-block relative">
+        <pre class="bg-black text-gray-300 font-mono text-sm p-6 rounded-xl overflow-x-auto border border-gray-800"><span class="text-gray-600">- name:</span> <span class="text-green-400">Check manifest is up to date</span>
+  <span class="text-gray-600">run:</span> php artisan necromancer:scan --diff --fail-on-drift
+
+<span class="text-gray-600">- name:</span> <span class="text-green-400">Fail on AI-readability errors</span>
+  <span class="text-gray-600">run:</span> php artisan necromancer:audit --fail-on=error
+
+<span class="text-gray-600">- name:</span> <span class="text-green-400">Enforce minimum AI readability score</span>
+  <span class="text-gray-600">run:</span> php artisan necromancer:doctor --min-score=80</pre>
+        <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MCP Tools -->
+  <section id="mcp" class="py-16 px-4 bg-gray-900 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">MCP Tools</h2>
+      <p class="text-gray-500 mb-8">
+        When <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">laravel/mcp</code> is installed, Necromancer exposes the manifest as read-only tools via a
+        <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">laravel-necromancer</code> MCP server handle — auto-configured in <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">.mcp.json</code> on first run.
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">query_routes</code>
+          <p class="text-gray-500 text-sm mt-2">List routes, optionally filtered by method or name/URI pattern.</p>
+        </div>
+
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">query_models</code>
+          <p class="text-gray-500 text-sm mt-2">List Eloquent models, optionally filtered by class name.</p>
+        </div>
+
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">query_artifacts</code>
+          <p class="text-gray-500 text-sm mt-2">List artifacts of any type, optionally filtered by JSON substring. Use when you know the artifact type.</p>
+        </div>
+
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">search_artifacts</code>
+          <p class="text-gray-500 text-sm mt-2">Full-text search across all artifact types. Use when you need to search across types.</p>
+        </div>
+
+      </div>
+      <div class="code-block relative">
+        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">{
+  "mcpServers": {
+    "laravel-necromancer": {
+      "command": "php",
+      "args": ["artisan", "mcp:start", "necromancer"]
+    }
+  }
+}</pre>
+        <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHP Attributes -->
+  <section id="attributes" class="py-16 px-4 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">PHP Attribute Support</h2>
+      <p class="text-gray-500 mb-8">Necromancer reads PHP 8 attributes as primary data sources alongside class properties. Codebases using the attribute-based API introduced in Laravel 11+ are fully supported.</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="border-b border-gray-800">
+              <th class="text-left py-3 pr-6 text-gray-500 font-medium">Subsystem</th>
+              <th class="text-left py-3 pr-6 text-gray-500 font-medium">Attributes</th>
+              <th class="text-left py-3 text-gray-500 font-medium">Manifest fields</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800">
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Routing</td>
+              <td class="py-3 pr-6 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Authorize]</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top"><code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">authorization</code></td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Eloquent</td>
+              <td class="py-3 pr-6 align-top flex flex-wrap gap-1">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[ObservedBy]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[UsePolicy]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[ScopedBy]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[UseFactory]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[UseEloquentBuilder]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Scope]</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">observers</code>,
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">policy</code>,
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">global_scopes</code>,
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">factory</code>,
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">custom_builder</code>,
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">scopes</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Queue</td>
+              <td class="py-3 pr-6 align-top flex flex-wrap gap-1">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Queue]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Connection]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Tries]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Timeout]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Backoff]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[MaxExceptions]</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top">all job queue config fields</td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Console</td>
+              <td class="py-3 pr-6 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Aliases]</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top"><code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">aliases</code></td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">FormRequest</td>
+              <td class="py-3 pr-6 align-top flex flex-wrap gap-1">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[StopOnFirstFailure]</code>
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[ErrorBag]</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">stop_on_first_failure</code>,
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">error_bag</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy callout -->
+  <section class="py-16 px-4 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <div class="border-l-4 border-red-800 bg-red-950/20 rounded-r-lg px-6 py-5">
+        <h3 class="font-semibold text-red-400 mb-3">Privacy &amp; Exclusions</h3>
+        <ul class="space-y-1.5 text-sm text-gray-400">
+          <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Never reads <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">.env</code> or raw configuration values</li>
+          <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Never collects or stores application secrets</li>
+          <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Horizon, Telescope, and Debugbar routes excluded by default</li>
+          <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Exclusions apply to every downstream command (map, audit, generate) — excluded artifacts never appear in results</li>
+        </ul>
+        <div class="mt-4 code-block relative">
+          <pre class="bg-black border border-gray-800 text-gray-300 font-mono text-xs p-4 rounded-lg overflow-x-auto"><span class="text-gray-600">// config/necromancer.php</span>
+'exclude' => [
+    'routes' => ['horizon.*', 'telescope.*', 'debugbar.*'],
+    'models' => [],
+    'tests'  => [],
+],</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-800 py-10 px-4">
+    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <div class="font-medium text-gray-400">Laravel Necromancer — MIT License</div>
+      <div>
+        Built by
+        <a href="https://github.com/robertogallea" target="_blank" rel="noopener" class="text-red-400 hover:underline font-medium">Roberto Gallea</a>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/robertogallea/laravel-necromancer" target="_blank" rel="noopener" class="hover:text-red-400 transition-colors">GitHub</a>
+        <a href="https://packagist.org/packages/robertogallea/laravel-necromancer" target="_blank" rel="noopener" class="hover:text-red-400 transition-colors">Packagist</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function copyCode(btn) {
+      const pre = btn.closest('.code-block').querySelector('pre');
+      navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    }
+  </script>
+
+</body>
+</html>
