@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use Livewire\Attributes\On;
+use Livewire\Component;
 use ReflectionClass;
 use ReflectionNamedType;
 
@@ -25,7 +28,7 @@ final readonly class LivewireCollector
      */
     public function collect(): array
     {
-        if (! class_exists(\Livewire\Component::class)) {
+        if (! class_exists(Component::class)) {
             return [];
         }
 
@@ -65,7 +68,7 @@ final readonly class LivewireCollector
 
         $reflection = new ReflectionClass($class);
 
-        if ($reflection->isAbstract() || ! $reflection->isSubclassOf(\Livewire\Component::class)) {
+        if ($reflection->isAbstract() || ! $reflection->isSubclassOf(Component::class)) {
             return null;
         }
 
@@ -158,18 +161,18 @@ final readonly class LivewireCollector
      */
     private function collectListens(ReflectionClass $reflection): array
     {
-        if (! class_exists(\Livewire\Attributes\On::class)) {
+        if (! class_exists(On::class)) {
             return [];
         }
 
         $listens = [];
 
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            foreach ($method->getAttributes(\Livewire\Attributes\On::class) as $attr) {
+            foreach ($method->getAttributes(On::class) as $attr) {
                 $args = $attr->getArguments();
 
                 if (isset($args[0])) {
-                    foreach (\Illuminate\Support\Arr::wrap($args[0]) as $event) {
+                    foreach (Arr::wrap($args[0]) as $event) {
                         if (is_string($event)) {
                             $listens[] = $event;
                         }

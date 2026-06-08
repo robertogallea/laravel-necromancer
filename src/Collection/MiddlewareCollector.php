@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Routing\Router;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use ReflectionClass;
@@ -90,7 +91,7 @@ final readonly class MiddlewareCollector
     private function globalMiddleware(): array
     {
         try {
-            $kernel = $this->app->make(\Illuminate\Contracts\Http\Kernel::class);
+            $kernel = $this->app->make(Kernel::class);
             $reflection = new ReflectionClass($kernel);
 
             if ($reflection->hasMethod('getMiddleware')) {
