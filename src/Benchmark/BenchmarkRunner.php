@@ -46,6 +46,29 @@ final class BenchmarkRunner
 
         foreach ($tasks as $task) {
             foreach ($options['conditions'] as $condition) {
+                $taskConditions = isset($task['conditions']) ? (array) $task['conditions'] : null;
+
+                if ($taskConditions !== null && ! in_array($condition, $taskConditions, true)) {
+                    $results[] = new BenchmarkResult(
+                        taskId: $task['id'],
+                        taskType: $task['type'],
+                        condition: $condition,
+                        prompt: $task['prompt'],
+                        response: '',
+                        promptTokens: 0,
+                        completionTokens: 0,
+                        accuracy: 0.0,
+                        hallucinationRate: 0.0,
+                        judgeScore: null,
+                        judgeTokens: null,
+                        goldenAnswersTrusted: false,
+                        skipped: true,
+                        skipReason: "task '{$task['id']}' is not configured to run under the '{$condition}' condition",
+                    );
+
+                    continue;
+                }
+
                 $results[] = $this->runTask($task, $condition, $options);
             }
         }

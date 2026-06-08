@@ -43,6 +43,8 @@ final class GoldenAnswerResolver
             $type === 'routes' && $field === 'auth_required' => $this->authRequiredRouteNames($artifacts),
             $type === 'models' && $field === 'cast_keys' && $identifier !== null => $this->modelCastKeys($artifacts, $identifier),
             $type === 'models' && $field === 'observer_short_names' && $identifier !== null => $this->modelObserverShortNames($artifacts, $identifier),
+            $type === 'models' && $field === 'with_observers' => $this->modelsWithObservers($artifacts),
+            $type === 'models' && $field === 'with_casts' => $this->modelsWithCasts($artifacts),
             $type === 'models' && $field !== null && $identifier !== null => $this->artifactField('models', $artifacts, $field, $identifier),
             $type === 'jobs' && $field === 'named' => $this->namedArtifacts('jobs', $artifacts),
             $type === 'jobs' && $field !== null && $identifier !== null => $this->artifactField('jobs', $artifacts, $field, $identifier),
@@ -121,6 +123,28 @@ final class GoldenAnswerResolver
                 (array) ($artifacts[$type] ?? [])
             )
         ));
+    }
+
+    /** @return string[] */
+    private function modelsWithObservers(array $artifacts): array
+    {
+        return array_values(array_filter(array_map(
+            function (array $model): ?string {
+                return ! empty($model['observers']) ? $this->shortName((string) ($model['class'] ?? '')) : null;
+            },
+            (array) ($artifacts['models'] ?? [])
+        )));
+    }
+
+    /** @return string[] */
+    private function modelsWithCasts(array $artifacts): array
+    {
+        return array_values(array_filter(array_map(
+            function (array $model): ?string {
+                return ! empty($model['casts']) ? $this->shortName((string) ($model['class'] ?? '')) : null;
+            },
+            (array) ($artifacts['models'] ?? [])
+        )));
     }
 
     /** @return string[]|null  null when model absent from manifest, [] when model present but no casts */

@@ -15,6 +15,8 @@ use LaravelNecromancer\Benchmark\Renderers\JsonRenderer;
 use LaravelNecromancer\Benchmark\Renderers\MarkdownRenderer;
 use LaravelNecromancer\Benchmark\Renderers\TerminalRenderer;
 use LaravelNecromancer\Benchmark\TaskSuite;
+use LaravelNecromancer\Benchmark\TaskSuiteGenerator;
+use LaravelNecromancer\Benchmark\TaskSuiteWriter;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
 use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Integrations\BoostDetector;
@@ -26,15 +28,17 @@ final class BenchmarkCommand extends Command
     use ReadsManifest;
 
     protected $signature = 'necromancer:benchmark
-        {--condition=* : Conditions to run: none,manual,necromancer. Default: all three.}
-        {--type=*      : Task types to run: qa,codegen,mini. Default: all.}
-        {--no-judge    : Skip the AI-as-judge pass (automated checks only)}
-        {--no-dump     : Skip writing the per-run benchmark dump}
-        {--model=      : Generation model override}
-        {--judge=      : Judge model override}
-        {--timeout=    : HTTP timeout in seconds for AI requests (default: 120)}
-        {--format=     : Output format: text|markdown|json (default: text)}
-        {--output=     : Write the report to this file path}';
+        {--condition=*    : Conditions to run: none,manual,necromancer. Default: all three.}
+        {--type=*         : Task types to run: qa,codegen,mini. Default: all.}
+        {--no-judge       : Skip the AI-as-judge pass (automated checks only)}
+        {--no-dump        : Skip writing the per-run benchmark dump}
+        {--model=         : Generation model override}
+        {--judge=         : Judge model override}
+        {--timeout=       : HTTP timeout in seconds for AI requests (default: 120)}
+        {--format=        : Output format: text|markdown|json (default: text)}
+        {--output=        : Write the report to this file path}
+        {--generate-suite : Generate a grounded task suite from the manifest and write it to config/benchmark-tasks.php}
+        {--suite-output=  : Path to write the generated suite (default: config/benchmark-tasks.php)}';
 
     protected $description = 'Benchmark the impact of Necromancer context on AI coding-assistant effectiveness';
 
@@ -48,6 +52,10 @@ final class BenchmarkCommand extends Command
             $this->error('Necromancer manifest not found. Run necromancer:scan first.');
 
             return self::FAILURE;
+        }
+
+        if ($this->option('generate-suite')) {
+            return $this->generateSuite($manifest);
         }
 
         if (! $aiDetector->isAvailable()) {
@@ -156,6 +164,34 @@ final class BenchmarkCommand extends Command
 
             $this->info('Dump written to '.$this->relativePath($dumpDirectory));
         }
+
+        return self::SUCCESS;
+    }
+
+    /** @param array<string, mixed> $manifest */
+    private function generateSuite(array $manifest): int
+    {
+        $outputPath = $this->option('suite-output') ?: base_path('config/benchmark-tasks.php');
+
+        if (file_exists($outputPath) && ! $this->confirm("Overwrite existing {$outputPath}?", true)) {
+            $this->line('Aborted.');
+
+            return self::SUCCESS;
+        }
+
+        $tasks = (new TaskSuiteGenerator($manifest))->generate();
+        $php = (new TaskSuiteWriter)->render($tasks);
+
+        if (! is_dir(dirname($outputPath))) {
+            mkdir(dirname($outputPath), 0755, true);
+        }
+
+        file_put_contents($outputPath, $php);
+
+        $this->info('Suite written to '.$this->relativePath($outputPath));
+        $this->line('');
+        $this->line('Wire it up in config/necromancer.php:');
+        $this->line("  'tasks' => require __DIR__.'/benchmark-tasks.php',");
 
         return self::SUCCESS;
     }

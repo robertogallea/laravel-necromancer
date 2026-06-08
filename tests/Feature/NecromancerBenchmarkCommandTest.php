@@ -347,7 +347,7 @@ test('resolves necromancer context to skill_path config when Boost is available'
     $this->artisan('necromancer:benchmark', [
         '--no-judge' => true,
         '--condition' => ['necromancer'],
-        '--type' => ['qa'],
+        '--type' => ['codegen'],
         '--format' => 'json',
         '--output' => $outputPath,
     ])->assertSuccessful();
@@ -355,7 +355,7 @@ test('resolves necromancer context to skill_path config when Boost is available'
     $json = json_decode(File::get($outputPath), true);
     $ran = array_filter($json['results'], fn ($r) => ! $r['skipped']);
 
-    // At least one non-skipped task means the skill file was found and loaded.
+    // At least one non-skipped codegen task means the skill file was found and loaded.
     expect(count($ran))->toBeGreaterThan(0);
 
     File::delete([$skillPath, $guidelinesPath, $outputPath]);
@@ -371,4 +371,106 @@ test('only runs tasks matching --type filter', function () {
         '--condition' => ['none'],
         '--type' => ['qa'],
     ])->assertSuccessful();
+});
+
+test('Q&A tasks are skipped for the necromancer condition', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $outputPath = base_path('benchmark-qa-conditions-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer'],
+        '--type' => ['qa'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+    $skipped = array_filter($json['results'], fn ($r) => $r['skipped'] === true);
+
+    expect(count($skipped))->toBe(count($json['results']));
+
+    File::delete($outputPath);
+});
+
+test('codegen tasks run for all three conditions', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-codegen-conditions-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'manual', 'necromancer'],
+        '--type' => ['codegen'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+    $notSkipped = array_filter($json['results'], fn ($r) => $r['skipped'] === false);
+
+    // At least one codegen task ran for each condition
+    $conditions = array_unique(array_column($notSkipped, 'condition'));
+    expect($conditions)->toContain('none', 'necromancer');
+
+    File::delete($outputPath);
+});
+
+test('--generate-suite writes a PHP task file and exits without benchmarking', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $outputPath = sys_get_temp_dir().'/necromancer-suite-'.uniqid().'.php';
+
+    $this->artisan('necromancer:benchmark', [
+        '--generate-suite' => true,
+        '--suite-output' => $outputPath,
+    ])
+        ->expectsOutputToContain('Suite written to')
+        ->expectsOutputToContain("'tasks' => require")
+        ->assertSuccessful();
+
+    expect(file_exists($outputPath))->toBeTrue();
+
+    $tasks = require $outputPath;
+    expect($tasks)->toBeArray()->toHaveCount(12);
+
+    @unlink($outputPath);
+});
+
+test('--generate-suite generates tasks grounded to manifest artifacts', function () {
+    $manifest = json_encode([
+        'meta' => ['app_name' => 'TestApp', 'generated_at' => now()->toISOString(), 'content_hash' => 'abc', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'artifacts' => [
+            'routes' => [
+                ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => ['auth'], 'controller' => 'OrderController', 'action' => 'index', 'source' => null],
+            ],
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'observers' => ['App\\Observers\\OrderObserver'], 'casts' => ['total' => 'decimal:2'], 'fillable' => ['amount']],
+            ],
+            'jobs' => [],
+            'events' => [['class' => 'App\\Events\\OrderPlaced']],
+            'policies' => [],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    File::put(base_path('necromancer.json'), $manifest);
+
+    $outputPath = sys_get_temp_dir().'/necromancer-suite-grounded-'.uniqid().'.php';
+
+    $this->artisan('necromancer:benchmark', [
+        '--generate-suite' => true,
+        '--suite-output' => $outputPath,
+    ])->assertSuccessful();
+
+    $content = File::get($outputPath);
+    expect($content)->toContain('Order');
+    expect($content)->toContain('OrderPlaced');
+
+    @unlink($outputPath);
 });

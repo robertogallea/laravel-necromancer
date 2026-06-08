@@ -457,17 +457,20 @@ This PR introduces a subscription model with activation workflow.
 
 ### Step 3h — Benchmark AI context effectiveness
 
-Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, and token cost compared to a hand-written `CLAUDE.md` or no context at all:
+Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, and token cost compared to a hand-written `AGENTS.md` or no context at all:
 
 ```bash
 php artisan necromancer:benchmark
 ```
 
-The command runs a bundled task suite (Q&A, code generation, and mini end-to-end tasks) in three conditions — no context, manual `CLAUDE.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run.
+The command runs a bundled task suite in three conditions — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run.
+
+Q&A tasks (which measure context *coverage*) only run under the `none` and `manual` conditions — Necromancer would trivially score 100% since the answers are in the context file it generated. Code generation and mini tasks run across all three conditions and measure actual effectiveness.
 
 ```bash
 php artisan necromancer:benchmark --no-judge              # automated checks only (single provider)
 php artisan necromancer:benchmark --format=markdown --output=benchmark.md
+php artisan necromancer:benchmark --generate-suite        # generate a suite grounded to your app's manifest
 ```
 
 > See **[BENCHMARK.md](BENCHMARK.md)** for full setup instructions, config reference, and bias mitigations.
