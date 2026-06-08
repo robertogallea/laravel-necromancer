@@ -90,7 +90,7 @@ return [
     [
         'id' => 'codegen-002',
         'type' => 'codegen',
-        'prompt' => "Add an array cast to a model in this application. Show the correct \$casts syntax following the casting conventions already used.",
+        'prompt' => 'Add an array cast to a model in this application. Show the correct $casts syntax following the casting conventions already used.',
         'required_key' => 'models.with_casts',
         'assertions' => [
             'must_contain' => ["'array'"],
