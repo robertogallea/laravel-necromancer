@@ -58,6 +58,7 @@ final class ManifestDiffer
     {
         return match ($type) {
             'routes' => ($artifact['method'] ?? '').':'.($artifact['uri'] ?? ''),
+            'tests' => $artifact['file'] ?? '',
             default => $artifact['class'] ?? $artifact['signature'] ?? '',
         };
     }

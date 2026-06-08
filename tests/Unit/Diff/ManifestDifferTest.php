@@ -108,6 +108,26 @@ test('throws on artifact with no canonical key', function () {
         ->toThrow(InvalidArgumentException::class);
 });
 
+test('uses file as canonical key for tests artifacts', function () {
+    $differ = new ManifestDiffer;
+    $artifact = [
+        'file' => 'tests/Feature/Auth/AuthenticationTest.php',
+        'type' => 'feature',
+        'subject' => 'App\\Auth\\Authentication',
+        'methods' => ['login screen can be rendered'],
+        'source' => ['file' => 'tests/Feature/Auth/AuthenticationTest.php', 'line' => 1, 'hash' => 'abc123'],
+    ];
+
+    $base = ['tests' => [$artifact]];
+    $head = ['tests' => [array_merge($artifact, ['methods' => ['login screen can be rendered', 'users can logout']])]];
+
+    $diff = $differ->diff($base, $head);
+
+    expect($diff->changed)->toHaveKey('tests')
+        ->and($diff->added)->toBeEmpty()
+        ->and($diff->removed)->toBeEmpty();
+});
+
 test('isEmpty returns false when there are additions', function () {
     $diff = new ManifestDiff(
         added: ['routes' => [['method' => 'GET', 'uri' => '/orders']]],

@@ -6,10 +6,10 @@ namespace LaravelNecromancer\Benchmark;
 
 final class TaskSuite
 {
-    /** @var list<array{id: string, type: string, prompt: string, assertions: array{must_contain: string[], must_not_contain: string[], fact_keys: string[]}}> */
+    /** @var list<array{id: string, type: string, prompt: string, assertions: array{must_contain: string[], must_not_contain: string[], fact_keys: string[]}, conditions?: string[]}> */
     private array $tasks;
 
-    /** @param list<array{id: string, type: string, prompt: string, assertions: array}>|null $override */
+    /** @param list<array{id: string, type: string, prompt: string, assertions: array, conditions?: string[]}>|null $override */
     public function __construct(?array $override = null)
     {
         $this->tasks = $override ?? require __DIR__.'/../../resources/benchmark/tasks.php';
@@ -17,7 +17,7 @@ final class TaskSuite
 
     /**
      * @param  list<string>|null  $types  Filter by task type(s). Null returns all.
-     * @return list<array{id: string, type: string, prompt: string, assertions: array}>
+     * @return list<array{id: string, type: string, prompt: string, assertions: array, conditions?: string[]}>
      */
     public function tasks(?array $types = null): array
     {

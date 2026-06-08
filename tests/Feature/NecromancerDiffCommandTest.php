@@ -236,6 +236,30 @@ it('includes AI review section when --review is used with AI available', functio
     }
 });
 
+test('labels tests artifacts using the file basename', function () {
+    $testArtifact = [
+        'file' => 'tests/Feature/Auth/AuthenticationTest.php',
+        'type' => 'feature',
+        'subject' => 'App\\Auth\\Authentication',
+        'methods' => ['login screen can be rendered'],
+        'source' => ['file' => 'tests/Feature/Auth/AuthenticationTest.php', 'line' => 1, 'line_end' => 41, 'hash' => 'abc123'],
+    ];
+
+    $baseManifest = makeDiffManifest(['tests' => []]);
+    $headManifest = makeDiffManifest(['tests' => [$testArtifact]]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('AuthenticationTest.php')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
 it('renders artifact sections in markdown format', function () {
     $baseManifest = makeDiffManifest();
     $headManifest = makeDiffManifest(['routes' => [['method' => 'GET', 'uri' => '/new-route', 'name' => 'new.route', 'middleware' => [], 'controller' => null, 'action' => null]]]);

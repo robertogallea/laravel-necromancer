@@ -443,6 +443,10 @@ final class DiffCommand extends Command
                 : "{$method} {$uri}";
         }
 
+        if ($type === 'tests') {
+            return basename((string) ($artifact['file'] ?? ''));
+        }
+
         $class = (string) ($artifact['class'] ?? $artifact['signature'] ?? '');
 
         return basename(str_replace('\\', '/', $class));
