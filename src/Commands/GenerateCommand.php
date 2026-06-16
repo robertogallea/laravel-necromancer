@@ -18,7 +18,8 @@ final class GenerateCommand extends Command
         {--output= : Override the Tier 2 output file path}
         {--force : Overwrite existing Tier 2 file without confirmation}
         {--only= : Comma-separated artifact type(s) to include (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers)}
-        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers)}';
+        {--except= : Comma-separated artifact type(s) to exclude (routes, models, form_requests, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers)}
+        {--paths= : Comma-separated source path prefix(es) to include (filters artifacts by file path, e.g. app/Models,app/Http/Controllers/Admin)}';
 
     /** @var array<int, string> */
     private const SUPPORTED_TYPES = ['routes', 'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'observers', 'policies', 'enums', 'tests', 'scheduled_tasks', 'middleware', 'livewire_components', 'gates', 'mailables', 'validation_rules', 'service_providers'];
@@ -81,27 +82,39 @@ final class GenerateCommand extends Command
 
         $usingBoost = $boostDetector->isAvailable();
 
+        $artifacts = (array) ($manifest['artifacts'] ?? []);
+
+        // --- Path filtering: narrow artifacts by source file path (always a full-app manifest) ---
+        if (filled($this->option('paths'))) {
+            $prefixes = $this->normalizePaths(explode(',', (string) $this->option('paths')));
+            $this->warnUnmatchedPaths($artifacts, $prefixes);
+
+            foreach ($artifacts as $type => $items) {
+                $artifacts[$type] = $this->filterByPaths((array) $items, $prefixes);
+            }
+        }
+
         // --- Tier 2: full content with --only/--except filtering ---
         $sectionMap = [
             'overview' => $this->buildOverview($manifest['meta'] ?? []),
-            'routes' => $this->buildRoutes($manifest['artifacts']['routes'] ?? []),
-            'models' => $this->buildModels($manifest['artifacts']['models'] ?? []),
-            'form_requests' => $this->buildFormRequests($manifest['artifacts']['form_requests'] ?? []),
-            'jobs' => $this->buildJobs($manifest['artifacts']['jobs'] ?? []),
-            'events' => $this->buildEvents($manifest['artifacts']['events'] ?? []),
-            'listeners' => $this->buildListeners($manifest['artifacts']['listeners'] ?? []),
-            'commands' => $this->buildCommands($manifest['artifacts']['commands'] ?? []),
-            'observers' => $this->buildObservers($manifest['artifacts']['observers'] ?? []),
-            'policies' => $this->buildPolicies($manifest['artifacts']['policies'] ?? []),
-            'enums' => $this->buildEnums($manifest['artifacts']['enums'] ?? []),
-            'tests' => $this->buildTests($manifest['artifacts']['tests'] ?? []),
-            'scheduled_tasks' => $this->buildScheduledTasks($manifest['artifacts']['scheduled_tasks'] ?? []),
-            'middleware' => $this->buildMiddleware($manifest['artifacts']['middleware'] ?? []),
-            'livewire_components' => $this->buildLivewireComponents($manifest['artifacts']['livewire_components'] ?? []),
-            'gates' => $this->buildGates($manifest['artifacts']['gates'] ?? []),
-            'mailables' => $this->buildMailables($manifest['artifacts']['mailables'] ?? []),
-            'validation_rules' => $this->buildValidationRules($manifest['artifacts']['validation_rules'] ?? []),
-            'service_providers' => $this->buildServiceProviders($manifest['artifacts']['service_providers'] ?? []),
+            'routes' => $this->buildRoutes($artifacts['routes'] ?? []),
+            'models' => $this->buildModels($artifacts['models'] ?? []),
+            'form_requests' => $this->buildFormRequests($artifacts['form_requests'] ?? []),
+            'jobs' => $this->buildJobs($artifacts['jobs'] ?? []),
+            'events' => $this->buildEvents($artifacts['events'] ?? []),
+            'listeners' => $this->buildListeners($artifacts['listeners'] ?? []),
+            'commands' => $this->buildCommands($artifacts['commands'] ?? []),
+            'observers' => $this->buildObservers($artifacts['observers'] ?? []),
+            'policies' => $this->buildPolicies($artifacts['policies'] ?? []),
+            'enums' => $this->buildEnums($artifacts['enums'] ?? []),
+            'tests' => $this->buildTests($artifacts['tests'] ?? []),
+            'scheduled_tasks' => $this->buildScheduledTasks($artifacts['scheduled_tasks'] ?? []),
+            'middleware' => $this->buildMiddleware($artifacts['middleware'] ?? []),
+            'livewire_components' => $this->buildLivewireComponents($artifacts['livewire_components'] ?? []),
+            'gates' => $this->buildGates($artifacts['gates'] ?? []),
+            'mailables' => $this->buildMailables($artifacts['mailables'] ?? []),
+            'validation_rules' => $this->buildValidationRules($artifacts['validation_rules'] ?? []),
+            'service_providers' => $this->buildServiceProviders($artifacts['service_providers'] ?? []),
         ];
 
         if ($onlyTypes !== null) {
@@ -1228,6 +1241,116 @@ final class GenerateCommand extends Command
         }
 
         return $item['source']['file'].':'.($item['source']['line'] ?? '?');
+    }
+
+    /**
+     * Keep only artifacts whose source file matches one of the given path prefixes.
+     *
+     * Artifacts without a resolvable source file (e.g. closure routes, inline gates)
+     * are excluded, since their path cannot be matched.
+     *
+     * @param  array<int, array<string, mixed>>  $artifacts
+     * @param  array<int, string>  $paths
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterByPaths(array $artifacts, array $paths): array
+    {
+        return array_values(array_filter($artifacts, function (array $artifact) use ($paths): bool {
+            $file = $this->artifactFile($artifact);
+
+            return $file !== null && $this->pathMatches($file, $paths);
+        }));
+    }
+
+    /**
+     * Resolve the source file of an artifact, preferring source.file and falling
+     * back to a top-level file field (used by the tests artifact type).
+     *
+     * @param  array<string, mixed>  $artifact
+     */
+    private function artifactFile(array $artifact): ?string
+    {
+        if (isset($artifact['source']['file']) && is_string($artifact['source']['file'])) {
+            return $artifact['source']['file'];
+        }
+
+        if (isset($artifact['file']) && is_string($artifact['file'])) {
+            return $artifact['file'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize raw path inputs: convert backslashes, strip leading/trailing
+     * slashes, drop empties and duplicates.
+     *
+     * @param  array<int, string>  $paths
+     * @return array<int, string>
+     */
+    private function normalizePaths(array $paths): array
+    {
+        $normalized = array_map(fn (string $path): string => $this->normalizePath($path), $paths);
+
+        return array_values(array_unique(array_filter($normalized, fn (string $path): bool => $path !== '')));
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return trim(str_replace('\\', '/', trim($path)), '/');
+    }
+
+    /**
+     * Determine whether a (normalized) file path falls under any of the given
+     * normalized path prefixes. Matching respects the filesystem's case
+     * sensitivity: case-sensitive on Linux, case-insensitive on macOS/Windows.
+     *
+     * @param  array<int, string>  $prefixes
+     */
+    private function pathMatches(string $file, array $prefixes): bool
+    {
+        $file = $this->normalizePath($file);
+        $caseInsensitive = in_array(PHP_OS_FAMILY, ['Darwin', 'Windows'], true);
+
+        if ($caseInsensitive) {
+            $file = strtolower($file);
+        }
+
+        foreach ($prefixes as $prefix) {
+            if ($caseInsensitive) {
+                $prefix = strtolower($prefix);
+            }
+
+            if ($file === $prefix || str_starts_with($file, $prefix.'/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Warn (without failing) for any provided path prefix that matches no
+     * artifact across the entire manifest.
+     *
+     * @param  array<string, mixed>  $artifacts
+     * @param  array<int, string>  $prefixes
+     */
+    private function warnUnmatchedPaths(array $artifacts, array $prefixes): void
+    {
+        foreach ($prefixes as $prefix) {
+            foreach ($artifacts as $items) {
+                foreach ((array) $items as $item) {
+                    $file = is_array($item) ? $this->artifactFile($item) : null;
+
+                    if ($file !== null && $this->pathMatches($file, [$prefix])) {
+                        continue 3;
+                    }
+                }
+            }
+
+            $this->warn("No artifacts found under path: {$prefix}");
+        }
     }
 
     /**

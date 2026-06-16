@@ -310,6 +310,7 @@ php artisan necromancer:doctor --only=route-clarity</pre>
           <div class="flex flex-wrap gap-1.5">
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--only=TYPE,TYPE</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--except=TYPE,TYPE</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--paths=PATH,PATH</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--force</span>
           </div>
@@ -319,6 +320,7 @@ php artisan necromancer:doctor --only=route-clarity</pre>
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:generate
 php artisan necromancer:generate --only=routes,models
 php artisan necromancer:generate --except=listeners,validation_rules
+php artisan necromancer:generate --paths=app/Models,app/Http/Controllers/Admin
 php artisan necromancer:generate --output=.ai/context/app.md --force</pre>
           <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
         </div>

@@ -184,6 +184,15 @@ php artisan necromancer:generate --except=listeners,validation_rules,service_pro
 
 `--only` and `--except` are mutually exclusive.
 
+Filter by source path to generate context for just one slice of the application:
+
+```bash
+php artisan necromancer:generate --paths=app/Models,app/Http/Controllers/Admin
+php artisan necromancer:generate --only=models --paths=app/Models
+```
+
+`--paths` matches each artifact's `source.file` by path prefix (after normalizing slashes) and is applied on top of `--only`/`--except`, so it can be combined with either. Paths are case-sensitive on Linux and case-insensitive on macOS/Windows, following the filesystem. Artifacts without a source file (closure routes, inline gates) are excluded while `--paths` is active, sections that end up empty are omitted, and a path that matches nothing emits a warning without failing.
+
 Skip the overwrite confirmation when regenerating:
 
 ```bash
@@ -485,7 +494,7 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 | `necromancer:map` | Display the manifest in the terminal | `--type=TYPE` |
 | `necromancer:audit` | Run the AI-readability audit (violation list) | `--format=text\|json\|markdown`, `--output=PATH`, `--fail-on=SEVERITY` |
 | `necromancer:doctor` | Show the AI readability score (percentage dashboard) | `--json`, `--min-score=N`, `--only=KEYS` |
-| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (18 types: routes, models, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--output=PATH`, `--force` |
+| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (18 types: routes, models, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
 | `necromancer:ask` | Ask a question about your codebase via AI | `--provider=`, `--model=` |
 | `necromancer:inspect-payload` | Show the AI payload size and content for `necromancer:ask` | `--privacy` |
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |

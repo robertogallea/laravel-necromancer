@@ -2348,3 +2348,300 @@ test('a manifest with no service_providers does not include a service providers 
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Service Providers');
 });
+
+test('--paths includes artifacts whose source file matches a provided prefix', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Models'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Models (1)');
+    expect($content)->toContain('app/Models/Invoice.php');
+});
+
+test('--paths excludes artifacts that do not match any provided prefix', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+            'routes' => [
+                [
+                    'name' => 'login',
+                    'method' => 'GET',
+                    'uri' => '/login',
+                    'controller' => 'App\\Http\\Controllers\\Auth\\LoginController',
+                    'action' => 'show',
+                    'middleware' => [],
+                    'source' => ['file' => 'app/Http/Controllers/Auth/LoginController.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Models'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Models');
+    expect($content)->not->toContain('## Routes');
+    expect($content)->not->toContain('LoginController');
+});
+
+test('--paths excludes artifacts that have no resolvable source file', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+            'routes' => [
+                [
+                    'name' => 'closure',
+                    'method' => 'GET',
+                    'uri' => '/closure',
+                    'controller' => null,
+                    'action' => 'Closure',
+                    'middleware' => [],
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Models');
+    expect($content)->not->toContain('## Routes');
+});
+
+test('--paths combines with --only to narrow within the selected type', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+            'routes' => [
+                [
+                    'name' => 'invoices.index',
+                    'method' => 'GET',
+                    'uri' => '/invoices',
+                    'controller' => 'App\\Http\\Controllers\\InvoiceController',
+                    'action' => 'index',
+                    'middleware' => [],
+                    'source' => ['file' => 'app/Http/Controllers/InvoiceController.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--only' => 'models', '--paths' => 'app/Models'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Models');
+    expect($content)->not->toContain('## Routes');
+});
+
+test('--paths combines with --except correctly', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+            'routes' => [
+                [
+                    'name' => 'invoices.index',
+                    'method' => 'GET',
+                    'uri' => '/invoices',
+                    'controller' => 'App\\Http\\Controllers\\InvoiceController',
+                    'action' => 'index',
+                    'middleware' => [],
+                    'source' => ['file' => 'app/Models/fake-route.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--except' => 'routes', '--paths' => 'app/Models'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Models');
+    expect($content)->not->toContain('## Routes');
+});
+
+test('--paths emits a warning for a prefix that matches nothing but does not fail', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Nonexistent'])
+        ->expectsOutputToContain('No artifacts found under path: app/Nonexistent')
+        ->assertSuccessful();
+});
+
+test('--paths omits a section entirely when all its artifacts are filtered out', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+            'jobs' => [
+                [
+                    'class' => 'App\\Jobs\\SendInvoice',
+                    'source' => ['file' => 'app/Jobs/SendInvoice.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Models'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Models');
+    expect($content)->not->toContain('## Jobs');
+});
+
+test('--paths normalizes leading/trailing slashes and backslashes', function () {
+    $manifest = [
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ];
+
+    File::put(base_path('necromancer.json'), json_encode($manifest, JSON_THROW_ON_ERROR));
+    $this->artisan('necromancer:generate', ['--paths' => '/app/Models/', '--force' => true])->assertSuccessful();
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('## Models');
+
+    File::put(base_path('necromancer.json'), json_encode($manifest, JSON_THROW_ON_ERROR));
+    $this->artisan('necromancer:generate', ['--paths' => 'app\\Models', '--force' => true])->assertSuccessful();
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('## Models');
+});
+
+test('--paths matches the tests artifact via its top-level file field', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'tests' => [
+                [
+                    'file' => 'tests/Unit/FooTest.php',
+                    'type' => 'unit',
+                    'methods' => ['it works'],
+                    'source' => null,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'tests/Unit'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('## Tests');
+    expect($content)->toContain('tests/Unit/FooTest.php');
+});
+
+test('--paths uses boundary-aware matching and does not match sibling prefixes', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Invoice',
+                    'table' => 'invoices',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1],
+                ],
+                [
+                    'class' => 'App\\ModelsArchive\\Old',
+                    'table' => 'old',
+                    'fillable' => [],
+                    'casts' => [],
+                    'relationships' => [],
+                    'source' => ['file' => 'app/ModelsArchive/Old.php', 'line' => 1],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Models'])->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('app/Models/Invoice.php');
+    expect($content)->not->toContain('app/ModelsArchive/Old.php');
+});
