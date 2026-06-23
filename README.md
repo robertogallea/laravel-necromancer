@@ -511,9 +511,10 @@ return [
 
     // Artifact exclusions — supports wildcard patterns for routes and glob patterns for tests
     'exclude' => [
-        'routes' => ['horizon.*', 'telescope.*', 'debugbar.*'],
-        'models' => [],
-        'tests'  => [],   // glob patterns matched against relative file paths, e.g. 'tests/Fixtures/*'
+        'routes'     => ['horizon.*', 'telescope.*', 'debugbar.*'],  // matched against the route NAME
+        'route_uris' => ['up'],                                      // matched against the route URI (works for unnamed routes such as Laravel's /up health check)
+        'models'     => [],
+        'tests'      => [],   // glob patterns matched against relative file paths, e.g. 'tests/Fixtures/*'
     ],
 
     // Test discovery roots — override the default tests/Unit and tests/Feature scan paths
@@ -545,8 +546,9 @@ Necromancer is designed to be safe to version by default:
 - It never reads `.env` or raw configuration values.
 - It never collects or stores application secrets.
 - Routes registered by Horizon, Telescope, and Debugbar are excluded from scans automatically.
+- Laravel's default `/up` health-check endpoint is excluded automatically via `exclude.route_uris`, so it never shows up as an unnamed-route audit finding.
 
-To exclude additional routes or models, add patterns to the `exclude` key in `config/necromancer.php`. Exclusions apply to every downstream command — map, audit, and generate — so excluded artifacts never appear in results.
+To exclude additional routes or models, add patterns to the `exclude` key in `config/necromancer.php`. The `exclude.routes` patterns match against the route **name** (and therefore never match unnamed routes); use `exclude.route_uris` to exclude routes by **URI** — including unnamed ones such as health checks. Both use `Str::is()` wildcard matching, and route URIs are matched without a leading slash (e.g. `up`, `orders/*`). Exclusions apply to every downstream command — map, audit, doctor, and generate — so excluded artifacts never appear in results.
 
 ## Laravel Boost Integration
 

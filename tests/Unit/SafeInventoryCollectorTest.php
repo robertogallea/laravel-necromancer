@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use LaravelNecromancer\Collection\RouteNoiseFilter;
 use LaravelNecromancer\Collection\SafeInventoryCollector;
 use LaravelNecromancer\Manifest\SourceLocation;
 use LaravelNecromancer\Manifest\StructuralArtifact;
@@ -161,4 +162,48 @@ test('unnamed routes remain in the inventory', function () {
                 'action' => null,
             ],
         ]);
+});
+
+test('unnamed routes matching a uri pattern are excluded from the inventory', function () {
+    $inventory = (new SafeInventoryCollector(
+        routeNoiseFilter: new RouteNoiseFilter(uriPatterns: ['up']),
+    ))->collect(
+        artifacts: [
+            StructuralArtifact::route(
+                name: null,
+                method: 'GET',
+                uri: 'up',
+                middleware: ['web'],
+            ),
+            StructuralArtifact::route(
+                name: 'orders.index',
+                method: 'GET',
+                uri: 'orders',
+                middleware: ['auth'],
+            ),
+        ],
+    );
+
+    $routes = $inventory->toArray()['artifacts']['routes'];
+
+    expect($routes)->toHaveCount(1);
+    expect($routes[0]['name'])->toBe('orders.index');
+    expect($routes[0]['uri'])->toBe('orders');
+});
+
+test('named routes matching a uri pattern are excluded from the inventory', function () {
+    $inventory = (new SafeInventoryCollector(
+        routeNoiseFilter: new RouteNoiseFilter(uriPatterns: ['up']),
+    ))->collect(
+        artifacts: [
+            StructuralArtifact::route(
+                name: 'health.check',
+                method: 'GET',
+                uri: 'up',
+                middleware: ['web'],
+            ),
+        ],
+    );
+
+    expect($inventory->toArray()['artifacts']['routes'] ?? [])->toHaveCount(0);
 });

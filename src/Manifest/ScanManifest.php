@@ -148,6 +148,12 @@ final readonly class ScanManifest implements JsonSerializable
             $routeExclusions = [];
         }
 
+        $routeUriExclusions = config('necromancer.exclude.route_uris', ['up']);
+
+        if (! is_array($routeUriExclusions)) {
+            $routeUriExclusions = [];
+        }
+
         $modelExclusions = config('necromancer.exclude.models', []);
 
         if (! is_array($modelExclusions)) {
@@ -197,7 +203,7 @@ final readonly class ScanManifest implements JsonSerializable
         $artifacts = $collected !== [] ? array_merge(...array_values($collected)) : [];
 
         $inventory = (new SafeInventoryCollector(
-            routeNoiseFilter: new RouteNoiseFilter(array_values($routeExclusions)),
+            routeNoiseFilter: new RouteNoiseFilter(array_values($routeExclusions), array_values($routeUriExclusions)),
             modelExclusionFilter: new ModelExclusionFilter(array_values($modelExclusions)),
         ))->collect(artifacts: $artifacts);
 

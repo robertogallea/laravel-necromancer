@@ -52,6 +52,11 @@ final readonly class StructuralArtifact implements JsonSerializable
         return $this->payload instanceof RoutePayload ? $this->payload->name : null;
     }
 
+    public function routeUri(): ?string
+    {
+        return $this->payload instanceof RoutePayload ? $this->payload->uri : null;
+    }
+
     public function modelClass(): ?string
     {
         return $this->payload instanceof ModelPayload ? $this->payload->class : null;

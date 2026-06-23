@@ -10,6 +10,7 @@ return [
             'boost.*', 'storage.*',
             'password.*', 'verification.*', 'login', 'logout', 'register',
         ],
+        'route_uris' => ['up'],
         'models' => [],
         'tests' => [],
     ],
