@@ -95,6 +95,7 @@ final readonly class StructuralArtifact implements JsonSerializable
      * @param  list<string>  $fillable
      * @param  array<string, string>  $casts
      * @param  list<string>  $hidden
+     * @param  list<string>  $appends
      * @param  list<string>  $scopes
      * @param  list<string>  $guarded
      * @param  list<array{type: string, related: string|null, method: string}>  $relationships
@@ -108,6 +109,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $casts = [],
         array $relationships = [],
         array $hidden = [],
+        array $appends = [],
         bool $softDeletes = false,
         array $scopes = [],
         array $guarded = ['*'],
@@ -127,6 +129,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             softDeletes: $softDeletes,
             guarded: $guarded,
             hidden: $hidden,
+            appends: $appends,
             scopes: $scopes,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
             observers: $observers,

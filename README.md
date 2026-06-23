@@ -9,7 +9,7 @@ The manifest covers 18 artifact types across the full Laravel application struct
 | Type | What it surfaces |
 |---|---|
 | `routes` | Name, method, URI, controller, action, middleware, authorization |
-| `models` | Table, fillable, casts, relationships, scopes, observers, policy, factory |
+| `models` | Table, fillable, casts, appends, relationships, scopes, observers, policy, factory |
 | `jobs` | Queue, connection, tries, timeout, backoff, max_exceptions |
 | `events` | Listeners, broadcastable channels |
 | `listeners` | Handled events, queued status |

@@ -334,6 +334,7 @@ test('the scan command captures hidden fields, soft deletes, and local scopes on
     $member = findManifestModel(expectScanManifest($path), NecromancerMember::class);
 
     expect($member->hidden)->toBe(['password', 'remember_token'])
+        ->and($member->appends)->toBe(['display_name'])
         ->and($member->soft_deletes)->toBeTrue()
         ->and($member->scopes)->toBe(['active', 'verified']);
 });
@@ -350,6 +351,7 @@ test('the scan command writes empty hidden and scopes as absent keys on models w
     $order = findManifestModel(expectScanManifest($path), NecromancerOrder::class);
 
     expect(isset($order->hidden))->toBeFalse()
+        ->and(isset($order->appends))->toBeFalse()
         ->and($order->soft_deletes)->toBeFalse()
         ->and(isset($order->scopes))->toBeFalse();
 });

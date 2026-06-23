@@ -18,6 +18,7 @@ final readonly class ModelPayload implements JsonSerializable
      * @param  array<string, mixed>|null  $source
      * @param  list<string>  $observers
      * @param  list<string>  $globalScopes
+     * @param  list<string>  $appends
      */
     public function __construct(
         public string $class,
@@ -35,6 +36,7 @@ final readonly class ModelPayload implements JsonSerializable
         public ?string $policy = null,
         public ?string $factory = null,
         public ?string $customBuilder = null,
+        public array $appends = [],
     ) {}
 
     /**
@@ -54,6 +56,10 @@ final readonly class ModelPayload implements JsonSerializable
 
         if (! empty($this->hidden)) {
             $data['hidden'] = $this->hidden;
+        }
+
+        if (! empty($this->appends)) {
+            $data['appends'] = $this->appends;
         }
 
         if (! empty($this->scopes)) {

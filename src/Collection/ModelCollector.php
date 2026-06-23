@@ -96,6 +96,7 @@ final readonly class ModelCollector
             casts: $this->casts($model),
             relationships: $this->relationships($reflection, $model),
             hidden: $model->getHidden(),
+            appends: $model->getAppends(),
             softDeletes: in_array(SoftDeletes::class, class_uses_recursive($class), strict: true),
             scopes: $this->localScopes($reflection),
             guarded: $model->getGuarded(),

@@ -18,7 +18,11 @@ final class ModelsWithOpenGuardCheck implements CheckInterface
         $findings = [];
 
         foreach ($applicable as $model) {
-            if ($model['guarded'] === []) {
+            // A non-empty $fillable whitelist governs mass assignment regardless of
+            // an open $guarded (common on Pivot models, which default to $guarded = []),
+            // so the open guard is not actually exploitable. Only flag a truly open
+            // guard — empty $guarded with no fillable whitelist to constrain it.
+            if ($model['guarded'] === [] && empty($model['fillable'])) {
                 $findings[] = new Finding(
                     severity: 'warning',
                     message: 'Open mass-assignment guard ($guarded = []): '.class_basename((string) ($model['class'] ?? '')),

@@ -337,6 +337,7 @@ test('the model section shows hidden fields, soft deletes, and scopes when prese
                     'casts' => [],
                     'relationships' => [],
                     'hidden' => ['password', 'remember_token'],
+                    'appends' => ['display_name'],
                     'soft_deletes' => true,
                     'scopes' => ['active', 'verified'],
                 ],
@@ -348,6 +349,7 @@ test('the model section shows hidden fields, soft deletes, and scopes when prese
 
     $content = File::get(base_path('NECROMANCER.md'));
     expect($content)->toContain('hidden: password, remember_token');
+    expect($content)->toContain('appends: display_name');
     expect($content)->toContain('scopes: active, verified');
     expect($content)->toContain('| yes |');
 });
@@ -373,6 +375,7 @@ test('the model section omits hidden, soft deletes, and scopes bullets when abse
 
     $content = File::get(base_path('NECROMANCER.md'));
     expect($content)->not->toContain('**Hidden**');
+    expect($content)->not->toContain('appends: ');
     expect($content)->not->toContain('**Soft deletes**');
     expect($content)->not->toContain('**Scopes**');
 });

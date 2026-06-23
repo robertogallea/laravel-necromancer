@@ -15,7 +15,13 @@ final class MissingFillableCheck implements CheckInterface
         $findings = [];
 
         foreach ($models as $model) {
-            if (empty($model['fillable'])) {
+            // A model that uses the guarded strategy (e.g. $guarded / #[Guarded])
+            // has a defined mass-assignment surface even with an empty fillable.
+            // Only the Eloquent default — empty fillable AND guarded === ['*'] —
+            // is genuinely unconfigured and worth flagging.
+            $usesGuardedStrategy = ($model['guarded'] ?? ['*']) !== ['*'];
+
+            if (empty($model['fillable']) && ! $usesGuardedStrategy) {
                 $findings[] = new Finding(
                     severity: 'warning',
                     message: 'No fillable defined: '.class_basename((string) ($model['class'] ?? '')),

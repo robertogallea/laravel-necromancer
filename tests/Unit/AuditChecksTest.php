@@ -109,6 +109,14 @@ test('MissingFillableCheck does not flag a model with fillable defined', functio
     expect($result->findings)->toBeEmpty();
 });
 
+test('MissingFillableCheck does not flag a model that uses the guarded strategy', function () {
+    $result = (new MissingFillableCheck)->run(['models' => [
+        ['class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => [], 'casts' => [], 'relationships' => [], 'guarded' => ['id'], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty();
+});
+
 // MissingCastsCheck
 
 test('MissingCastsCheck flags a model with no casts', function () {
@@ -142,6 +150,14 @@ test('ModelsWithOpenGuardCheck flags a model with guarded set to empty array', f
 test('ModelsWithOpenGuardCheck does not flag a model without a guarded key', function () {
     $result = (new ModelsWithOpenGuardCheck)->run(['models' => [
         ['class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => ['name'], 'casts' => [], 'relationships' => [], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty();
+});
+
+test('ModelsWithOpenGuardCheck does not flag an open guard constrained by a fillable whitelist', function () {
+    $result = (new ModelsWithOpenGuardCheck)->run(['models' => [
+        ['class' => 'App\\Models\\CallCandidate', 'table' => 'call_candidates', 'fillable' => ['candidate_id', 'source'], 'casts' => [], 'relationships' => [], 'guarded' => [], 'source' => null],
     ]]);
 
     expect($result->findings)->toBeEmpty();

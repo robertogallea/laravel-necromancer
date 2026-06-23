@@ -54,6 +54,11 @@ test('ModelCollector reads #[UseEloquentBuilder] into custom_builder field', fun
     expect($data['custom_builder'])->toBe('LaravelNecromancer\Tests\Fixtures\Builders\OrderBuilder');
 });
 
+test('ModelCollector reads #[Appends] into appends field', function () {
+    $data = modelFixtureArtifact('LaravelNecromancer\\Tests\\Fixtures\\Models\\OrderWithAttributes');
+    expect($data['appends'])->toContain('formatted_total');
+});
+
 test('ModelCollector detects #[Scope]-annotated method in scopes alongside scopeX convention', function () {
     $data = modelFixtureArtifact('LaravelNecromancer\\Tests\\Fixtures\\Models\\OrderWithAttributes');
     expect($data['scopes'])->toContain('pending')

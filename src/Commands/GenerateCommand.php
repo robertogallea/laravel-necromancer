@@ -369,6 +369,9 @@ final class GenerateCommand extends Command
             if (! empty($model['hidden'])) {
                 $extras[] = 'hidden: '.implode(', ', $model['hidden']);
             }
+            if (! empty($model['appends'])) {
+                $extras[] = 'appends: '.implode(', ', $model['appends']);
+            }
             if (! empty($model['scopes'])) {
                 $extras[] = 'scopes: '.implode(', ', $model['scopes']);
             }

@@ -18,6 +18,8 @@ final class NecromancerMember extends Model
 
     protected $hidden = ['password', 'remember_token'];
 
+    protected $appends = ['display_name'];
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('active', true);
