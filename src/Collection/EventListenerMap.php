@@ -70,6 +70,8 @@ final readonly class EventListenerMap
         $listenersByEvent = [];
 
         foreach ($dispatcher->getRawListeners() as $eventClass => $listeners) {
+            // PHP array keys are int|string; Dispatcher's PHPDoc narrows this to string,
+            // but a purely-numeric event "class" key would be cast to int at runtime.
             if (! is_string($eventClass) || str_contains($eventClass, '*') || ! $this->knownEvent($eventClass)) {
                 continue;
             }

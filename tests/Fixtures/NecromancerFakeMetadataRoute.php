@@ -29,7 +29,17 @@ final class NecromancerFakeMetadataRoute extends Route
         return $this;
     }
 
-    public function getMetadata(?string $key = null, mixed $default = null): mixed
+    /**
+     * Signature intentionally untyped to stay compatible with the real
+     * Illuminate\Routing\Route::getMetadata($key = null, $default = null) —
+     * adding native types here would violate LSP once that method exists
+     * on the parent class (Laravel 13.17+).
+     *
+     * @param  string|null  $key
+     * @param  mixed  $default
+     * @return ($key is null ? array<string, mixed> : mixed)
+     */
+    public function getMetadata($key = null, $default = null)
     {
         return $key === null ? $this->routeMetadata : Arr::get($this->routeMetadata, $key, $default);
     }

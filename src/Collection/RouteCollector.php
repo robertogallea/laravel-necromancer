@@ -58,6 +58,9 @@ final readonly class RouteCollector
      */
     private function routeMetadata(Route $route): array
     {
+        // Route::metadata()/getMetadata() only exists from Laravel 13.17+; this package
+        // supports "^13.0", so the method may genuinely be absent at runtime even though
+        // it's always present on whatever Laravel version PHPStan analyses against.
         if (! method_exists($route, 'getMetadata')) {
             return [];
         }
