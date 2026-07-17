@@ -13,6 +13,7 @@ use LaravelNecromancer\Inference\ManifestSummarizer;
 use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
+use LaravelNecromancer\Prompt\PromptRelevanceScorer;
 
 final class AskCommand extends Command
 {
@@ -26,7 +27,7 @@ final class AskCommand extends Command
 
     protected $description = 'Ask a natural-language question about your codebase using the Necromancer manifest and laravel/ai';
 
-    public function handle(ManifestReader $reader, AiDetector $aiDetector): int
+    public function handle(ManifestReader $reader, AiDetector $aiDetector, PromptRelevanceScorer $scorer): int
     {
         $manifestPath = $this->resolveManifestPath();
 
@@ -63,7 +64,7 @@ final class AskCommand extends Command
             return self::FAILURE;
         }
 
-        $instructions = $this->buildInstructions($manifest, $privacy);
+        $instructions = $this->buildInstructions($manifest, $privacy, $scorer, $question);
         $provider = $this->option('provider') ?: null;
         $model = $this->option('model') ?: null;
 
@@ -87,7 +88,7 @@ final class AskCommand extends Command
     }
 
     /** @param array<string, mixed> $manifest */
-    private function buildInstructions(array $manifest, bool $privacy = false): string
+    private function buildInstructions(array $manifest, bool $privacy, PromptRelevanceScorer $scorer, string $question): string
     {
         if ($privacy) {
             $context = (new ManifestSummarizer)->summarize($manifest);
@@ -97,11 +98,58 @@ final class AskCommand extends Command
             $label = 'Full Manifest (JSON)';
         }
 
+        $relevantEvidence = $this->buildRelevantEvidenceBlock($manifest, $scorer, $question);
+
         return <<<PROMPT
         You are a Laravel application expert. Use the following manifest — a machine-readable inventory of this app's routes, models, jobs, events, commands, and policies — to answer questions accurately and concisely. If you cannot determine something from the manifest, say so clearly.
-
+        {$relevantEvidence}
         {$label}:
         {$context}
         PROMPT;
+    }
+
+    /**
+     * Ranks manifest artifacts against the question (keyword matches, boosted for
+     * declared route metadata domain/flow/capability) and surfaces the top matches
+     * ahead of the full manifest — prioritizing the AI's attention without discarding
+     * anything, so broad questions with no strong keyword match are unaffected.
+     *
+     * @param  array<string, mixed>  $manifest
+     */
+    private function buildRelevantEvidenceBlock(array $manifest, PromptRelevanceScorer $scorer, string $question): string
+    {
+        $artifacts = (array) ($manifest['artifacts'] ?? []);
+        $ranked = $scorer->score($artifacts, $question, 10);
+
+        if (empty($ranked)) {
+            return '';
+        }
+
+        $lines = array_map(
+            fn (array $result): string => '- ['.$result['type'].'] '.$this->labelArtifact($result['type'], $result['artifact']),
+            $ranked,
+        );
+
+        return "\nMost Relevant Evidence For This Question (ranked, highest first):\n".implode("\n", $lines)."\n";
+    }
+
+    /** @param array<string, mixed> $artifact */
+    private function labelArtifact(string $type, array $artifact): string
+    {
+        if ($type === 'routes') {
+            $method = $artifact['method'] ?? '';
+            $uri = $artifact['uri'] ?? '';
+            $name = $artifact['name'] ?? null;
+
+            return $name ? "{$method} {$uri} ({$name})" : "{$method} {$uri}";
+        }
+
+        if ($type === 'tests') {
+            return basename((string) ($artifact['file'] ?? ''));
+        }
+
+        $class = (string) ($artifact['class'] ?? $artifact['signature'] ?? '');
+
+        return basename(str_replace('\\', '/', $class));
     }
 }

@@ -13,6 +13,8 @@ final readonly class RoutePayload implements JsonSerializable
      * @param  list<array{name: string, optional: bool, constraint: string|null}>  $parameters
      * @param  list<array{ability: string, models: list<string>}>  $authorization
      * @param  array<string, mixed>|null  $source
+     * @param  array<string, mixed>  $metadata
+     * @param  array{domain?: string, flow?: string, capability?: string, summary?: string, risk?: string, external_services?: list<string>, adr?: string}  $necromancerMetadata
      */
     public function __construct(
         public ?string $name,
@@ -24,6 +26,8 @@ final readonly class RoutePayload implements JsonSerializable
         public array $parameters,
         public ?array $source,
         public array $authorization = [],
+        public array $metadata = [],
+        public array $necromancerMetadata = [],
     ) {}
 
     /**
@@ -50,6 +54,13 @@ final readonly class RoutePayload implements JsonSerializable
 
         if ($this->source !== null) {
             $data['source'] = $this->source;
+        }
+
+        if (! empty($this->metadata) || ! empty($this->necromancerMetadata)) {
+            $data['route_metadata'] = array_filter([
+                'raw' => $this->metadata,
+                'necromancer' => $this->necromancerMetadata,
+            ], fn (array $v): bool => ! empty($v));
         }
 
         return $data;

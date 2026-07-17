@@ -250,6 +250,7 @@ final class GenerateCommand extends Command
         $hasParameters = ! empty(array_filter($routes, fn (array $r): bool => ! empty($r['parameters'])));
         $hasAuthorization = ! empty(array_filter($routes, fn (array $r): bool => ! empty($r['authorization'])));
         $hasSources = $this->hasSources($routes);
+        [$hasDomain, $hasRisk, $hasExternalServices, $hasAdr] = $this->routeMetadataColumnFlags($routes);
 
         $header = '| Name | Method | URI | Controller | Middleware';
         $divider = '|---|---|---|---|---';
@@ -263,6 +264,22 @@ final class GenerateCommand extends Command
         }
         if ($hasSources) {
             $header .= ' | Source';
+            $divider .= '|---';
+        }
+        if ($hasDomain) {
+            $header .= ' | Domain';
+            $divider .= '|---';
+        }
+        if ($hasRisk) {
+            $header .= ' | Risk';
+            $divider .= '|---';
+        }
+        if ($hasExternalServices) {
+            $header .= ' | External Services';
+            $divider .= '|---';
+        }
+        if ($hasAdr) {
+            $header .= ' | ADR';
             $divider .= '|---';
         }
 
@@ -290,11 +307,54 @@ final class GenerateCommand extends Command
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($route);
             }
+            if ($hasDomain) {
+                $row .= ' | '.(string) ($route['route_metadata']['necromancer']['domain'] ?? '');
+            }
+            if ($hasRisk) {
+                $row .= ' | '.(string) ($route['route_metadata']['necromancer']['risk'] ?? '');
+            }
+            if ($hasExternalServices) {
+                $row .= ' | '.implode(', ', $route['route_metadata']['necromancer']['external_services'] ?? []);
+            }
+            if ($hasAdr) {
+                $row .= ' | '.(string) ($route['route_metadata']['necromancer']['adr'] ?? '');
+            }
 
             $lines[] = $row.' |';
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Determines, in a single pass over $routes, whether any route declares each of the
+     * Domain/Risk/External Services/ADR route-metadata fields — used to decide which
+     * optional columns to render.
+     *
+     * @param  array<int, array<string, mixed>>  $routes
+     * @return array{bool, bool, bool, bool}
+     */
+    private function routeMetadataColumnFlags(array $routes): array
+    {
+        $hasDomain = false;
+        $hasRisk = false;
+        $hasExternalServices = false;
+        $hasAdr = false;
+
+        foreach ($routes as $route) {
+            $necromancer = $route['route_metadata']['necromancer'] ?? [];
+
+            $hasDomain = $hasDomain || ! empty($necromancer['domain'] ?? null);
+            $hasRisk = $hasRisk || ! empty($necromancer['risk'] ?? null);
+            $hasExternalServices = $hasExternalServices || ! empty($necromancer['external_services'] ?? null);
+            $hasAdr = $hasAdr || ! empty($necromancer['adr'] ?? null);
+
+            if ($hasDomain && $hasRisk && $hasExternalServices && $hasAdr) {
+                break;
+            }
+        }
+
+        return [$hasDomain, $hasRisk, $hasExternalServices, $hasAdr];
     }
 
     /**

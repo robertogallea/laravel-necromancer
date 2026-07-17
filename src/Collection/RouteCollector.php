@@ -36,6 +36,7 @@ final readonly class RouteCollector
     private function collectRoute(Route $route): StructuralArtifact
     {
         [$controller, $action] = $this->controllerAction($route);
+        $metadata = $this->routeMetadata($route);
 
         return StructuralArtifact::route(
             name: $route->getName(),
@@ -47,7 +48,35 @@ final readonly class RouteCollector
             source: $this->source($route, $controller, $action),
             parameters: $this->parameters($route),
             authorization: $this->authorization($controller, $action),
+            metadata: $metadata,
+            necromancerMetadata: $this->normalizedRouteMetadata($metadata),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function routeMetadata(Route $route): array
+    {
+        if (! method_exists($route, 'getMetadata')) {
+            return [];
+        }
+
+        /** @var array<string, mixed> $metadata */
+        $metadata = $route->getMetadata();
+
+        return $metadata;
+    }
+
+    /**
+     * @param  array<string, mixed>  $rawMetadata
+     * @return array<string, mixed>
+     */
+    private function normalizedRouteMetadata(array $rawMetadata): array
+    {
+        $namespace = (string) config('necromancer.route_metadata.namespace', 'necromancer');
+
+        return (new RouteMetadataNormalizer($namespace))->normalize($rawMetadata);
     }
 
     private function methodString(Route $route): string

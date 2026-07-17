@@ -82,6 +82,16 @@ final class DiffReviewAgent
     {
         $lines = [];
 
+        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+
+        if (! empty($flaggedRoutes)) {
+            $lines[] = 'FLAGGED ROUTES';
+            foreach ($flaggedRoutes as $route) {
+                $lines[] = '- '.$this->labelArtifact('routes', $route).'  '.FlaggedRoutes::reason($route);
+            }
+            $lines[] = '';
+        }
+
         if (! empty($diff->added)) {
             $lines[] = 'ADDED';
             foreach ($diff->added as $type => $artifacts) {

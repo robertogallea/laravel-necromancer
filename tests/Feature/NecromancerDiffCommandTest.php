@@ -204,6 +204,144 @@ test('shows changed artifact in diff output', function () {
     }
 });
 
+test('flags a newly added high-risk route in text output', function () {
+    $baseManifest = makeDiffManifest(['routes' => []]);
+    $headManifest = makeDiffManifest([
+        'routes' => [[
+            'method' => 'POST', 'uri' => '/billing/cancel', 'name' => 'billing.cancel', 'middleware' => [],
+            'route_metadata' => ['necromancer' => ['domain' => 'billing', 'risk' => 'high']],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('FLAGGED ROUTES')
+            ->expectsOutputToContain('POST /billing/cancel')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flags a newly added external-service route in markdown output', function () {
+    $baseManifest = makeDiffManifest(['routes' => []]);
+    $headManifest = makeDiffManifest([
+        'routes' => [[
+            'method' => 'POST', 'uri' => '/stripe/webhook', 'name' => 'stripe.webhook', 'middleware' => [],
+            'route_metadata' => ['necromancer' => ['domain' => 'billing', 'external_services' => ['stripe']]],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile, '--format' => 'markdown'])
+            ->expectsOutputToContain('### Flagged Routes')
+            ->expectsOutputToContain('stripe')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flagged route text output shows domain flow and capability when available', function () {
+    $baseManifest = makeDiffManifest(['routes' => []]);
+    $headManifest = makeDiffManifest([
+        'routes' => [[
+            'method' => 'POST', 'uri' => '/billing/cancel', 'name' => 'billing.cancel', 'middleware' => [],
+            'route_metadata' => ['necromancer' => [
+                'domain' => 'billing',
+                'flow' => 'subscription-cancellation',
+                'capability' => 'subscription.cancel',
+                'risk' => 'high',
+            ]],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('domain: billing · flow: subscription-cancellation · capability: subscription.cancel · risk: high')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flagged route markdown output shows domain flow and capability when available', function () {
+    $baseManifest = makeDiffManifest(['routes' => []]);
+    $headManifest = makeDiffManifest([
+        'routes' => [[
+            'method' => 'POST', 'uri' => '/stripe/webhook', 'name' => 'stripe.webhook', 'middleware' => [],
+            'route_metadata' => ['necromancer' => [
+                'domain' => 'billing',
+                'flow' => 'stripe-webhook-processing',
+                'capability' => 'billing.webhook.receive',
+                'external_services' => ['stripe'],
+            ]],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile, '--format' => 'markdown'])
+            ->expectsOutputToContain('domain: billing · flow: stripe-webhook-processing · capability: billing.webhook.receive · external services: stripe')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flagged route output omits domain flow and capability when not declared', function () {
+    $baseManifest = makeDiffManifest(['routes' => []]);
+    $headManifest = makeDiffManifest([
+        'routes' => [[
+            'method' => 'POST', 'uri' => '/billing/cancel', 'name' => 'billing.cancel', 'middleware' => [],
+            'route_metadata' => ['necromancer' => ['risk' => 'high']],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('risk: high')
+            ->doesntExpectOutputToContain('domain:')
+            ->doesntExpectOutputToContain('flow:')
+            ->doesntExpectOutputToContain('capability:')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('does not flag routes without high risk or external services', function () {
+    $baseManifest = makeDiffManifest(['routes' => []]);
+    $headManifest = makeDiffManifest([
+        'routes' => [['method' => 'GET', 'uri' => '/orders', 'name' => 'orders.index', 'middleware' => []]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->doesntExpectOutputToContain('Flagged Routes')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
 it('includes AI review section when --review is used with AI available', function () {
     $this->instance(AiDetector::class, new AiDetector(ServiceProvider::class));
 

@@ -19,6 +19,10 @@ return [
         'roots' => [],
     ],
 
+    'route_metadata' => [
+        'namespace' => 'necromancer',
+    ],
+
     'output' => [
         'manifest' => base_path('necromancer.json'),
         'context' => base_path('NECROMANCER.md'),

@@ -1,4 +1,6 @@
-# Laravel Necromancer
+<p align="center">                                                                                                                                                                
+  <img src="docs/banner.png" alt="Laravel Necromancer" width="100%">                                                                                                              
+</p>
 
 Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, jobs, events, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers, and more.
 
@@ -8,7 +10,7 @@ The manifest covers 18 artifact types across the full Laravel application struct
 
 | Type | What it surfaces |
 |---|---|
-| `routes` | Name, method, URI, controller, action, middleware, authorization |
+| `routes` | Name, method, URI, controller, action, middleware, authorization, route metadata (domain, flow, capability, summary, risk, external services, ADR) |
 | `models` | Table, fillable, casts, appends, relationships, scopes, observers, policy, factory |
 | `jobs` | Queue, connection, tries, timeout, backoff, max_exceptions |
 | `events` | Listeners, broadcastable channels |
@@ -73,6 +75,25 @@ Necromancer reads PHP attributes (`#[ObservedBy]`, `#[Queue]`, `#[Aliases]`, `#[
 
 Test files in `tests/Unit/` and `tests/Feature/` are scanned and included as a `tests` artifact type. Both Pest functional-style files (`test()`/`it()` calls) and class-based PHPUnit tests are supported. Subject classes are inferred from `uses()` declarations and filename convention (`OrderTest.php` → `App\Models\Order`).
 
+On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself:
+
+```php
+Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+    ->metadata([
+        'necromancer' => [
+            'domain' => 'billing',
+            'flow' => 'subscription-cancellation',
+            'capability' => 'subscription.cancel',
+            'summary' => 'Cancels an active subscription.',
+            'risk' => 'high',
+            'external_services' => ['stripe'],
+            'adr' => 'docs/adr/004-subscription-cancellation.md',
+        ],
+    ]);
+```
+
+All fields are optional and the feature is entirely opt-in — apps that don't use route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
+
 Check for manifest drift without writing a new file (CI use):
 
 ```bash
@@ -103,7 +124,7 @@ Check how well your application can be understood by an AI coding agent:
 php artisan necromancer:audit
 ```
 
-Each finding is grouped by severity (error / warning / suggestion). The score is a weighted pass-rate across all checks — normalized by the number of applicable artifacts — so an app with 1 unnamed route out of 50 scores far better than one with 1 out of 1. Errors weigh 3×, warnings 2×, and suggestions 1× in the calculation. Output a shareable or machine-readable report, or enforce a CI gate:
+Each finding is grouped by severity (error / warning / suggestion). The score is a weighted pass-rate across all checks — normalized by the number of applicable artifacts — so an app with 1 unnamed route out of 50 scores far better than one with 1 out of 1. Errors weigh 3×, warnings 2×, and suggestions 1× in the calculation. Routes using `Route::metadata()` are checked for quality too: a `risk: high`/`critical` route with no `adr` reference, an `external_services` route with no matching test subject, a `summary` over 200 characters (narrative content that belongs in an ADR instead), and routes sharing the same `flow` that disagree on `domain` or `risk` (a single business process should agree on both) all produce findings — but only for routes that have actually declared metadata, so adopting the feature is never required to keep a clean audit. Output a shareable or machine-readable report, or enforce a CI gate:
 
 ```bash
 php artisan necromancer:audit --format=markdown              # paste into a GitHub issue or PR
@@ -115,7 +136,7 @@ php artisan necromancer:audit --fail-on=warning  # exit 1 if any warnings or err
 
 ### Step 3b — Check the AI readability score
 
-Get a quick percentage score across seven weighted dimensions of AI readability:
+Get a quick percentage score across eight weighted dimensions of AI readability:
 
 ```bash
 php artisan necromancer:doctor
@@ -135,9 +156,12 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
   Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
+  Route Metadata Coverage████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service routes tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.
 ```
+
+Route Metadata Coverage scores N/A (and doesn't affect the overall score) until at least one route declares `necromancer` route metadata — adopting the feature is entirely optional.
 
 Output a machine-readable score or enforce a CI gate:
 
@@ -214,6 +238,8 @@ php artisan necromancer:ask "What routes require authentication?"
 ```
 
 If you omit the question, the command prompts you interactively. The manifest is injected verbatim into the AI's context, so answers are grounded in your actual application — not a model's prior knowledge. A warning is shown if the manifest may be stale.
+
+The full manifest is always included — nothing is discarded — but a "Most Relevant Evidence" section is prepended ahead of it, ranking the artifacts most related to your question so the AI's attention is prioritized rather than left to search the whole payload unguided. Ranking uses the same keyword scoring as `necromancer:prompt`, boosted for declared route metadata: a route's `domain`/`flow`/`capability` count as strongly as its name or class, since that's an intentional signal from the developer rather than something inferred from naming.
 
 ```bash
 php artisan necromancer:ask                                        # interactive prompt
@@ -395,6 +421,13 @@ php artisan necromancer:diff main
 
 Compares the current manifest against the manifest on the `main` branch. The output shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts.
 
+When an added or changed route declares `risk: high`/`critical` or a non-empty `external_services` via route metadata, it's called out in a dedicated "Flagged Routes" section before the rest of the diff — this is a deterministic check, so it shows up even without `--review`/`laravel/ai`. Each flagged route also shows its `domain`, `flow`, and `capability` when declared, so reviewers see business context alongside the trigger:
+
+```text
+FLAGGED ROUTES
+⚠  POST /billing/cancel (billing.cancel)  domain: billing · flow: subscription-cancellation · capability: subscription.cancel · risk: high
+```
+
 #### Options
 
 | Option | Description |
@@ -461,6 +494,8 @@ This PR introduces a subscription model with activation workflow.
 ```
 
 > **Note:** The `--review` option requires `laravel/ai` to be installed and configured. Without it, only the basic diff is shown. Both branches must have a committed `necromancer.json` manifest.
+
+The AI reviewer's prompt includes the same "Flagged Routes" signal shown in the deterministic diff (high/critical-risk and external-service routes, with `domain`/`flow`/`capability` when declared) — so its risk assessment is grounded in what you actually declared via route metadata, not left to infer risk purely from the raw diff.
 
 ---
 
@@ -534,6 +569,11 @@ return [
     // Laravel Boost integration
     'boost' => [
         'context_path' => base_path('.ai/guidelines/necromancer.md'),
+    ],
+
+    // Route metadata (Laravel 13.17+ Route::metadata()) — the namespace key Necromancer reads
+    'route_metadata' => [
+        'namespace' => 'necromancer',
     ],
 
 ];

@@ -4,12 +4,16 @@ use LaravelNecromancer\Audit\Checks\BroadcastableEventsWithNoChannelCheck;
 use LaravelNecromancer\Audit\Checks\ClosureRoutesCheck;
 use LaravelNecromancer\Audit\Checks\EmptyCommandDescriptionsCheck;
 use LaravelNecromancer\Audit\Checks\EventsWithNoListenersCheck;
+use LaravelNecromancer\Audit\Checks\ExternalServiceRoutesWithoutTestsCheck;
+use LaravelNecromancer\Audit\Checks\HighRiskRoutesWithoutAdrCheck;
+use LaravelNecromancer\Audit\Checks\InconsistentFlowMetadataCheck;
 use LaravelNecromancer\Audit\Checks\JobsWithNoQueueNameCheck;
 use LaravelNecromancer\Audit\Checks\JobsWithNoTimeoutCheck;
 use LaravelNecromancer\Audit\Checks\JobsWithNoTriesCheck;
 use LaravelNecromancer\Audit\Checks\MissingCastsCheck;
 use LaravelNecromancer\Audit\Checks\MissingFillableCheck;
 use LaravelNecromancer\Audit\Checks\ModelsWithOpenGuardCheck;
+use LaravelNecromancer\Audit\Checks\NarrativeRouteMetadataSummaryCheck;
 use LaravelNecromancer\Audit\Checks\NonGetRoutesWithoutAuthCheck;
 use LaravelNecromancer\Audit\Checks\UnnamedRoutesCheck;
 
@@ -296,4 +300,161 @@ test('JobsWithNoTriesCheck does not flag a job with tries configured', function 
     ]]);
 
     expect($result->findings)->toBeEmpty();
+});
+
+// HighRiskRoutesWithoutAdrCheck
+
+test('HighRiskRoutesWithoutAdrCheck flags a high-risk route with no ADR reference', function () {
+    $result = (new HighRiskRoutesWithoutAdrCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['risk' => 'high']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toHaveCount(1)
+        ->and($result->findings[0]->severity)->toBe('warning')
+        ->and($result->total)->toBe(1);
+});
+
+test('HighRiskRoutesWithoutAdrCheck does not flag a high-risk route with an ADR reference', function () {
+    $result = (new HighRiskRoutesWithoutAdrCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['risk' => 'critical', 'adr' => 'docs/adr/1.md']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty();
+});
+
+test('HighRiskRoutesWithoutAdrCheck ignores routes without high/critical risk', function () {
+    $result = (new HighRiskRoutesWithoutAdrCheck)->run(['routes' => [
+        ['method' => 'GET', 'uri' => '/orders', 'route_metadata' => ['necromancer' => ['risk' => 'low']], 'source' => null],
+        ['method' => 'GET', 'uri' => '/plain', 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty()
+        ->and($result->total)->toBe(0);
+});
+
+// ExternalServiceRoutesWithoutTestsCheck
+
+test('ExternalServiceRoutesWithoutTestsCheck flags an external-service route with no matching test', function () {
+    $result = (new ExternalServiceRoutesWithoutTestsCheck)->run([
+        'routes' => [
+            ['method' => 'POST', 'uri' => '/stripe/webhook', 'controller' => 'App\\Http\\Controllers\\StripeController', 'route_metadata' => ['necromancer' => ['external_services' => ['stripe']]], 'source' => null],
+        ],
+        'tests' => [],
+    ]);
+
+    expect($result->findings)->toHaveCount(1)
+        ->and($result->findings[0]->severity)->toBe('warning');
+});
+
+test('ExternalServiceRoutesWithoutTestsCheck does not flag a route with a matching test subject', function () {
+    $result = (new ExternalServiceRoutesWithoutTestsCheck)->run([
+        'routes' => [
+            ['method' => 'POST', 'uri' => '/stripe/webhook', 'controller' => 'App\\Http\\Controllers\\StripeController', 'route_metadata' => ['necromancer' => ['external_services' => ['stripe']]], 'source' => null],
+        ],
+        'tests' => [
+            ['subject' => 'App\\Http\\Controllers\\StripeController'],
+        ],
+    ]);
+
+    expect($result->findings)->toBeEmpty();
+});
+
+test('ExternalServiceRoutesWithoutTestsCheck ignores routes without external_services', function () {
+    $result = (new ExternalServiceRoutesWithoutTestsCheck)->run(['routes' => [
+        ['method' => 'GET', 'uri' => '/orders', 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty()
+        ->and($result->total)->toBe(0);
+});
+
+// NarrativeRouteMetadataSummaryCheck
+
+test('NarrativeRouteMetadataSummaryCheck flags a summary over 200 characters', function () {
+    $result = (new NarrativeRouteMetadataSummaryCheck)->run(['routes' => [
+        ['method' => 'GET', 'uri' => '/orders', 'route_metadata' => ['necromancer' => ['summary' => str_repeat('a', 201)]], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toHaveCount(1)
+        ->and($result->findings[0]->severity)->toBe('suggestion');
+});
+
+test('NarrativeRouteMetadataSummaryCheck does not flag a compact summary', function () {
+    $result = (new NarrativeRouteMetadataSummaryCheck)->run(['routes' => [
+        ['method' => 'GET', 'uri' => '/orders', 'route_metadata' => ['necromancer' => ['summary' => 'Cancels an active subscription.']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty();
+});
+
+test('NarrativeRouteMetadataSummaryCheck ignores routes without a summary', function () {
+    $result = (new NarrativeRouteMetadataSummaryCheck)->run(['routes' => [
+        ['method' => 'GET', 'uri' => '/orders', 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty()
+        ->and($result->total)->toBe(0);
+});
+
+// InconsistentFlowMetadataCheck
+
+test('InconsistentFlowMetadataCheck flags routes in the same flow with different risk levels', function () {
+    $result = (new InconsistentFlowMetadataCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'risk' => 'high']], 'source' => null],
+        ['method' => 'POST', 'uri' => '/billing/refund', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'risk' => 'low']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toHaveCount(2)
+        ->and($result->findings[0]->severity)->toBe('warning')
+        ->and($result->findings[0]->message)->toContain('risk')
+        ->and($result->total)->toBe(2);
+});
+
+test('InconsistentFlowMetadataCheck flags routes in the same flow with different domains', function () {
+    $result = (new InconsistentFlowMetadataCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'domain' => 'billing']], 'source' => null],
+        ['method' => 'POST', 'uri' => '/billing/refund', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'domain' => 'payments']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toHaveCount(2)
+        ->and($result->findings[0]->message)->toContain('domain');
+});
+
+test('InconsistentFlowMetadataCheck does not flag a flow where domain and risk agree', function () {
+    $result = (new InconsistentFlowMetadataCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'domain' => 'billing', 'risk' => 'high']], 'source' => null],
+        ['method' => 'POST', 'uri' => '/billing/refund', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'domain' => 'billing', 'risk' => 'high']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty()
+        ->and($result->total)->toBe(2);
+});
+
+test('InconsistentFlowMetadataCheck ignores a route whose flow has no siblings', function () {
+    $result = (new InconsistentFlowMetadataCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'risk' => 'high']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty()
+        ->and($result->total)->toBe(0);
+});
+
+test('InconsistentFlowMetadataCheck ignores routes without a flow', function () {
+    $result = (new InconsistentFlowMetadataCheck)->run(['routes' => [
+        ['method' => 'GET', 'uri' => '/orders', 'source' => null],
+    ]]);
+
+    expect($result->findings)->toBeEmpty()
+        ->and($result->total)->toBe(0);
+});
+
+test('InconsistentFlowMetadataCheck emits one finding per route even when it conflicts on multiple fields', function () {
+    $result = (new InconsistentFlowMetadataCheck)->run(['routes' => [
+        ['method' => 'POST', 'uri' => '/billing/cancel', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'domain' => 'billing', 'risk' => 'high']], 'source' => null],
+        ['method' => 'POST', 'uri' => '/billing/refund', 'route_metadata' => ['necromancer' => ['flow' => 'subscription-cancellation', 'domain' => 'payments', 'risk' => 'low']], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toHaveCount(2)
+        ->and($result->total)->toBe(2)
+        ->and($result->findings[0]->message)->toContain('domain')->toContain('risk');
 });

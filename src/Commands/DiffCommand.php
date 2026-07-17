@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Process;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
 use LaravelNecromancer\Diff\DiffReviewAgent;
 use LaravelNecromancer\Diff\DiffReviewResult;
+use LaravelNecromancer\Diff\FlaggedRoutes;
 use LaravelNecromancer\Diff\ManifestDiff;
 use LaravelNecromancer\Diff\ManifestDiffer;
 use LaravelNecromancer\Inference\ManifestSummarizer;
@@ -192,6 +193,17 @@ final class DiffCommand extends Command
             return implode(PHP_EOL, $lines);
         }
 
+        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+
+        if (! empty($flaggedRoutes)) {
+            $lines[] = '';
+            $lines[] = '  FLAGGED ROUTES';
+
+            foreach ($flaggedRoutes as $route) {
+                $lines[] = "  <fg=red>⚠</>  {$this->labelArtifact('routes', $route)}  ".FlaggedRoutes::reason($route);
+            }
+        }
+
         if (! empty($diff->added)) {
             $lines[] = '';
             $lines[] = '  ADDED';
@@ -264,6 +276,17 @@ final class DiffCommand extends Command
             $lines[] = '_No architectural drift detected._';
 
             return implode(PHP_EOL, $lines);
+        }
+
+        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+
+        if (! empty($flaggedRoutes)) {
+            $lines[] = '';
+            $lines[] = '### Flagged Routes';
+
+            foreach ($flaggedRoutes as $route) {
+                $lines[] = "- `{$this->labelArtifact('routes', $route)}` — ".FlaggedRoutes::reason($route);
+            }
         }
 
         if (! empty($diff->added)) {

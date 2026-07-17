@@ -124,3 +124,39 @@ test('includes the manifest content in the agent instructions', function () {
         return $prompt->contains('What routes exist?');
     });
 });
+
+test('includes a most relevant evidence section ranking matches for the question', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'artifacts' => [
+            'routes' => [
+                ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'middleware' => []],
+                [
+                    'name' => 'billing.cancel', 'method' => 'POST', 'uri' => '/billing/cancel', 'middleware' => [],
+                    'route_metadata' => ['necromancer' => ['domain' => 'billing']],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:ask', ['question' => 'How does billing work?'])
+        ->assertSuccessful();
+
+    CodebaseAnswerAgent::assertPrompted(function (AgentPrompt $prompt) {
+        $instructions = (string) $prompt->agent->instructions();
+
+        return str_contains($instructions, 'Most Relevant Evidence')
+            && str_contains($instructions, 'billing.cancel');
+    });
+});
+
+test('omits the most relevant evidence section when nothing matches the question', function () {
+    File::put(base_path('necromancer.json'), askCommandManifest());
+
+    $this->artisan('necromancer:ask', ['question' => 'zzznonexistentkeywordzzz'])
+        ->assertSuccessful();
+
+    CodebaseAnswerAgent::assertPrompted(function (AgentPrompt $prompt) {
+        return ! str_contains((string) $prompt->agent->instructions(), 'Most Relevant Evidence');
+    });
+});

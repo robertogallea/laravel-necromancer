@@ -221,6 +221,61 @@ test('routes with parameters render a parameters column in the routes table', fu
     expect($content)->toContain('id (\d+), slug?');
 });
 
+test('routes with necromancer route metadata render domain risk external services and adr columns', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'routes' => [
+                [
+                    'name' => 'billing.cancel',
+                    'method' => 'POST',
+                    'uri' => '/billing/cancel',
+                    'controller' => 'App\\Http\\Controllers\\BillingController',
+                    'action' => 'cancel',
+                    'middleware' => [],
+                    'source' => null,
+                    'route_metadata' => [
+                        'necromancer' => [
+                            'domain' => 'billing',
+                            'risk' => 'high',
+                            'external_services' => ['stripe'],
+                            'adr' => 'docs/adr/004-subscription-cancellation.md',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('| Name | Method | URI | Controller | Middleware | Domain | Risk | External Services | ADR |');
+    expect($content)->toContain('billing');
+    expect($content)->toContain('high');
+    expect($content)->toContain('stripe');
+    expect($content)->toContain('docs/adr/004-subscription-cancellation.md');
+});
+
+test('routes without necromancer route metadata omit the metadata columns', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'routes' => [
+                ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->not->toContain('Domain')
+        ->and($content)->not->toContain('Risk')
+        ->and($content)->not->toContain('External Services')
+        ->and($content)->not->toContain('| ADR |');
+});
+
 test('a manifest with no routes does not include a routes section', function () {
     File::put(base_path('necromancer.json'), json_encode([
         'meta' => ['app_name' => 'TestApp'],

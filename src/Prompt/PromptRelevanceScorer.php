@@ -68,18 +68,72 @@ final class PromptRelevanceScorer
                 continue;
             }
 
+            if ($field === 'route_metadata') {
+                $score += $this->scoreRouteMetadata($value, $keywords);
+
+                continue;
+            }
+
             $weight = match (true) {
                 in_array($field, self::HIGH_WEIGHT_FIELDS, true) => 3,
                 in_array($field, self::MID_WEIGHT_FIELDS, true) => 2,
                 default => 1,
             };
 
-            $text = is_array($value) ? strtolower(json_encode($value) ?: '') : strtolower((string) $value);
+            $text = is_array($value) ? (json_encode($value) ?: '') : (string) $value;
 
-            foreach ($keywords as $keyword) {
-                if (str_contains($text, $keyword)) {
-                    $score += $weight;
-                }
+            $score += $this->matchWeight($text, $keywords, $weight);
+        }
+
+        return $score;
+    }
+
+    /**
+     * Declared route metadata is a stronger relevance signal than an inferred/observed
+     * field, since it's the developer explicitly naming the domain/flow/capability a
+     * route belongs to — so `domain`/`flow`/`capability` are weighted like `class`/`name`,
+     * `summary` like `description`, and everything else (including raw metadata from
+     * other packages' namespaces) falls back to the default weight.
+     *
+     * @param  list<string>  $keywords
+     */
+    private function scoreRouteMetadata(mixed $value, array $keywords): int
+    {
+        if (! is_array($value)) {
+            return 0;
+        }
+
+        $necromancer = is_array($value['necromancer'] ?? null) ? $value['necromancer'] : [];
+        $score = 0;
+
+        foreach (['domain', 'flow', 'capability'] as $field) {
+            $score += $this->matchWeight((string) ($necromancer[$field] ?? ''), $keywords, 3);
+        }
+
+        $score += $this->matchWeight((string) ($necromancer['summary'] ?? ''), $keywords, 2);
+        $score += $this->matchWeight((string) ($necromancer['risk'] ?? ''), $keywords, 1);
+        $score += $this->matchWeight(implode(',', (array) ($necromancer['external_services'] ?? [])), $keywords, 1);
+        $score += $this->matchWeight((string) ($necromancer['adr'] ?? ''), $keywords, 1);
+        $score += $this->matchWeight(json_encode($value['raw'] ?? []) ?: '', $keywords, 1);
+
+        return $score;
+    }
+
+    /**
+     * @param  list<string>  $keywords
+     */
+    private function matchWeight(string $text, array $keywords, int $weight): int
+    {
+        if ($text === '') {
+            return 0;
+        }
+
+        $text = strtolower($text);
+        $score = 0;
+
+        foreach ($keywords as $keyword) {
+            if (str_contains($text, $keyword)) {
+                $score += $weight;
             }
         }
 

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Doctor;
 
+use LaravelNecromancer\Collection\RouteMetadataNormalizer;
+use LaravelNecromancer\Collection\TestSubjectMatcher;
+
 final class DoctorAnalyzer
 {
     /**
@@ -24,6 +27,7 @@ final class DoctorAnalyzer
             $this->asyncClarity(),
             $this->codebaseVocabulary(),
             $this->testPresence(),
+            $this->routeMetadataCoverage(),
         ];
     }
 
@@ -265,7 +269,7 @@ final class DoctorAnalyzer
         if ($modelTotal > 0) {
             $modelsWithTests = count(array_filter(
                 $models,
-                fn (array $m): bool => $this->hasTestSubject($m['class'] ?? '', $testedSubjects),
+                fn (array $m): bool => TestSubjectMatcher::matches($m['class'] ?? '', $testedSubjects),
             ));
             $ratios[] = $modelsWithTests / $modelTotal;
             $detailParts[] = "{$modelsWithTests}/{$modelTotal} models";
@@ -274,7 +278,7 @@ final class DoctorAnalyzer
         if ($jobTotal > 0) {
             $jobsWithTests = count(array_filter(
                 $jobs,
-                fn (array $j): bool => $this->hasTestSubject($j['class'] ?? '', $testedSubjects),
+                fn (array $j): bool => TestSubjectMatcher::matches($j['class'] ?? '', $testedSubjects),
             ));
             $ratios[] = $jobsWithTests / $jobTotal;
             $detailParts[] = "{$jobsWithTests}/{$jobTotal} jobs";
@@ -285,25 +289,107 @@ final class DoctorAnalyzer
         return new DimensionResult('test-presence', 'Test Presence', $score, implode(' · ', $detailParts), 0.10);
     }
 
-    /**
-     * Returns true when any subject exactly matches the class OR is a namespace prefix of it.
-     * Prefix matching handles the case where a single test file covers an entire namespace
-     * (e.g. ModelsTest.php with subject "App\Models" covers "App\Models\Order").
-     *
-     * @param  list<string>  $subjects
-     */
-    private function hasTestSubject(string $class, array $subjects): bool
+    private function routeMetadataCoverage(): DimensionResult
     {
-        foreach ($subjects as $subject) {
-            if ($class === $subject) {
-                return true;
-            }
+        $routes = (array) ($this->artifacts['routes'] ?? []);
 
-            if (str_starts_with($class, $subject.'\\')) {
-                return true;
+        $annotated = array_values(array_filter(
+            $routes,
+            fn (array $r): bool => ! empty($r['route_metadata']['necromancer'] ?? null),
+        ));
+        $annotatedTotal = count($annotated);
+
+        if ($annotatedTotal === 0) {
+            return new DimensionResult('route-metadata-coverage', 'Route Metadata Coverage', 1.0, 'N/A', 0.10);
+        }
+
+        $withDomain = count(array_filter(
+            $annotated,
+            fn (array $r): bool => ! empty($r['route_metadata']['necromancer']['domain'] ?? null),
+        ));
+
+        $highRisk = array_values(array_filter(
+            $annotated,
+            fn (array $r): bool => in_array($r['route_metadata']['necromancer']['risk'] ?? null, RouteMetadataNormalizer::HIGH_RISK_LEVELS, true),
+        ));
+        $highRiskTotal = count($highRisk);
+        $highRiskWithAdr = $highRiskTotal > 0
+            ? count(array_filter($highRisk, fn (array $r): bool => ! empty($r['route_metadata']['necromancer']['adr'] ?? null)))
+            : 0;
+
+        $externalService = array_values(array_filter(
+            $annotated,
+            fn (array $r): bool => ! empty($r['route_metadata']['necromancer']['external_services'] ?? null),
+        ));
+        $externalServiceTotal = count($externalService);
+
+        $testedSubjects = array_filter(
+            array_column((array) ($this->artifacts['tests'] ?? []), 'subject'),
+            fn (?string $s): bool => $s !== null,
+        );
+        $externalServiceTested = $externalServiceTotal > 0
+            ? count(array_filter($externalService, fn (array $r): bool => TestSubjectMatcher::matches((string) ($r['controller'] ?? ''), $testedSubjects)))
+            : 0;
+
+        $ratios = [$withDomain / $annotatedTotal];
+        $detailParts = ["{$withDomain}/{$annotatedTotal} tagged with domain"];
+
+        if ($highRiskTotal > 0) {
+            $ratios[] = $highRiskWithAdr / $highRiskTotal;
+            $detailParts[] = "{$highRiskWithAdr}/{$highRiskTotal} high-risk with ADR";
+        }
+
+        if ($externalServiceTotal > 0) {
+            $ratios[] = $externalServiceTested / $externalServiceTotal;
+            $detailParts[] = "{$externalServiceTested}/{$externalServiceTotal} external-service routes tested";
+        }
+
+        $byFlow = [];
+        foreach ($annotated as $route) {
+            $flow = $route['route_metadata']['necromancer']['flow'] ?? null;
+
+            if (! empty($flow)) {
+                $byFlow[$flow][] = $route;
             }
         }
 
-        return false;
+        $groupedTotal = 0;
+        $consistentCount = 0;
+
+        foreach ($byFlow as $group) {
+            if (count($group) < 2) {
+                continue;
+            }
+
+            $groupedTotal += count($group);
+
+            $conflict = $this->hasFieldConflict($group, 'domain') || $this->hasFieldConflict($group, 'risk');
+
+            if (! $conflict) {
+                $consistentCount += count($group);
+            }
+        }
+
+        if ($groupedTotal > 0) {
+            $ratios[] = $consistentCount / $groupedTotal;
+            $detailParts[] = "{$consistentCount}/{$groupedTotal} flow-consistent";
+        }
+
+        $score = array_sum($ratios) / count($ratios);
+
+        return new DimensionResult('route-metadata-coverage', 'Route Metadata Coverage', $score, implode(' · ', $detailParts), 0.10);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $group
+     */
+    private function hasFieldConflict(array $group, string $field): bool
+    {
+        $distinct = array_unique(array_filter(array_map(
+            fn (array $r): ?string => $r['route_metadata']['necromancer'][$field] ?? null,
+            $group,
+        )));
+
+        return count($distinct) > 1;
     }
 }
