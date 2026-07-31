@@ -5,6 +5,12 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.1
+
+### Fixed
+
+- `Necromancer` facade root alias now registered via `extra.laravel.aliases` in `composer.json` (`"Necromancer": "LaravelNecromancer\\Facades\\Necromancer"`), matching how `laravel/head` registers its `Head` alias. Previously `Necromancer::forMetadata()` only worked with an explicit `use LaravelNecromancer\Facades\Necromancer;` import; it now resolves anywhere — including Tinker — with no import needed, via Laravel's package auto-discovery.
+
 ## 1.3.0
 
 ### Added
