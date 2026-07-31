@@ -28,6 +28,7 @@ use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Integrations\BoostDetector;
 use LaravelNecromancer\Integrations\McpInstaller;
 use LaravelNecromancer\Mcp\NecromancerServer;
+use LaravelNecromancer\Metadata\RouteMetadataFactory;
 
 final class NecromancerServiceProvider extends ServiceProvider
 {
@@ -40,6 +41,7 @@ final class NecromancerServiceProvider extends ServiceProvider
         $this->app->bind(AdrInferrer::class, AdrInferenceAgent::class);
         $this->app->bind(AdrTranslator::class, AdrTranslationAgent::class);
         $this->app->bind(AdrCritic::class, AdrCriticAgent::class);
+        $this->app->singleton(RouteMetadataFactory::class);
     }
 
     public function boot(): void

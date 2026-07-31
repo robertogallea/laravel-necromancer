@@ -94,6 +94,25 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
 
 All fields are optional and the feature is entirely opt-in — apps that don't use route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
 
+A `Necromancer::forMetadata()` facade helper is available as a shorthand for building this array, handling the `necromancer` namespace wrapping (respecting a configured `route_metadata.namespace`) and dropping any fields you don't pass:
+
+```php
+use LaravelNecromancer\Facades\Necromancer;
+
+Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+    ->metadata(Necromancer::forMetadata(
+        domain: 'billing',
+        flow: 'subscription-cancellation',
+        capability: 'subscription.cancel',
+        summary: 'Cancels an active subscription.',
+        risk: 'high',
+        externalServices: ['stripe'],
+        adr: 'docs/adr/004-subscription-cancellation.md',
+    ));
+```
+
+`externalServices` accepts either a single string or an array of strings. This is purely a convenience for constructing the array above — the raw array form remains fully supported.
+
 Check for manifest drift without writing a new file (CI use):
 
 ```bash
