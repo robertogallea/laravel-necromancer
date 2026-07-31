@@ -37,7 +37,7 @@
     <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="font-bold text-red-400 tracking-tight">Laravel Necromancer</span>
-        <span class="text-xs text-gray-600 font-mono">v1.2</span>
+        <span class="text-xs text-gray-600 font-mono">v1.3</span>
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm text-gray-400">
         <a href="#artifacts" class="hover:text-red-400 transition-colors">Artifacts</a>
@@ -656,6 +656,25 @@ php artisan necromancer:generate</pre>
             'adr' => 'docs/adr/004-subscription-cancellation.md',
         ],
     ]);</pre>
+        <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+      </div>
+      <p class="text-gray-500 mb-6">
+        A <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">Necromancer::forMetadata()</code>
+        facade helper builds this array for you, handling the namespace wrapping and dropping any field you don't pass:
+      </p>
+      <div class="code-block relative mb-6">
+        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">use LaravelNecromancer\Facades\Necromancer;
+
+Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+    ->metadata(Necromancer::forMetadata(
+        domain: 'billing',
+        flow: 'subscription-cancellation',
+        capability: 'subscription.cancel',
+        summary: 'Cancels an active subscription.',
+        risk: 'high',
+        externalServices: ['stripe'],
+        adr: 'docs/adr/004-subscription-cancellation.md',
+    ));</pre>
         <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

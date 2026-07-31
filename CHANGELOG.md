@@ -5,6 +5,12 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.0
+
+### Added
+
+- `Necromancer::forMetadata()` facade helper (`LaravelNecromancer\Facades\Necromancer`, backed by `LaravelNecromancer\Metadata\RouteMetadataFactory`) as a shorthand for building the `route_metadata` array passed to `Route::metadata()`. Accepts `domain`, `flow`, `capability`, `summary`, `risk`, `externalServices` (string or array), and `adr` as named arguments, wraps them under the configured `route_metadata.namespace`, and drops any field left null — callers no longer need to remember the namespace key or filter empty values by hand. Produces the exact same shape as the raw-array form; has no effect on collection or normalization.
+
 ## 1.2.0
 
 ### Added
