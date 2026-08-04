@@ -29,6 +29,7 @@ use LaravelNecromancer\Integrations\BoostDetector;
 use LaravelNecromancer\Integrations\McpInstaller;
 use LaravelNecromancer\Mcp\NecromancerServer;
 use LaravelNecromancer\Metadata\RouteMetadataFactory;
+use LaravelNecromancer\Routing\RouteMetadataMacros;
 
 final class NecromancerServiceProvider extends ServiceProvider
 {
@@ -46,6 +47,8 @@ final class NecromancerServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        (new RouteMetadataMacros)->register();
+
         $this->publishes([
             __DIR__.'/../config/necromancer.php' => config_path('necromancer.php'),
         ], 'necromancer-config');

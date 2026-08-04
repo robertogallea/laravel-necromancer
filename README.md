@@ -75,32 +75,11 @@ Necromancer reads PHP attributes (`#[ObservedBy]`, `#[Queue]`, `#[Aliases]`, `#[
 
 Test files in `tests/Unit/` and `tests/Feature/` are scanned and included as a `tests` artifact type. Both Pest functional-style files (`test()`/`it()` calls) and class-based PHPUnit tests are supported. Subject classes are inferred from `uses()` declarations and filename convention (`OrderTest.php` → `App\Models\Order`).
 
-On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself:
+On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself. The `withNecromancer()` route macro declares it:
 
 ```php
 Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
-    ->metadata([
-        'necromancer' => [
-            'domain' => 'billing',
-            'flow' => 'subscription-cancellation',
-            'capability' => 'subscription.cancel',
-            'summary' => 'Cancels an active subscription.',
-            'risk' => 'high',
-            'external_services' => ['stripe'],
-            'adr' => 'docs/adr/004-subscription-cancellation.md',
-        ],
-    ]);
-```
-
-All fields are optional and the feature is entirely opt-in — apps that don't use route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
-
-A `Necromancer::forMetadata()` facade helper is available as a shorthand for building this array, handling the `necromancer` namespace wrapping (respecting a configured `route_metadata.namespace`) and dropping any fields you don't pass:
-
-```php
-use LaravelNecromancer\Facades\Necromancer;
-
-Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
-    ->metadata(Necromancer::forMetadata(
+    ->withNecromancer(
         domain: 'billing',
         flow: 'subscription-cancellation',
         capability: 'subscription.cancel',
@@ -108,10 +87,37 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
         risk: 'high',
         externalServices: ['stripe'],
         adr: 'docs/adr/004-subscription-cancellation.md',
-    ));
+    );
 ```
 
-`externalServices` accepts either a single string or an array of strings. This is purely a convenience for constructing the array above — the raw array form remains fully supported.
+Every field is an optional named argument, and `externalServices` accepts either a single string or an array of strings. The macro is registered on every routing surface, so a whole group — or every route a resource registers — can be tagged in one place:
+
+```php
+// Group position, before or after any other group attribute
+Route::withNecromancer(domain: 'billing')->prefix('billing')->group(/* ... */);
+Route::prefix('billing')->withNecromancer(domain: 'billing')->group(/* ... */);
+
+// Resource and singleton registrations
+Route::resource('posts', PostController::class)->withNecromancer(domain: 'blog');
+Route::singleton('profile', ProfileController::class)->withNecromancer(domain: 'account');
+```
+
+Routes inherit the fields declared by their group, and a field set on the route itself wins over the group's value for that field — Laravel's own route metadata merging, not a Necromancer behaviour.
+
+The macro is a shorthand, never a parallel metadata system: it wraps the arguments you pass under the configured `route_metadata.namespace`, drops the ones left null, and hands the result to native `->metadata()`. The equivalent raw array is always supported, and is the form to use on Laravel < 13.17 — where `withNecromancer()` throws, since the framework has no route metadata to write to:
+
+```php
+Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+    ->metadata([
+        'necromancer' => [
+            'domain' => 'billing',
+            'risk' => 'high',
+            'external_services' => ['stripe'],
+        ],
+    ]);
+```
+
+All fields are optional and the feature is entirely opt-in — apps that don't declare route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
 
 Check for manifest drift without writing a new file (CI use):
 

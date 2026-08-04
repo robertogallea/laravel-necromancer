@@ -37,7 +37,7 @@
     <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="font-bold text-red-400 tracking-tight">Laravel Necromancer</span>
-        <span class="text-xs text-gray-600 font-mono">v1.3</span>
+        <span class="text-xs text-gray-600 font-mono">v1.4</span>
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm text-gray-400">
         <a href="#artifacts" class="hover:text-red-400 transition-colors">Artifacts</a>
@@ -643,30 +643,13 @@ php artisan necromancer:generate</pre>
         Necromancer infers from naming. Entirely opt-in: apps that don't set route metadata, or that run
         an older Laravel version, are unaffected.
       </p>
-      <div class="code-block relative mb-6">
-        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
-    ->metadata([
-        'necromancer' => [
-            'domain' => 'billing',
-            'flow' => 'subscription-cancellation',
-            'capability' => 'subscription.cancel',
-            'summary' => 'Cancels an active subscription.',
-            'risk' => 'high',
-            'external_services' => ['stripe'],
-            'adr' => 'docs/adr/004-subscription-cancellation.md',
-        ],
-    ]);</pre>
-        <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
-      </div>
       <p class="text-gray-500 mb-6">
-        A <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">Necromancer::forMetadata()</code>
-        facade helper builds this array for you, handling the namespace wrapping and dropping any field you don't pass:
+        The <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">withNecromancer()</code>
+        route macro declares it with named arguments — every field optional, and dropped when left unset:
       </p>
       <div class="code-block relative mb-6">
-        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">use LaravelNecromancer\Facades\Necromancer;
-
-Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
-    ->metadata(Necromancer::forMetadata(
+        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+    ->withNecromancer(
         domain: 'billing',
         flow: 'subscription-cancellation',
         capability: 'subscription.cancel',
@@ -674,7 +657,37 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
         risk: 'high',
         externalServices: ['stripe'],
         adr: 'docs/adr/004-subscription-cancellation.md',
-    ));</pre>
+    );</pre>
+        <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+      </div>
+      <p class="text-gray-500 mb-6">
+        The macro is registered on every routing surface, so a group — or every route a resource registers —
+        can be tagged in one place. Routes inherit their group's fields, and a field declared on the route
+        itself wins for that field:
+      </p>
+      <div class="code-block relative mb-6">
+        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">Route::withNecromancer(domain: 'billing')->prefix('billing')->group(/* ... */);
+Route::prefix('billing')->withNecromancer(domain: 'billing')->group(/* ... */);
+
+Route::resource('posts', PostController::class)->withNecromancer(domain: 'blog');
+Route::singleton('profile', ProfileController::class)->withNecromancer(domain: 'account');</pre>
+        <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+      </div>
+      <p class="text-gray-500 mb-6">
+        It is a shorthand, never a parallel metadata system — the fields go straight into native route
+        metadata under the configured namespace. The raw array form stays fully supported, and is what to
+        use on Laravel &lt; 13.17, where the macro throws because the framework has no route metadata to
+        write to:
+      </p>
+      <div class="code-block relative mb-6">
+        <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+    ->metadata([
+        'necromancer' => [
+            'domain' => 'billing',
+            'risk' => 'high',
+            'external_services' => ['stripe'],
+        ],
+    ]);</pre>
         <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
