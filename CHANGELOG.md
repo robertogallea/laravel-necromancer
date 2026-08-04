@@ -5,6 +5,17 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.4.0
+
+### Added
+
+- `withNecromancer()` route macro for declaring route metadata, registered on all five routing surfaces — `Illuminate\Routing\Router` (`Route::withNecromancer(...)->group(...)`), `RouteRegistrar` (`Route::prefix(...)->withNecromancer(...)->group(...)`), `Route` (`Route::post(...)->withNecromancer(...)`), `PendingResourceRegistration` (`Route::resource(...)->withNecromancer(...)`), and `PendingSingletonResourceRegistration` (`Route::singleton(...)->withNecromancer(...)`). Takes `domain`, `flow`, `capability`, `summary`, `risk`, `externalServices` (string or array), and `adr` as optional named arguments; wraps them under the configured `route_metadata.namespace`, drops any argument left null, and hands the result to Laravel's native `->metadata()`. Group-level fields are inherited by the routes inside the group, with route-level fields winning per field (native Laravel metadata merging). Registered by `LaravelNecromancer\Routing\RouteMetadataMacros`, which is booted by the service provider.
+- Because native route metadata only exists from Laravel 13.17, calling `withNecromancer()` on an older 13.x release throws a `RuntimeException` naming the required version rather than failing silently. Manifest collection is unchanged and still degrades quietly on those versions.
+
+### Removed
+
+- **BREAKING** — the `Necromancer` facade (`LaravelNecromancer\Facades\Necromancer`), its `Necromancer::forMetadata()` helper, and the `extra.laravel.aliases` root alias registered in `composer.json`. The macro replaces them: rewrite `->metadata(Necromancer::forMetadata(domain: 'billing'))` as `->withNecromancer(domain: 'billing')`. The raw `->metadata(['necromancer' => [...]])` array form is unaffected, as are the manifest shape, collection, normalization, and every downstream command. `LaravelNecromancer\Metadata\RouteMetadataFactory` still exists as the internal payload builder the macros delegate to.
+
 ## 1.3.1
 
 ### Fixed

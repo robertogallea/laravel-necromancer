@@ -9,12 +9,14 @@ parameters:
         - stubs/laravel-mcp.php
         - stubs/livewire.php
     ignoreErrors:
-        # This package supports Laravel ^13.0, but Route::getMetadata() only exists from
-        # 13.17+, and Dispatcher::getRawListeners()'s key type has varied across 13.x
-        # patch releases. These defensive runtime checks are only "unnecessary" on
+        # This package supports Laravel ^13.0, but Route::metadata()/getMetadata() only
+        # exist from 13.17+, and Dispatcher::getRawListeners()'s key type has varied across
+        # 13.x patch releases. These defensive runtime checks are only "unnecessary" on
         # whichever Laravel version happens to be installed when PHPStan runs (CI floats
         # to the latest 13.* release); reportUnmatched: false keeps this rule a no-op on
-        # older installed versions where the check is genuinely still needed.
+        # older installed versions where the check is genuinely still needed. For the same
+        # reason the withNecromancer() macros call metadata() behind a runtime guard, so on
+        # an older installed Laravel that call itself looks like an undefined method.
         -
             identifier: function.alreadyNarrowedType
             path: src/Collection/RouteCollector.php
@@ -22,4 +24,8 @@ parameters:
         -
             identifier: function.alreadyNarrowedType
             path: src/Collection/EventListenerMap.php
+            reportUnmatched: false
+        -
+            identifier: method.notFound
+            path: src/Routing/RouteMetadataMacros.php
             reportUnmatched: false

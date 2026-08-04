@@ -30,10 +30,7 @@
         "laravel": {
             "providers": [
                 "LaravelNecromancer\\NecromancerServiceProvider"
-            ],
-            "aliases": {
-                "Necromancer": "LaravelNecromancer\\Facades\\Necromancer"
-            }
+            ]
         }
     },
     "suggest": {
