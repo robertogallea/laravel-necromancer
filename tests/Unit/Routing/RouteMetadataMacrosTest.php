@@ -99,6 +99,20 @@ test('withNecromancer fails loudly when the framework has no native route metada
         ->toThrow(RuntimeException::class, '13.17');
 })->skip($metadataSupported, 'The installed Laravel supports native route metadata.');
 
+/**
+ * Resolve a registered route by name.
+ *
+ * ->name() is called after the route has been added to the collection, so the
+ * name lookup table has to be refreshed before the route can be found by name.
+ */
+function necromancerRegisteredRoute(string $name): ?RoutingRoute
+{
+    $routes = app(Router::class)->getRoutes();
+    $routes->refreshNameLookups();
+
+    return $routes->getByName($name);
+}
+
 test('withNecromancer tags every route in a group', function () {
     Route::withNecromancer(domain: 'billing', risk: 'high')
         ->prefix('billing')
@@ -106,7 +120,7 @@ test('withNecromancer tags every route in a group', function () {
             Route::post('/cancel', fn () => 'ok')->name('billing.cancel');
         });
 
-    $route = app(Router::class)->getRoutes()->getByName('billing.cancel');
+    $route = necromancerRegisteredRoute('billing.cancel');
 
     expect($route->getMetadata('necromancer.domain'))->toBe('billing')
         ->and($route->getMetadata('necromancer.risk'))->toBe('high');
@@ -119,7 +133,7 @@ test('withNecromancer tags a group it is chained onto', function () {
             Route::get('/invoices', fn () => 'ok')->name('billing.invoices');
         });
 
-    $route = app(Router::class)->getRoutes()->getByName('billing.invoices');
+    $route = necromancerRegisteredRoute('billing.invoices');
 
     expect($route->getMetadata('necromancer.domain'))->toBe('billing');
 })->skip(! $metadataSupported, 'Requires Laravel 13.17+ native route metadata.');
@@ -127,7 +141,7 @@ test('withNecromancer tags a group it is chained onto', function () {
 test('withNecromancer tags a resource registration', function () {
     Route::resource('posts', 'PostController')->withNecromancer(domain: 'blog');
 
-    $route = app(Router::class)->getRoutes()->getByName('posts.index');
+    $route = necromancerRegisteredRoute('posts.index');
 
     expect($route->getMetadata('necromancer.domain'))->toBe('blog');
 })->skip(! $metadataSupported, 'Requires Laravel 13.17+ native route metadata.');
@@ -135,7 +149,7 @@ test('withNecromancer tags a resource registration', function () {
 test('withNecromancer tags a singleton resource registration', function () {
     Route::singleton('profile', 'ProfileController')->withNecromancer(domain: 'account');
 
-    $route = app(Router::class)->getRoutes()->getByName('profile.show');
+    $route = necromancerRegisteredRoute('profile.show');
 
     expect($route->getMetadata('necromancer.domain'))->toBe('account');
 })->skip(! $metadataSupported, 'Requires Laravel 13.17+ native route metadata.');
