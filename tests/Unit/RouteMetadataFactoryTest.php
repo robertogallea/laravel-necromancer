@@ -62,6 +62,15 @@ test('forMetadata accepts a Risk enum and preserves singular and plural ADR decl
     ]]);
 });
 
+test('forMetadata rejects invalid new annotation declarations clearly', function () {
+    $factory = app(RouteMetadataFactory::class);
+
+    expect(fn () => $factory->forMetadata(risk: 'urgent'))
+        ->toThrow(InvalidArgumentException::class, 'risk')
+        ->and(fn () => $factory->forMetadata(adrs: ['docs/adr/001.md', ' ']))
+        ->toThrow(InvalidArgumentException::class, 'adrs');
+});
+
 test('forMetadata respects a custom route_metadata namespace', function () {
     config(['necromancer.route_metadata.namespace' => 'acme']);
 

@@ -4,6 +4,7 @@ use App\Providers\NecromancerFixtureServiceProvider;
 use Illuminate\Auth\Access\Gate;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use LaravelNecromancer\Collection\CommandCollector;
@@ -37,8 +38,8 @@ use LaravelNecromancer\Tests\Fixtures\Models\NecromancerMember;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerOrder;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerReport;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerUnguardedModel;
-use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerFakeMetadataRoute;
+use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
 use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
 use LaravelNecromancer\Tests\Fixtures\Policies\NecromancerPostPolicy;
@@ -139,7 +140,7 @@ test('the scan command projects native route metadata into canonical annotations
             'adrs' => ['docs/adr/002.md', 'docs/adr/001.md'],
         ],
     ]);
-    app(\Illuminate\Routing\Router::class)->getRoutes()->add($route);
+    app(Router::class)->getRoutes()->add($route);
 
     $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])->assertSuccessful();
 
@@ -156,6 +157,32 @@ test('the scan command projects native route metadata into canonical annotations
             'risk' => 'high',
             'external_services' => ['stripe'],
             'adrs' => ['docs/adr/001.md', 'docs/adr/002.md'],
+        ]);
+});
+
+test('the scan command warns about legacy route values excluded from annotations', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-route-annotations.json');
+    $route = new NecromancerFakeMetadataRoute(['POST'], '/necromancer/legacy-invalid', ['uses' => fn () => 'ok']);
+    $route->name('necromancer.legacy.invalid');
+    $route->metadata(['necromancer' => [
+        'domain' => 'billing',
+        'risk' => 'urgent',
+        'external_services' => ['stripe', ''],
+    ]]);
+    app(Router::class)->getRoutes()->add($route);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])
+        ->expectsOutputToContain('AN_LEGACY_RISK')
+        ->expectsOutputToContain('AN_LEGACY_VALUE')
+        ->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.legacy.invalid');
+
+    expect($route->route_metadata->raw->necromancer->risk)->toBe('urgent')
+        ->and($route->route_metadata->necromancer->risk)->toBe('urgent')
+        ->and($route->annotations)->toEqual((object) [
+            'domain' => 'billing',
+            'external_services' => ['stripe'],
         ]);
 });
 

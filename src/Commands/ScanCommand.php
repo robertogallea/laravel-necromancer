@@ -43,6 +43,10 @@ final class ScanCommand extends Command
             return self::FAILURE;
         }
 
+        foreach (array_unique($manifest->diagnostics()) as $diagnostic) {
+            $this->warn($diagnostic);
+        }
+
         $this->info("Necromancer manifest written to {$path}");
 
         return self::SUCCESS;

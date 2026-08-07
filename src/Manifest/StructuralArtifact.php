@@ -24,6 +24,7 @@ use LaravelNecromancer\Manifest\ArtifactPayloads\RulePayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ScheduledTaskPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ServiceProviderPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\TestPayload;
+use LaravelNecromancer\Metadata\ArtifactAnnotations;
 
 final readonly class StructuralArtifact implements JsonSerializable
 {
@@ -68,7 +69,6 @@ final readonly class StructuralArtifact implements JsonSerializable
      * @param  list<array{ability: string, models: list<string>}>  $authorization
      * @param  array<string, mixed>  $metadata
      * @param  array<string, mixed>  $necromancerMetadata
-     * @param  array<string, mixed>  $annotations
      */
     public static function route(
         ?string $name,
@@ -82,7 +82,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $authorization = [],
         array $metadata = [],
         array $necromancerMetadata = [],
-        array $annotations = [],
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('routes', new RoutePayload(
             name: $name,

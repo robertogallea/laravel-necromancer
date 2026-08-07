@@ -40,7 +40,7 @@ final readonly class RouteMetadataNormalizer
     private function stringOrNull(mixed $value): ?string
     {
         if (is_string($value) || is_int($value) || is_float($value)) {
-            return (string) $value;
+            return trim((string) $value);
         }
 
         return null;

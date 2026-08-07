@@ -111,11 +111,11 @@ final readonly class ManifestReader
 
         $route['route_metadata'] = [
             ...$metadata,
-            'necromancer' => $resolved['compatibility'],
+            'necromancer' => $resolved->compatibility,
         ];
 
-        if ($resolved['annotations'] !== []) {
-            $route['annotations'] = $resolved['annotations'];
+        if (! $resolved->annotations->isEmpty()) {
+            $route['annotations'] = $resolved->annotations->jsonSerialize();
         }
 
         return $route;

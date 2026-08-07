@@ -16,11 +16,11 @@ final readonly class RouteAnnotationResolver
 
     /**
      * @param  array<string, mixed>  $raw
-     * @return array{compatibility: array<string, mixed>, annotations: array<string, mixed>}
      */
-    public function resolve(array $raw): array
+    public function resolve(array $raw): RouteAnnotationResolution
     {
         $compatibility = (new RouteMetadataNormalizer($this->namespace))->normalize($raw);
+        $diagnostics = $this->legacyDiagnostics($raw);
         $adrs = $this->canonicalList([
             $compatibility['adr'] ?? null,
             ...($compatibility['adrs'] ?? []),
@@ -31,31 +31,27 @@ final readonly class RouteAnnotationResolver
             $compatibility['adrs'] = $adrs;
         }
 
-        $annotations = [];
-
-        foreach (['domain', 'flow', 'capability', 'summary'] as $field) {
-            $value = $this->nonEmptyString($compatibility[$field] ?? null);
-
-            if ($value !== null) {
-                $annotations[$field] = $value;
-            }
-        }
+        $domain = $this->nonEmptyString($compatibility['domain'] ?? null);
+        $flow = $this->nonEmptyString($compatibility['flow'] ?? null);
+        $capability = $this->nonEmptyString($compatibility['capability'] ?? null);
+        $summary = $this->nonEmptyString($compatibility['summary'] ?? null);
 
         $risk = $this->nonEmptyString($compatibility['risk'] ?? null);
-        if ($risk !== null && Risk::tryFrom($risk) !== null) {
-            $annotations['risk'] = $risk;
-        }
-
         $externalServices = $this->canonicalList($compatibility['external_services'] ?? []);
-        if ($externalServices !== []) {
-            $annotations['external_services'] = $externalServices;
-        }
 
-        if ($adrs !== []) {
-            $annotations['adrs'] = $adrs;
-        }
-
-        return ['compatibility' => $compatibility, 'annotations' => $annotations];
+        return new RouteAnnotationResolution(
+            compatibility: $compatibility,
+            annotations: new ArtifactAnnotations(
+                domain: $domain,
+                flow: $flow,
+                capability: $capability,
+                summary: $summary,
+                risk: $risk === null ? null : Risk::tryFrom($risk),
+                externalServices: $externalServices,
+                adrs: $adrs,
+            ),
+            diagnostics: $diagnostics,
+        );
     }
 
     private function nonEmptyString(mixed $value): ?string
@@ -86,5 +82,57 @@ final readonly class RouteAnnotationResolver
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return list<string>
+     */
+    private function legacyDiagnostics(array $raw): array
+    {
+        $declared = $raw[$this->namespace] ?? null;
+
+        if (! is_array($declared)) {
+            return [];
+        }
+
+        $diagnostics = [];
+        foreach (['domain', 'flow', 'capability', 'summary'] as $field) {
+            if (array_key_exists($field, $declared) && (! $this->isLegacyScalar($declared[$field]) || trim((string) $declared[$field]) === '')) {
+                $diagnostics[] = "AN_LEGACY_VALUE: route metadata {$field} cannot enter Annotation Schema v1.";
+            }
+        }
+
+        if (array_key_exists('risk', $declared)) {
+            $risk = $declared['risk'];
+            if (! $this->isLegacyScalar($risk) || Risk::tryFrom(trim((string) $risk)) === null) {
+                $diagnostics[] = 'AN_LEGACY_RISK: route metadata risk is not a Schema v1 Risk value.';
+            }
+        }
+
+        foreach (['external_services', 'adrs'] as $field) {
+            if (! array_key_exists($field, $declared)) {
+                continue;
+            }
+
+            if ($field === 'adrs' && ! is_array($declared[$field])) {
+                $diagnostics[] = 'AN_LEGACY_VALUE: route metadata adrs must be a list for Annotation Schema v1.';
+            }
+
+            $values = is_array($declared[$field]) ? $declared[$field] : [$declared[$field]];
+            foreach ($values as $value) {
+                if (! $this->isLegacyScalar($value) || trim((string) $value) === '') {
+                    $diagnostics[] = "AN_LEGACY_VALUE: route metadata {$field} contains a value outside Annotation Schema v1.";
+                    break;
+                }
+            }
+        }
+
+        return $diagnostics;
+    }
+
+    private function isLegacyScalar(mixed $value): bool
+    {
+        return is_string($value) || is_int($value) || is_float($value);
     }
 }

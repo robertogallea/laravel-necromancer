@@ -10,14 +10,18 @@ use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use LaravelNecromancer\Manifest\SourceLocation;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\RouteAnnotationResolution;
 use LaravelNecromancer\Metadata\RouteAnnotationResolver;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionFunction;
 use ReflectionMethod;
 
-final readonly class RouteCollector
+final class RouteCollector
 {
+    /** @var list<string> */
+    private array $diagnostics = [];
+
     public function __construct(private Router $router) {}
 
     /**
@@ -25,6 +29,7 @@ final readonly class RouteCollector
      */
     public function collect(): array
     {
+        $this->diagnostics = [];
         $artifacts = [];
 
         foreach ($this->router->getRoutes()->getRoutes() as $route) {
@@ -34,11 +39,18 @@ final readonly class RouteCollector
         return $artifacts;
     }
 
+    /** @return list<string> */
+    public function diagnostics(): array
+    {
+        return $this->diagnostics;
+    }
+
     private function collectRoute(Route $route): StructuralArtifact
     {
         [$controller, $action] = $this->controllerAction($route);
         $metadata = $this->routeMetadata($route);
         $resolvedAnnotations = $this->resolvedAnnotations($metadata);
+        $this->diagnostics = [...$this->diagnostics, ...$resolvedAnnotations->diagnostics];
 
         return StructuralArtifact::route(
             name: $route->getName(),
@@ -51,8 +63,8 @@ final readonly class RouteCollector
             parameters: $this->parameters($route),
             authorization: $this->authorization($controller, $action),
             metadata: $metadata,
-            necromancerMetadata: $resolvedAnnotations['compatibility'],
-            annotations: $resolvedAnnotations['annotations'],
+            necromancerMetadata: $resolvedAnnotations->compatibility,
+            annotations: $resolvedAnnotations->annotations,
         );
     }
 
@@ -76,9 +88,8 @@ final readonly class RouteCollector
 
     /**
      * @param  array<string, mixed>  $rawMetadata
-     * @return array<string, mixed>
      */
-    private function resolvedAnnotations(array $rawMetadata): array
+    private function resolvedAnnotations(array $rawMetadata): RouteAnnotationResolution
     {
         $namespace = (string) config('necromancer.route_metadata.namespace', 'necromancer');
 

@@ -32,8 +32,11 @@ use LaravelNecromancer\Collection\TestCollector;
 use stdClass;
 use Throwable;
 
-final readonly class ScanManifest implements JsonSerializable
+final class ScanManifest implements JsonSerializable
 {
+    /** @var list<string> */
+    private array $diagnostics = [];
+
     public function __construct(
         private Application $app,
         private RouteCollector $routeCollector,
@@ -105,6 +108,12 @@ final readonly class ScanManifest implements JsonSerializable
         ];
     }
 
+    /** @return list<string> */
+    public function diagnostics(): array
+    {
+        return $this->diagnostics;
+    }
+
     /**
      * Build a reverse-lookup map from observer FQCN to model FQCN using the
      * #[ObservedBy] attributes already captured in the model artifacts.
@@ -151,6 +160,7 @@ final readonly class ScanManifest implements JsonSerializable
      */
     private function collectArtifacts(array $only = []): array
     {
+        $this->diagnostics = [];
         $routeExclusions = config('necromancer.exclude.routes', ['horizon.*', 'telescope.*', 'debugbar.*']);
 
         if (! is_array($routeExclusions)) {
@@ -178,7 +188,12 @@ final readonly class ScanManifest implements JsonSerializable
         $observerCollector = $this->observerCollector->withModelMap($observerModelMap);
 
         $collectors = [
-            'routes' => fn (): array => $this->routeCollector->collect(),
+            'routes' => function (): array {
+                $artifacts = $this->routeCollector->collect();
+                $this->diagnostics = $this->routeCollector->diagnostics();
+
+                return $artifacts;
+            },
             // Reuse the eagerly-collected model list when it was already fetched for the
             // observer map; otherwise collect on demand.
             'models' => fn (): array => $eagerModelArtifacts !== [] ? $eagerModelArtifacts : $this->modelCollector->collect(),

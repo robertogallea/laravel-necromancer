@@ -71,6 +71,20 @@ test('normalize retains plural ADR declarations', function () {
     ]);
 });
 
+test('normalize trims legacy scalar values before creating the compatibility projection', function () {
+    $normalizer = new RouteMetadataNormalizer;
+
+    expect($normalizer->normalize(['necromancer' => [
+        'domain' => ' billing ',
+        'risk' => ' high ',
+        'external_services' => [' stripe '],
+    ]]))->toBe([
+        'domain' => 'billing',
+        'risk' => 'high',
+        'external_services' => ['stripe'],
+    ]);
+});
+
 test('normalize drops non-scalar values instead of throwing', function () {
     $normalizer = new RouteMetadataNormalizer;
 
