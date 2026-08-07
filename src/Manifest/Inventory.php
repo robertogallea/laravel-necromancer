@@ -15,6 +15,7 @@ final readonly class Inventory implements JsonSerializable
     public function __construct(
         public ConfigurationSummary $configuration,
         public array $artifacts = [],
+        private ArtifactId $artifactId = new ArtifactId,
     ) {}
 
     /**
@@ -30,9 +31,12 @@ final readonly class Inventory implements JsonSerializable
 
         ksort($artifacts);
 
+        // Hook and scheduled-task IDs include registration order, so identifiers
+        // must be assigned before the manifest is sorted for deterministic output.
+        $artifacts = $this->artifactId->assign($artifacts);
+
         foreach ($artifacts as $type => $items) {
-            usort($items, fn (array $a, array $b): int => $this->canonicalKey($type, $a) <=> $this->canonicalKey($type, $b)
-            );
+            usort($items, static fn (array $a, array $b): int => $a['id'] <=> $b['id']);
             $artifacts[$type] = $items;
         }
 
@@ -40,19 +44,6 @@ final readonly class Inventory implements JsonSerializable
             'configuration' => $this->configuration->jsonSerialize(),
             'artifacts' => $artifacts,
         ];
-    }
-
-    private function canonicalKey(string $type, array $item): string
-    {
-        if ($type === 'routes') {
-            return (string) ($item['method'] ?? '').':'.($item['uri'] ?? '');
-        }
-
-        if ($type === 'tests') {
-            return (string) ($item['file'] ?? json_encode($item));
-        }
-
-        return (string) ($item['class'] ?? $item['signature'] ?? json_encode($item));
     }
 
     /**

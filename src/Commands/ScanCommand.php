@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
+use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ScanManifest;
@@ -125,15 +126,13 @@ final class ScanCommand extends Command
 
     private function artifactKey(string $type, array $item): string
     {
-        if ($type === 'routes') {
-            return (string) ($item['method'] ?? '').':'.($item['uri'] ?? '');
+        $id = $item['id'] ?? null;
+
+        if (is_string($id) && $id !== '') {
+            return $id;
         }
 
-        if ($type === 'tests') {
-            return (string) ($item['file'] ?? json_encode($item));
-        }
-
-        return (string) ($item['class'] ?? $item['signature'] ?? json_encode($item));
+        return (new ArtifactId)->for($type, $item);
     }
 
     private function resolveOutputPath(): string

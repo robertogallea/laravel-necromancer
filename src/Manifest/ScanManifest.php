@@ -57,7 +57,7 @@ final readonly class ScanManifest implements JsonSerializable
     ) {}
 
     /**
-     * @return array{meta: array{generated_at: string, content_hash: string, necromancer_version: string, laravel_version: string, php_version: string, app_name: string, app_url: string, app_env: string}, artifacts: stdClass|array<string, list<array<string, mixed>>>}
+     * @return array{meta: array<string, mixed>, artifacts: stdClass|array<string, list<array<string, mixed>>>}
      */
     public function jsonSerialize(): array
     {
@@ -74,15 +74,24 @@ final readonly class ScanManifest implements JsonSerializable
 
     /**
      * @param  list<string>  $only
-     * @return array{meta: array{generated_at: string, content_hash: string, necromancer_version: string, laravel_version: string, php_version: string, app_name: string, app_url: string, app_env: string}, artifacts: stdClass|array<string, list<array<string, mixed>>>}
+     * @return array{meta: array<string, mixed>, artifacts: stdClass|array<string, list<array<string, mixed>>>}
      */
     public function buildPayload(array $only = []): array
     {
         $artifacts = $this->collectArtifacts($only);
-        $contentHash = hash('sha256', json_encode($artifacts, JSON_THROW_ON_ERROR));
+        $scope = $this->scope($only);
+        $contentHash = hash('sha256', json_encode([
+            'manifest_schema_version' => 1,
+            'annotation_schema_version' => 1,
+            'scope' => $scope,
+            'artifacts' => $artifacts,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
 
         return [
             'meta' => [
+                'manifest_schema_version' => 1,
+                'annotation_schema_version' => 1,
+                'scope' => $scope,
                 'generated_at' => now()->toAtomString(),
                 'content_hash' => $contentHash,
                 'necromancer_version' => $this->necromancerVersion(),
@@ -208,5 +217,30 @@ final readonly class ScanManifest implements JsonSerializable
         ))->collect(artifacts: $artifacts);
 
         return $inventory->toArray()['artifacts'];
+    }
+
+    /**
+     * @param  list<string>  $only
+     * @return array{complete: bool, artifact_types: list<string>}
+     */
+    private function scope(array $only): array
+    {
+        $types = [
+            'routes', 'models', 'form_requests', 'jobs', 'events', 'listeners',
+            'commands', 'policies', 'enums', 'tests', 'observers', 'scheduled_tasks',
+            'middleware', 'livewire_components', 'gates', 'mailables',
+            'validation_rules', 'service_providers',
+        ];
+
+        if ($only !== []) {
+            $types = array_values(array_intersect($types, $only));
+        }
+
+        sort($types, SORT_STRING);
+
+        return [
+            'complete' => $only === [],
+            'artifact_types' => $types,
+        ];
     }
 }

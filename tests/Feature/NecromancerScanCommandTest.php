@@ -66,6 +66,26 @@ test('the scan command writes a minimal manifest to the default path', function 
     expectMinimalScanManifest($path);
 });
 
+test('the scan command records complete and partial scan scope', function () {
+    $fullPath = necromancerScanTestPath('necromancer-full-scope.json');
+    $partialPath = necromancerScanTestPath('necromancer-partial-scope.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $fullPath])->assertSuccessful();
+    $this->artisan('necromancer:scan', ['--output' => $partialPath, '--only' => 'routes'])->assertSuccessful();
+
+    $full = expectScanManifest($fullPath);
+    $partial = expectScanManifest($partialPath);
+
+    expect($full->meta->scope->complete)->toBeTrue()
+        ->and($full->meta->scope->artifact_types)->toBe([
+            'commands', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
+            'livewire_components', 'mailables', 'middleware', 'models', 'observers',
+            'policies', 'routes', 'scheduled_tasks', 'service_providers', 'tests', 'validation_rules',
+        ])
+        ->and($partial->meta->scope->complete)->toBeFalse()
+        ->and($partial->meta->scope->artifact_types)->toBe(['routes']);
+});
+
 test('the scan command writes named and unnamed closure route artifacts', function () {
     $path = necromancerScanTestPath('necromancer-routes-closure.json');
     $secret = 'necromancer-route-closure-secret';
@@ -1239,6 +1259,9 @@ function expectScanManifest(string $path): stdClass
         ->toHaveProperty('artifacts');
 
     expect($manifest->meta)
+        ->toHaveProperty('manifest_schema_version', 1)
+        ->toHaveProperty('annotation_schema_version', 1)
+        ->toHaveProperty('scope')
         ->toHaveProperty('generated_at')
         ->toHaveProperty('content_hash')
         ->toHaveProperty('necromancer_version')
@@ -1256,6 +1279,15 @@ function expectScanManifest(string $path): stdClass
         ->and($manifest->meta->app_name)->toBe(config('app.name'))
         ->and($manifest->meta->app_url)->toBe(config('app.url'))
         ->and($manifest->meta->app_env)->toBe(app()->environment());
+
+    expect($manifest->meta->scope->complete)->toBeBool()
+        ->and($manifest->meta->scope->artifact_types)->toBeArray();
+
+    foreach ((array) $manifest->artifacts as $items) {
+        foreach ($items as $artifact) {
+            expect($artifact->id)->toBeString()->not->toBeEmpty();
+        }
+    }
 
     expect(array_keys((array) $manifest->artifacts))->each->toBeIn([
         'commands',
