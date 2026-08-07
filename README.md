@@ -31,7 +31,7 @@ The manifest covers 18 artifact types across the full Laravel application struct
 
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
-Every class-backed type in the table above — `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below.
+Every class-backed type in the table above — `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
 
 ## Requirements
 
@@ -160,6 +160,24 @@ final class EnsureTwoFactorIsEnabled
     // ...
 }
 ```
+
+#### Annotating non-reflectable artifacts with exact-ID mappings
+
+Closures, test files, gates, and scheduled tasks have no class or method to carry a `#[Necromancer]` attribute. The `annotations` key in `config/necromancer.php` covers these — and adds a registration-specific override on top of any other family, including middleware — by mapping an exact, opaque canonical Artifact ID (the same `id` every artifact already carries in the manifest) to a Schema v1 field array:
+
+```php
+'annotations' => [
+    'gates:ability:edit-post' => [
+        'domain' => 'content',
+        'risk' => 'low',
+    ],
+    'middleware:group:web:App\\Http\\Middleware\\EnsureTwoFactorIsEnabled' => [
+        'capability' => 'security.two-factor',
+    ],
+],
+```
+
+Keys must be exact IDs — there is no wildcard or pattern syntax, and an unresolvable made-up ID is never allowed to invent an artifact. A mapping only **fills** an annotation field left absent by every other declaration source; when it disagrees with an already-resolved value (a `#[Necromancer]` attribute, a controller annotation, or native route metadata), the existing value wins and `necromancer:scan` prints an `AN_SOURCE_CONFLICT` warning. List fields (`external_services`, `adrs`) are additive: config values are appended after whatever was already resolved, with exact deduplication. An unknown field name, an empty scalar, an invalid `risk` value, or a wildcard/malformed key fails the scan before anything is written, leaving an existing manifest untouched — the same controlled-failure behavior invalid `#[Necromancer]` attribute values already produce. A mapping whose artifact type is included in the current scan but whose exact ID matches nothing collected prints a non-fatal `AN_CONFIG_UNMATCHED` warning; a mapping for a type outside a `--only` scan's scope is silently skipped.
 
 Check for manifest drift without writing a new file (CI use):
 
@@ -641,6 +659,17 @@ return [
     // Route metadata (Laravel 13.17+ Route::metadata()) — the namespace key Necromancer reads
     'route_metadata' => [
         'namespace' => 'necromancer',
+    ],
+
+    // Exact-ID annotation mappings for non-reflectable artifacts (closures, test
+    // files, gates, scheduled tasks) and registration-specific overrides for
+    // reflectable ones. Keys MUST be exact canonical Artifact IDs — no wildcards.
+    'annotations' => [
+        // 'jobs:App\\Jobs\\SendInvoice' => [
+        //     'domain' => 'billing',
+        //     'capability' => 'invoice.send',
+        //     'risk' => 'high',
+        // ],
     ],
 
 ];

@@ -29,6 +29,7 @@ use LaravelNecromancer\Collection\SafeInventoryCollector;
 use LaravelNecromancer\Collection\ScheduledTaskCollector;
 use LaravelNecromancer\Collection\ServiceProviderCollector;
 use LaravelNecromancer\Collection\TestCollector;
+use LaravelNecromancer\Metadata\AnnotationConfigurationResolver;
 use stdClass;
 use Throwable;
 
@@ -231,7 +232,21 @@ final class ScanManifest implements JsonSerializable
             modelExclusionFilter: new ModelExclusionFilter(array_values($modelExclusions)),
         ))->collect(artifacts: $artifacts);
 
-        return $inventory->toArray()['artifacts'];
+        $identifiedArtifacts = $inventory->toArray()['artifacts'];
+
+        // Exact-ID mappings are the sole annotation source for non-reflectable
+        // artifact families (closures, test files, gates, scheduled tasks) and a
+        // fill-only, registration-specific escape hatch for every other family.
+        // They can only be resolved after every artifact has its canonical ID.
+        $annotationConfig = config('necromancer.annotations', []);
+        $configResolver = new AnnotationConfigurationResolver(is_array($annotationConfig) ? $annotationConfig : []);
+        [$identifiedArtifacts, $configDiagnostics] = $configResolver->apply(
+            $identifiedArtifacts,
+            $this->scope($only)['artifact_types'],
+        );
+        $this->diagnostics = [...$this->diagnostics, ...$configDiagnostics];
+
+        return $identifiedArtifacts;
     }
 
     /**

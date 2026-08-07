@@ -634,6 +634,15 @@ php artisan necromancer:generate</pre>
                 <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> on every class-backed artifact, controllers (class default + action refinement), and middleware classes
               </td>
             </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Exact-ID mappings</td>
+              <td class="py-3 pr-6 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">config('necromancer.annotations')</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> on closures, test files, gates, scheduled tasks, and registration-specific middleware — keyed by exact canonical Artifact ID, no wildcards
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

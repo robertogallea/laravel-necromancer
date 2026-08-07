@@ -30,6 +30,25 @@ final readonly class ArtifactAnnotations implements JsonSerializable
         return $this->jsonSerialize() === [];
     }
 
+    /**
+     * Reconstructs an instance from already-validated Annotation Schema v1 data,
+     * such as the "annotations" key of a serialized manifest artifact.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            domain: isset($data['domain']) ? (string) $data['domain'] : null,
+            flow: isset($data['flow']) ? (string) $data['flow'] : null,
+            capability: isset($data['capability']) ? (string) $data['capability'] : null,
+            summary: isset($data['summary']) ? (string) $data['summary'] : null,
+            risk: isset($data['risk']) ? Risk::from((string) $data['risk']) : null,
+            externalServices: is_array($data['external_services'] ?? null) ? array_values($data['external_services']) : [],
+            adrs: is_array($data['adrs'] ?? null) ? array_values($data['adrs']) : [],
+        );
+    }
+
     /** @return array<string, string|list<string>> */
     public function jsonSerialize(): array
     {
