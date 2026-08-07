@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Manifest;
 
 use JsonException;
-use LaravelNecromancer\Collection\RouteMetadataNormalizer;
+use LaravelNecromancer\Metadata\RouteAnnotationResolver;
 
 final readonly class ManifestReader
 {
@@ -107,60 +107,17 @@ final readonly class ManifestReader
             return $route;
         }
 
-        $normalized = (new RouteMetadataNormalizer)->normalize(['necromancer' => $declared]);
-        $adrs = $this->legacyAdrs($declared, $normalized['adr'] ?? null);
-
-        if ($adrs !== []) {
-            $normalized['adr'] = $adrs[0];
-            $normalized['adrs'] = $adrs;
-        }
+        $resolved = (new RouteAnnotationResolver)->resolve(['necromancer' => $declared]);
 
         $route['route_metadata'] = [
             ...$metadata,
-            'necromancer' => $normalized,
+            'necromancer' => $resolved['compatibility'],
         ];
 
-        $annotations = [];
-        foreach (['domain', 'flow', 'capability', 'summary'] as $field) {
-            if (isset($normalized[$field]) && trim($normalized[$field]) !== '') {
-                $annotations[$field] = trim($normalized[$field]);
-            }
-        }
-
-        if (in_array($normalized['risk'] ?? null, ['low', 'medium', 'high', 'critical'], true)) {
-            $annotations['risk'] = $normalized['risk'];
-        }
-
-        if (($normalized['external_services'] ?? []) !== []) {
-            $annotations['external_services'] = $normalized['external_services'];
-        }
-
-        if ($adrs !== []) {
-            $annotations['adrs'] = $adrs;
-        }
-
-        if ($annotations !== []) {
-            $route['annotations'] = $annotations;
+        if ($resolved['annotations'] !== []) {
+            $route['annotations'] = $resolved['annotations'];
         }
 
         return $route;
-    }
-
-    /**
-     * @param  array<string, mixed>  $declared
-     * @return list<string>
-     */
-    private function legacyAdrs(array $declared, ?string $legacyAdr): array
-    {
-        $values = $legacyAdr === null ? [] : [$legacyAdr];
-        $plural = $declared['adrs'] ?? [];
-
-        foreach (is_array($plural) ? $plural : [$plural] as $adr) {
-            if (is_string($adr) && trim($adr) !== '') {
-                $values[] = trim($adr);
-            }
-        }
-
-        return array_values(array_unique($values));
     }
 }

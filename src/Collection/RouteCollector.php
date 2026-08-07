@@ -10,6 +10,7 @@ use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use LaravelNecromancer\Manifest\SourceLocation;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\RouteAnnotationResolver;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionFunction;
@@ -37,6 +38,7 @@ final readonly class RouteCollector
     {
         [$controller, $action] = $this->controllerAction($route);
         $metadata = $this->routeMetadata($route);
+        $resolvedAnnotations = $this->resolvedAnnotations($metadata);
 
         return StructuralArtifact::route(
             name: $route->getName(),
@@ -49,7 +51,8 @@ final readonly class RouteCollector
             parameters: $this->parameters($route),
             authorization: $this->authorization($controller, $action),
             metadata: $metadata,
-            necromancerMetadata: $this->normalizedRouteMetadata($metadata),
+            necromancerMetadata: $resolvedAnnotations['compatibility'],
+            annotations: $resolvedAnnotations['annotations'],
         );
     }
 
@@ -75,11 +78,11 @@ final readonly class RouteCollector
      * @param  array<string, mixed>  $rawMetadata
      * @return array<string, mixed>
      */
-    private function normalizedRouteMetadata(array $rawMetadata): array
+    private function resolvedAnnotations(array $rawMetadata): array
     {
         $namespace = (string) config('necromancer.route_metadata.namespace', 'necromancer');
 
-        return (new RouteMetadataNormalizer($namespace))->normalize($rawMetadata);
+        return (new RouteAnnotationResolver($namespace))->resolve($rawMetadata);
     }
 
     private function methodString(Route $route): string

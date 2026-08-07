@@ -38,6 +38,7 @@ use LaravelNecromancer\Tests\Fixtures\Models\NecromancerOrder;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerReport;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerUnguardedModel;
 use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
+use LaravelNecromancer\Tests\Fixtures\NecromancerFakeMetadataRoute;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
 use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
 use LaravelNecromancer\Tests\Fixtures\Policies\NecromancerPostPolicy;
@@ -119,6 +120,43 @@ test('the scan command writes named and unnamed closure route artifacts', functi
         ->and($unnamedRoute->name)->toBeNull()
         ->and($unnamedRoute->method)->toBe('POST')
         ->and((string) File::get($path))->not->toContain($secret);
+});
+
+test('the scan command projects native route metadata into canonical annotations', function () {
+    $path = necromancerScanTestPath('necromancer-route-annotations.json');
+    $route = new NecromancerFakeMetadataRoute(['POST'], '/necromancer/subscriptions/cancel', ['uses' => fn () => 'ok']);
+    $route->name('necromancer.subscription.cancel');
+    $route->metadata([
+        'head' => ['title' => 'Cancel subscription'],
+        'necromancer' => [
+            'domain' => ' billing ',
+            'flow' => 'subscription-cancellation',
+            'capability' => 'subscription.cancel',
+            'summary' => 'Cancels an active subscription.',
+            'risk' => 'high',
+            'external_services' => ['stripe', 'stripe'],
+            'adr' => 'docs/adr/001.md',
+            'adrs' => ['docs/adr/002.md', 'docs/adr/001.md'],
+        ],
+    ]);
+    app(\Illuminate\Routing\Router::class)->getRoutes()->add($route);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.subscription.cancel');
+
+    expect($route->route_metadata->raw->head->title)->toBe('Cancel subscription')
+        ->and($route->route_metadata->raw->necromancer->domain)->toBe(' billing ')
+        ->and($route->route_metadata->necromancer->adrs)->toBe(['docs/adr/001.md', 'docs/adr/002.md'])
+        ->and($route->annotations)->toEqual((object) [
+            'domain' => 'billing',
+            'flow' => 'subscription-cancellation',
+            'capability' => 'subscription.cancel',
+            'summary' => 'Cancels an active subscription.',
+            'risk' => 'high',
+            'external_services' => ['stripe'],
+            'adrs' => ['docs/adr/001.md', 'docs/adr/002.md'],
+        ]);
 });
 
 test('the scan command joins multiple non head methods in registered order', function () {

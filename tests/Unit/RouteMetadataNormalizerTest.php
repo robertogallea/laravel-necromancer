@@ -59,6 +59,18 @@ test('normalize coerces a scalar external_services value into a list', function 
     expect($result)->toBe(['external_services' => ['stripe']]);
 });
 
+test('normalize retains plural ADR declarations', function () {
+    $normalizer = new RouteMetadataNormalizer;
+
+    expect($normalizer->normalize(['necromancer' => [
+        'adr' => 'docs/adr/001.md',
+        'adrs' => ['docs/adr/002.md'],
+    ]]))->toBe([
+        'adr' => 'docs/adr/001.md',
+        'adrs' => ['docs/adr/002.md'],
+    ]);
+});
+
 test('normalize drops non-scalar values instead of throwing', function () {
     $normalizer = new RouteMetadataNormalizer;
 

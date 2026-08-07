@@ -68,6 +68,7 @@ final readonly class StructuralArtifact implements JsonSerializable
      * @param  list<array{ability: string, models: list<string>}>  $authorization
      * @param  array<string, mixed>  $metadata
      * @param  array<string, mixed>  $necromancerMetadata
+     * @param  array<string, mixed>  $annotations
      */
     public static function route(
         ?string $name,
@@ -81,6 +82,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $authorization = [],
         array $metadata = [],
         array $necromancerMetadata = [],
+        array $annotations = [],
     ): self {
         return new self('routes', new RoutePayload(
             name: $name,
@@ -94,6 +96,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             authorization: $authorization,
             metadata: $metadata,
             necromancerMetadata: $necromancerMetadata,
+            annotations: $annotations,
         ));
     }
 

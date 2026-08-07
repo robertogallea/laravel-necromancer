@@ -19,18 +19,20 @@ final readonly class RouteMetadataFactory
         ?string $flow = null,
         ?string $capability = null,
         ?string $summary = null,
-        ?string $risk = null,
+        Risk|string|null $risk = null,
         string|array|null $externalServices = null,
         ?string $adr = null,
+        array $adrs = [],
     ): array {
         $fields = array_filter([
             'domain' => $domain,
             'flow' => $flow,
             'capability' => $capability,
             'summary' => $summary,
-            'risk' => $risk,
+            'risk' => $risk instanceof Risk ? $risk->value : $risk,
             'external_services' => is_string($externalServices) ? [$externalServices] : $externalServices,
             'adr' => $adr,
+            'adrs' => $adrs,
         ], fn (mixed $value): bool => $value !== null && $value !== []);
 
         if ($fields === []) {
