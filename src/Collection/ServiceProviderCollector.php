@@ -6,7 +6,9 @@ namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Support\DeferrableProvider;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 
 final readonly class ServiceProviderCollector
@@ -71,6 +73,7 @@ final readonly class ServiceProviderCollector
             bindings: [],
             singletons: [],
             source: $source,
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
         );
     }
 }

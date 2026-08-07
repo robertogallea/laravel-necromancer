@@ -6,7 +6,9 @@ namespace LaravelNecromancer\Collection;
 
 use BackedEnum;
 use Illuminate\Contracts\Foundation\Application;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionEnum;
 
 final readonly class EnumCollector
@@ -77,6 +79,7 @@ final readonly class EnumCollector
             backingType: $backingType,
             cases: $cases,
             source: (new SourceLocator)->forClass($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
         );
     }
 }

@@ -31,6 +31,7 @@ final readonly class StructuralArtifact implements JsonSerializable
     private function __construct(
         public string $type,
         private JsonSerializable $payload,
+        private ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ) {}
 
     public function isRoute(): bool
@@ -128,6 +129,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?string $policy = null,
         ?string $factory = null,
         ?string $customBuilder = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('models', new ModelPayload(
             class: $class,
@@ -146,7 +148,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             policy: $policy,
             factory: $factory,
             customBuilder: $customBuilder,
-        ));
+        ), $annotations);
     }
 
     public static function job(
@@ -158,6 +160,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?SourceLocation $source = null,
         array|int|null $backoff = null,
         ?int $maxExceptions = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('jobs', new JobPayload(
             class: $class,
@@ -168,7 +171,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
             backoff: $backoff,
             maxExceptions: $maxExceptions,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -181,6 +184,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         bool $broadcastable = false,
         array $channels = [],
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('events', new EventPayload(
             class: $class,
@@ -188,7 +192,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             broadcastable: $broadcastable,
             channels: $channels,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -199,13 +203,14 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $handles = [],
         bool $queued = false,
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('listeners', new ListenerPayload(
             class: $class,
             handles: $handles,
             queued: $queued,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -217,6 +222,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?SourceLocation $source = null,
         bool $stopOnFirstFailure = false,
         ?string $errorBag = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('form_requests', new FormRequestPayload(
             class: $class,
@@ -224,7 +230,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
             stopOnFirstFailure: $stopOnFirstFailure,
             errorBag: $errorBag,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -236,6 +242,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         string $description,
         ?SourceLocation $source = null,
         array $aliases = [],
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('commands', new CommandPayload(
             class: $class,
@@ -243,7 +250,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             description: $description,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
             aliases: $aliases,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -254,13 +261,14 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?string $backingType = null,
         array $cases = [],
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('enums', new EnumPayload(
             class: $class,
             backingType: $backingType,
             cases: $cases,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -271,13 +279,14 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?string $model = null,
         array $methods = [],
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('policies', new PolicyPayload(
             class: $class,
             model: $model,
             methods: $methods,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -307,6 +316,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $hooks = [],
         bool $queued = false,
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('observers', new ObserverPayload(
             class: $class,
@@ -314,7 +324,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             hooks: $hooks,
             queued: $queued,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -347,6 +357,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         string $scope,
         ?string $group = null,
         ?array $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('middleware', new MiddlewarePayload(
             alias: $alias,
@@ -354,7 +365,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             scope: $scope,
             group: $group,
             source: $source,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -369,6 +380,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $actions = [],
         array $listens = [],
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('livewire_components', new LivewirePayload(
             class: $class,
@@ -377,7 +389,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             actions: $actions,
             listens: $listens,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     public static function mailable(
@@ -387,6 +399,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?string $queue = null,
         ?string $view = null,
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('mailables', new MailablePayload(
             class: $class,
@@ -395,7 +408,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             queue: $queue,
             view: $view,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     public static function validationRule(
@@ -403,13 +416,14 @@ final readonly class StructuralArtifact implements JsonSerializable
         bool $implicit = false,
         ?string $description = null,
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('validation_rules', new RulePayload(
             class: $class,
             implicit: $implicit,
             description: $description,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     public static function scheduledTask(
@@ -446,6 +460,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         array $bindings = [],
         array $singletons = [],
         ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('service_providers', new ServiceProviderPayload(
             class: $class,
@@ -453,7 +468,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             bindings: $bindings,
             singletons: $singletons,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
-        ));
+        ), $annotations);
     }
 
     /**
@@ -461,6 +476,12 @@ final readonly class StructuralArtifact implements JsonSerializable
      */
     public function jsonSerialize(): array
     {
-        return $this->payload->jsonSerialize();
+        $data = $this->payload->jsonSerialize();
+
+        if (! $this->annotations->isEmpty() && ! array_key_exists('annotations', $data)) {
+            $data['annotations'] = $this->annotations->jsonSerialize();
+        }
+
+        return $data;
     }
 }

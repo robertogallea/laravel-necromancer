@@ -31,6 +31,8 @@ The manifest covers 18 artifact types across the full Laravel application struct
 
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
+Every class-backed type in the table above — `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below.
+
 ## Requirements
 
 | | Version |
@@ -118,6 +120,46 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
 ```
 
 All fields are optional and the feature is entirely opt-in — apps that don't declare route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
+
+#### Annotating class-backed artifacts, controllers, and middleware
+
+The same `domain`/`flow`/`capability`/`summary`/`risk`/`externalServices`/`adrs` fields can be declared directly on a class or method with the `#[Necromancer]` attribute, so artifacts that aren't routes get the same declared-intent signal:
+
+```php
+use LaravelNecromancer\Attributes\Necromancer;
+use LaravelNecromancer\Metadata\Risk;
+
+#[Necromancer(domain: 'billing', capability: 'invoice.send', risk: Risk::High, externalServices: ['stripe'])]
+final class SendInvoiceEmail implements ShouldQueue
+{
+    // ...
+}
+```
+
+The attribute is a single, non-repeatable declaration and applies directly to every class-backed artifact type: models, form requests, jobs, events, listeners, commands, policies, enums, observers, Livewire components, mailables, validation rules, and service providers.
+
+On a controller, a class-level attribute supplies defaults for every action, and a method-level attribute refines them — the action wins for any field it declares, silently, with no warning:
+
+```php
+#[Necromancer(domain: 'billing', risk: Risk::Low)]
+final class SubscriptionController
+{
+    #[Necromancer(capability: 'subscription.cancel', risk: Risk::High)]
+    public function cancel(): RedirectResponse { /* ... */ }
+}
+```
+
+`cancel()`'s route annotations resolve to `domain: billing` (inherited), `capability: subscription.cancel`, and `risk: high` (refined). Native `Route::metadata()` — including the `withNecromancer()` macro — remains the most specific declaration and overrides a conflicting controller-derived value; when it does, `necromancer:scan` prints an `AN_SOURCE_CONFLICT` warning naming the field so the disagreement isn't silent.
+
+A middleware class annotation applies to every place that middleware is registered — globally, in a group, or under an alias each produce their own manifest entry, but all of them carry the same annotations:
+
+```php
+#[Necromancer(domain: 'security', risk: Risk::High)]
+final class EnsureTwoFactorIsEnabled
+{
+    // ...
+}
+```
 
 Check for manifest drift without writing a new file (CI use):
 

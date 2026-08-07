@@ -5,6 +5,7 @@ use Illuminate\Auth\Access\Gate;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use LaravelNecromancer\Collection\CommandCollector;
@@ -27,17 +28,21 @@ use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerStatus;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerBroadcastedEvent;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerOrderPlaced;
 use LaravelNecromancer\Tests\Fixtures\Gates\NecromancerManageUsersGate;
+use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerAnnotatedJob;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerQueuedJob;
 use LaravelNecromancer\Tests\Fixtures\Listeners\RecordNecromancerOrderMetrics;
 use LaravelNecromancer\Tests\Fixtures\Listeners\SendNecromancerReceipt;
 use LaravelNecromancer\Tests\Fixtures\Livewire\NecromancerIssueForm;
 use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerPasswordResetMail;
 use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerWelcomeMail;
+use LaravelNecromancer\Tests\Fixtures\Middleware\NecromancerAnnotatedMiddleware;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerCustomer;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerMember;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerOrder;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerReport;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerUnguardedModel;
+use LaravelNecromancer\Tests\Fixtures\NecromancerAnnotatedInvokableRouteController;
+use LaravelNecromancer\Tests\Fixtures\NecromancerAnnotatedRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerFakeMetadataRoute;
 use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
@@ -240,6 +245,105 @@ test('the scan command writes invokable controller route action metadata and sou
         ->and($route->action)->toBe('__invoke')
         ->and($route->source->file)->toBe('tests/Fixtures/NecromancerInvokableRouteController.php')
         ->and($route->source->line)->toBeInt();
+});
+
+test('an invokable controller resolves its #[Necromancer] attribute from __invoke as the action-level source', function () {
+    $path = necromancerScanTestPath('necromancer-routes-invokable-annotated.json');
+
+    Route::post('/necromancer/invokable-annotated-route', NecromancerAnnotatedInvokableRouteController::class)
+        ->name('necromancer.invokable-annotated-route');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.invokable-annotated-route');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'billing', 'capability' => 'billing.process']);
+});
+
+test('a controller class annotation supplies defaults for an unannotated action', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-class-annotation.json');
+
+    Route::get('/necromancer/annotated/index', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.index');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.index');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'billing', 'risk' => 'low']);
+});
+
+test('an action annotation refines the controller class defaults without a warning', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-action-annotation.json');
+
+    Route::get('/necromancer/annotated/charge', [NecromancerAnnotatedRouteController::class, 'charge'])
+        ->name('necromancer.annotated.charge');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.charge');
+
+    expect($route->annotations)->toEqual((object) [
+        'domain' => 'billing',
+        'capability' => 'billing.charge',
+        'risk' => 'low',
+    ]);
+});
+
+test('an action annotation deterministically overrides a conflicting controller class value with no warning', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-conflict-annotation.json');
+
+    Route::get('/necromancer/annotated/conflict', [NecromancerAnnotatedRouteController::class, 'conflictingDomain'])
+        ->name('necromancer.annotated.conflict');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->doesntExpectOutputToContain('AN_SOURCE_CONFLICT')
+        ->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.conflict');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'support', 'risk' => 'low']);
+});
+
+test('native route metadata overrides controller-derived annotations with a warning', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-metadata-conflict.json');
+
+    Route::get('/necromancer/annotated/native-override', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.native-override')
+        ->withNecromancer(domain: 'enterprise');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->expectsOutputToContain('AN_SOURCE_CONFLICT')
+        ->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.native-override');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'enterprise', 'risk' => 'low']);
+});
+
+test('two routes conflicting on the same field each surface their own warning instead of collapsing into one', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-metadata-conflict-distinct.json');
+
+    Route::get('/necromancer/annotated/native-override-a', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.native-override-a')
+        ->withNecromancer(domain: 'enterprise');
+
+    Route::get('/necromancer/annotated/native-override-b', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.native-override-b')
+        ->withNecromancer(domain: 'partner');
+
+    // Each conflict warning names its own route's method+URI, so the two warnings
+    // are distinct strings and neither collapses the other via array_unique().
+    Artisan::call('necromancer:scan', ['--output' => $path]);
+    $warnings = array_values(array_filter(
+        explode("\n", Artisan::output()),
+        fn (string $line): bool => str_contains($line, 'AN_SOURCE_CONFLICT') && str_contains($line, 'domain'),
+    ));
+
+    expect($warnings)->toHaveCount(2)
+        ->and($warnings[0])->not->toBe($warnings[1])
+        ->and($warnings[0])->toContain('native-override-a')
+        ->and($warnings[1])->toContain('native-override-b');
 });
 
 test('the scan command excludes default vendor and debug route names', function (string $routeName) {
@@ -685,6 +789,23 @@ test('the scan command captures timeout on job artifacts', function () {
     expect($job->timeout)->toBeNull();
 });
 
+test('a #[Necromancer] class attribute serializes into a class-backed artifact', function () {
+    $path = necromancerScanTestPath('necromancer-jobs-annotated.json');
+
+    useNecromancerFixtureExecutables();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $job = findManifestJob(expectScanManifest($path), NecromancerAnnotatedJob::class);
+
+    expect($job->annotations)->toEqual((object) [
+        'domain' => 'billing',
+        'capability' => 'invoice.send',
+        'risk' => 'high',
+        'external_services' => ['stripe'],
+    ]);
+});
+
 test('the scan command captures broadcastable and channels on event artifacts', function () {
     $path = necromancerScanTestPath('necromancer-events-broadcastable.json');
 
@@ -1057,6 +1178,33 @@ test('the scan command collects middleware artifacts with valid scope and class 
             expect($item->group)->toBeNull();
         }
     }
+});
+
+test('a middleware class annotation applies consistently to every registration of that class', function () {
+    $path = necromancerScanTestPath('necromancer-middleware-annotations.json');
+
+    // Resolving the Http Kernel syncs its own middleware groups onto the Router
+    // (Kernel::__construct() -> syncMiddlewareToRouter()), which would otherwise
+    // clobber a group pushed to beforehand. Force that sync first so the group
+    // addition below survives the collector's own Kernel resolution.
+    app(Illuminate\Contracts\Http\Kernel::class);
+
+    app(Router::class)->aliasMiddleware('necromancer-annotated', NecromancerAnnotatedMiddleware::class);
+    app(Router::class)->pushMiddlewareToGroup('web', NecromancerAnnotatedMiddleware::class);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'middleware'])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $registrations = array_values(array_filter(
+        (array) ($manifest->artifacts->middleware ?? []),
+        fn (stdClass $item): bool => $item->class === NecromancerAnnotatedMiddleware::class,
+    ));
+
+    expect($registrations)->toHaveCount(2)
+        ->and($registrations[0]->scope)->not->toBe($registrations[1]->scope)
+        ->and($registrations[0]->annotations)->toEqual((object) ['domain' => 'security', 'risk' => 'high'])
+        ->and($registrations[1]->annotations)->toEqual((object) ['domain' => 'security', 'risk' => 'high']);
 });
 
 test('the --only=middleware scan restricts to middleware artifacts', function () {

@@ -6,7 +6,9 @@ namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use ReflectionMethod;
 
@@ -112,6 +114,7 @@ final readonly class ObserverCollector
             hooks: $hooks,
             queued: $reflection->implementsInterface(ShouldQueue::class),
             source: (new SourceLocator)->forClass($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
         );
     }
 

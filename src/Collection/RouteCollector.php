@@ -8,8 +8,12 @@ use Closure;
 use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\SourceLocation;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\AnnotationMerger;
+use LaravelNecromancer\Metadata\ArtifactAnnotations;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use LaravelNecromancer\Metadata\RouteAnnotationResolution;
 use LaravelNecromancer\Metadata\RouteAnnotationResolver;
 use ReflectionClass;
@@ -50,7 +54,21 @@ final class RouteCollector
         [$controller, $action] = $this->controllerAction($route);
         $metadata = $this->routeMetadata($route);
         $resolvedAnnotations = $this->resolvedAnnotations($metadata);
-        $this->diagnostics = [...$this->diagnostics, ...$resolvedAnnotations->diagnostics];
+        $controllerAnnotations = $this->controllerAnnotations($controller, $action);
+
+        // Native route metadata is the most specific declaration source: it wins
+        // over a controller-derived default/refinement, but disagreement is
+        // reported so an author knows the controller-level intent was ignored.
+        [$annotations, $conflictDiagnostics] = (new AnnotationMerger)->merge(
+            $controllerAnnotations,
+            $resolvedAnnotations->annotations,
+            warnOnConflict: true,
+            artifactLabel: trim($this->methodString($route).' '.$route->uri()),
+            baseSourceLabel: 'the controller annotation',
+            moreSpecificSourceLabel: 'route metadata',
+        );
+
+        $this->diagnostics = [...$this->diagnostics, ...$resolvedAnnotations->diagnostics, ...$conflictDiagnostics];
 
         return StructuralArtifact::route(
             name: $route->getName(),
@@ -64,8 +82,38 @@ final class RouteCollector
             authorization: $this->authorization($controller, $action),
             metadata: $metadata,
             necromancerMetadata: $resolvedAnnotations->compatibility,
-            annotations: $resolvedAnnotations->annotations,
+            annotations: $annotations,
         );
+    }
+
+    /**
+     * The controller class annotation is an inherited default; the action method
+     * annotation is a more specific declaration that silently refines it.
+     */
+    private function controllerAnnotations(?string $controller, ?string $action): ArtifactAnnotations
+    {
+        if ($controller === null || ! class_exists($controller)) {
+            return new ArtifactAnnotations;
+        }
+
+        try {
+            $classReflection = new ReflectionClass($controller);
+            $methodReflection = ($action !== null && $classReflection->hasMethod($action))
+                ? $classReflection->getMethod($action)
+                : null;
+        } catch (ReflectionException) {
+            return new ArtifactAnnotations;
+        }
+
+        $resolver = new ClassAnnotationResolver;
+        $classAnnotations = $resolver->resolve(AttributeReader::first($classReflection, Necromancer::class));
+        $actionAnnotations = $methodReflection !== null
+            ? $resolver->resolve(AttributeReader::first($methodReflection, Necromancer::class))
+            : new ArtifactAnnotations;
+
+        [$merged] = (new AnnotationMerger)->merge($classAnnotations, $actionAnnotations);
+
+        return $merged;
     }
 
     /**

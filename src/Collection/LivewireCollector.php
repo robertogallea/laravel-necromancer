@@ -7,7 +7,9 @@ namespace LaravelNecromancer\Collection;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use ReflectionClass;
@@ -84,6 +86,7 @@ final readonly class LivewireCollector
             actions: $actions,
             listens: $listens,
             source: (new SourceLocator)->forClass($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
         );
     }
 

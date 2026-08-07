@@ -14,7 +14,9 @@ use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use ReflectionMethod;
 use Throwable;
@@ -106,6 +108,7 @@ final readonly class ModelCollector
             policy: $this->attributeClass($reflection, UsePolicy::class, 'class'),
             factory: $this->attributeClass($reflection, UseFactory::class, 'factoryClass'),
             customBuilder: $this->attributeClass($reflection, UseEloquentBuilder::class, 'builderClass'),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
         );
     }
 

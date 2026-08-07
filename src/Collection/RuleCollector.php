@@ -8,7 +8,9 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Validation\ImplicitRule;
 use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Contracts\Validation\ValidationRule;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 
 final readonly class RuleCollector
@@ -81,6 +83,7 @@ final readonly class RuleCollector
             implicit: $implicit,
             description: $description,
             source: (new SourceLocator)->forClass($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
         );
     }
 
