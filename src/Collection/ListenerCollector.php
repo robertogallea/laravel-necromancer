@@ -84,7 +84,7 @@ final readonly class ListenerCollector
             handles: $handles,
             queued: $reflection->implementsInterface(ShouldQueue::class),
             source: (new SourceLocator)->forClass($reflection),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

@@ -28,6 +28,7 @@ use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerStatus;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerBroadcastedEvent;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerOrderPlaced;
 use LaravelNecromancer\Tests\Fixtures\Gates\NecromancerManageUsersGate;
+use LaravelNecromancer\Tests\Fixtures\InvalidJobs\NecromancerInvalidAnnotatedJob;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerAnnotatedJob;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerQueuedJob;
 use LaravelNecromancer\Tests\Fixtures\Listeners\RecordNecromancerOrderMetrics;
@@ -319,6 +320,18 @@ test('native route metadata overrides controller-derived annotations with a warn
     $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.native-override');
 
     expect($route->annotations)->toEqual((object) ['domain' => 'enterprise', 'risk' => 'low']);
+});
+
+test('the conflict warning names the route by its canonical routes:METHOD:URI Artifact ID', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-metadata-conflict-id.json');
+
+    Route::get('/necromancer/annotated/canonical-id-override', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.canonical-id-override')
+        ->withNecromancer(domain: 'enterprise');
+
+    Artisan::call('necromancer:scan', ['--output' => $path]);
+
+    expect(Artisan::output())->toContain('routes:GET:necromancer/annotated/canonical-id-override');
 });
 
 test('two routes conflicting on the same field each surface their own warning instead of collapsing into one', function () {
@@ -983,6 +996,64 @@ test('the scan command fails clearly when the output parent path is not a direct
         ->assertExitCode(1);
 
     expect(File::exists($path))->toBeFalse();
+});
+
+test('the scan command fails clearly instead of crashing when a #[Necromancer] attribute value is invalid', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-annotation.json');
+
+    app()->bind(
+        JobCollector::class,
+        fn ($app): JobCollector => new JobCollector($app, [[
+            'path' => base_path('tests/Fixtures/InvalidJobs'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\InvalidJobs\\',
+        ]]),
+    );
+
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('Invalid Necromancer annotation')
+        ->and($output)->toContain(NecromancerInvalidAnnotatedJob::class);
+
+    expect(File::exists($path))->toBeFalse();
+});
+
+test('an existing manifest survives a scan that fails on an invalid #[Necromancer] attribute value', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-annotation-preserves-existing.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+    $before = File::get($path);
+
+    app()->bind(
+        JobCollector::class,
+        fn ($app): JobCollector => new JobCollector($app, [[
+            'path' => base_path('tests/Fixtures/InvalidJobs'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\InvalidJobs\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertExitCode(1);
+
+    expect(File::get($path))->toBe($before);
+});
+
+test('--diff also fails clearly instead of crashing on an invalid #[Necromancer] attribute value', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-annotation-diff.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    app()->bind(
+        JobCollector::class,
+        fn ($app): JobCollector => new JobCollector($app, [[
+            'path' => base_path('tests/Fixtures/InvalidJobs'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\InvalidJobs\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true])
+        ->expectsOutputToContain('Invalid Necromancer annotation')
+        ->assertExitCode(1);
 });
 
 test('the --only option restricts the scan to the specified artifact type', function () {

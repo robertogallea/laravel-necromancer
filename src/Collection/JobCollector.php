@@ -93,7 +93,7 @@ final readonly class JobCollector
             source: (new SourceLocator)->forClass($reflection),
             backoff: $backoffAttr !== null ? $backoffAttr->backoff : null,
             maxExceptions: $maxExcAttr !== null ? $maxExcAttr->maxExceptions : null,
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

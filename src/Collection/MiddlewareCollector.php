@@ -103,6 +103,7 @@ final readonly class MiddlewareCollector
         if (! isset($cache[$class])) {
             $cache[$class] = (new ClassAnnotationResolver)->resolve(
                 AttributeReader::first(new ReflectionClass($class), Necromancer::class),
+                $class,
             );
         }
 

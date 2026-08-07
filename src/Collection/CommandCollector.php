@@ -76,7 +76,7 @@ final readonly class CommandCollector
             description: $command->getDescription(),
             source: (new SourceLocator)->forClass($reflection),
             aliases: $this->aliases($reflection),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

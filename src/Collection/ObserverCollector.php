@@ -114,7 +114,7 @@ final readonly class ObserverCollector
             hooks: $hooks,
             queued: $reflection->implementsInterface(ShouldQueue::class),
             source: (new SourceLocator)->forClass($reflection),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

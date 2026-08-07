@@ -73,7 +73,7 @@ final readonly class ServiceProviderCollector
             bindings: [],
             singletons: [],
             source: $source,
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 }

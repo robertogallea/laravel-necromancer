@@ -9,6 +9,7 @@ use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use LaravelNecromancer\Attributes\Necromancer;
+use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\SourceLocation;
 use LaravelNecromancer\Manifest\StructuralArtifact;
 use LaravelNecromancer\Metadata\AnnotationMerger;
@@ -59,11 +60,14 @@ final class RouteCollector
         // Native route metadata is the most specific declaration source: it wins
         // over a controller-derived default/refinement, but disagreement is
         // reported so an author knows the controller-level intent was ignored.
+        // The conflict is labelled with the route's canonical Artifact ID — the
+        // same identity ArtifactId assigns at serialization time — so warnings
+        // for two different routes never collapse into one via array_unique().
         [$annotations, $conflictDiagnostics] = (new AnnotationMerger)->merge(
             $controllerAnnotations,
             $resolvedAnnotations->annotations,
             warnOnConflict: true,
-            artifactLabel: trim($this->methodString($route).' '.$route->uri()),
+            artifactLabel: (new ArtifactId)->for('routes', ['method' => $this->methodString($route), 'uri' => $route->uri()]),
             baseSourceLabel: 'the controller annotation',
             moreSpecificSourceLabel: 'route metadata',
         );
@@ -106,9 +110,9 @@ final class RouteCollector
         }
 
         $resolver = new ClassAnnotationResolver;
-        $classAnnotations = $resolver->resolve(AttributeReader::first($classReflection, Necromancer::class));
+        $classAnnotations = $resolver->resolve(AttributeReader::first($classReflection, Necromancer::class), $controller);
         $actionAnnotations = $methodReflection !== null
-            ? $resolver->resolve(AttributeReader::first($methodReflection, Necromancer::class))
+            ? $resolver->resolve(AttributeReader::first($methodReflection, Necromancer::class), "{$controller}::{$action}")
             : new ArtifactAnnotations;
 
         [$merged] = (new AnnotationMerger)->merge($classAnnotations, $actionAnnotations);

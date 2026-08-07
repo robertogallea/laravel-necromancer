@@ -108,7 +108,7 @@ final readonly class ModelCollector
             policy: $this->attributeClass($reflection, UsePolicy::class, 'class'),
             factory: $this->attributeClass($reflection, UseFactory::class, 'factoryClass'),
             customBuilder: $this->attributeClass($reflection, UseEloquentBuilder::class, 'builderClass'),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

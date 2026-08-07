@@ -12,24 +12,29 @@ use LaravelNecromancer\Attributes\Necromancer;
  */
 final readonly class ClassAnnotationResolver
 {
-    public function resolve(?Necromancer $attribute): ArtifactAnnotations
+    /**
+     * @param  string  $context  A human-readable declaration site (e.g. a FQCN or
+     *                           "Controller::action") included in validation errors
+     *                           so a fatal failure can be traced back to its source.
+     */
+    public function resolve(?Necromancer $attribute, string $context = ''): ArtifactAnnotations
     {
         if ($attribute === null) {
             return new ArtifactAnnotations;
         }
 
         return new ArtifactAnnotations(
-            domain: $this->scalar('domain', $attribute->domain),
-            flow: $this->scalar('flow', $attribute->flow),
-            capability: $this->scalar('capability', $attribute->capability),
-            summary: $this->scalar('summary', $attribute->summary),
+            domain: $this->scalar('domain', $attribute->domain, $context),
+            flow: $this->scalar('flow', $attribute->flow, $context),
+            capability: $this->scalar('capability', $attribute->capability, $context),
+            summary: $this->scalar('summary', $attribute->summary, $context),
             risk: $attribute->risk,
-            externalServices: $this->list('external_services', $attribute->externalServices),
-            adrs: $this->list('adrs', $attribute->adrs),
+            externalServices: $this->list('external_services', $attribute->externalServices, $context),
+            adrs: $this->list('adrs', $attribute->adrs, $context),
         );
     }
 
-    private function scalar(string $field, ?string $value): ?string
+    private function scalar(string $field, ?string $value, string $context): ?string
     {
         if ($value === null) {
             return null;
@@ -38,7 +43,7 @@ final readonly class ClassAnnotationResolver
         $trimmed = trim($value);
 
         if ($trimmed === '') {
-            throw new InvalidArgumentException("Invalid Necromancer annotation {$field}: strings must not be empty.");
+            throw new InvalidArgumentException($this->message($context, "{$field} must not be an empty string."));
         }
 
         return $trimmed;
@@ -48,13 +53,13 @@ final readonly class ClassAnnotationResolver
      * @param  array<array-key, mixed>  $values
      * @return list<string>
      */
-    private function list(string $field, array $values): array
+    private function list(string $field, array $values, string $context): array
     {
         $normalized = [];
 
         foreach ($values as $value) {
             if (! is_string($value) || trim($value) === '') {
-                throw new InvalidArgumentException("Invalid Necromancer annotation {$field}: list items must be non-empty strings.");
+                throw new InvalidArgumentException($this->message($context, "{$field} list items must be non-empty strings."));
             }
 
             $trimmed = trim($value);
@@ -65,5 +70,12 @@ final readonly class ClassAnnotationResolver
         }
 
         return $normalized;
+    }
+
+    private function message(string $context, string $detail): string
+    {
+        return $context === ''
+            ? "Invalid Necromancer annotation: {$detail}"
+            : "Invalid Necromancer annotation on {$context}: {$detail}";
     }
 }

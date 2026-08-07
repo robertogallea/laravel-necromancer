@@ -83,7 +83,7 @@ final readonly class RuleCollector
             implicit: $implicit,
             description: $description,
             source: (new SourceLocator)->forClass($reflection),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

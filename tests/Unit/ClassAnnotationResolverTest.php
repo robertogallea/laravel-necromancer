@@ -5,6 +5,7 @@ use LaravelNecromancer\Collection\AttributeReader;
 use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use LaravelNecromancer\Metadata\Risk;
 use LaravelNecromancer\Tests\TestCase;
+use PHPUnit\Framework\Assert;
 
 uses(TestCase::class)->group('class-annotations');
 
@@ -71,6 +72,31 @@ test('resolve rejects a blank list item', function () {
 
     expect(fn () => (new ClassAnnotationResolver)->resolve($attribute))
         ->toThrow(InvalidArgumentException::class, 'adrs');
+});
+
+test('resolve includes the declaring context in a scalar validation error so the failure is traceable', function () {
+    $attribute = new Necromancer(domain: '   ');
+
+    expect(fn () => (new ClassAnnotationResolver)->resolve($attribute, 'App\\Jobs\\SendInvoice'))
+        ->toThrow(InvalidArgumentException::class, 'App\\Jobs\\SendInvoice');
+});
+
+test('resolve includes the declaring context in a list validation error so the failure is traceable', function () {
+    $attribute = new Necromancer(adrs: [' ']);
+
+    expect(fn () => (new ClassAnnotationResolver)->resolve($attribute, 'App\\Http\\Controllers\\BillingController::cancel'))
+        ->toThrow(InvalidArgumentException::class, 'App\\Http\\Controllers\\BillingController::cancel');
+});
+
+test('resolve omits any context prefix when none is given', function () {
+    $attribute = new Necromancer(domain: '   ');
+
+    try {
+        (new ClassAnnotationResolver)->resolve($attribute);
+        Assert::fail('Expected an InvalidArgumentException.');
+    } catch (InvalidArgumentException $exception) {
+        expect($exception->getMessage())->not->toContain(' on ');
+    }
 });
 
 test('a parent class annotation is not inherited by a subclass', function () {

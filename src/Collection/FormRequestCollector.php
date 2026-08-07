@@ -85,7 +85,7 @@ final readonly class FormRequestCollector
             source: (new SourceLocator)->forClass($reflection),
             stopOnFirstFailure: AttributeReader::first($reflection, StopOnFirstFailure::class) !== null,
             errorBag: AttributeReader::first($reflection, ErrorBag::class)?->name,
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

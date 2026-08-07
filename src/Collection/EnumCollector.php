@@ -79,7 +79,7 @@ final readonly class EnumCollector
             backingType: $backingType,
             cases: $cases,
             source: (new SourceLocator)->forClass($reflection),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 }

@@ -72,7 +72,7 @@ final readonly class PolicyCollector
             model: $this->guardedModel($reflection),
             methods: $this->policyMethods($reflection),
             source: (new SourceLocator)->forClass($reflection),
-            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class)),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
 use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
@@ -37,7 +38,15 @@ final class ScanCommand extends Command
             return self::FAILURE;
         }
 
-        if (@file_put_contents($path, $manifest->toJson(only: $this->parseOnly()).PHP_EOL) === false) {
+        try {
+            $payload = $manifest->toJson(only: $this->parseOnly()).PHP_EOL;
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        if (@file_put_contents($path, $payload) === false) {
             $this->error("Unable to write Necromancer manifest to {$path}.");
 
             return self::FAILURE;
@@ -64,7 +73,13 @@ final class ScanCommand extends Command
             return self::FAILURE;
         }
 
-        $new = $manifest->buildPayload(only: $this->parseOnly());
+        try {
+            $new = $manifest->buildPayload(only: $this->parseOnly());
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
 
         $oldArtifacts = is_array($old['artifacts']) ? $old['artifacts'] : [];
         $newArtifacts = is_array($new['artifacts']) ? $new['artifacts'] : [];
