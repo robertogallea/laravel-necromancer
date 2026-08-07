@@ -90,6 +90,61 @@ test('shows no drift when manifests are identical', function () {
     }
 });
 
+test('does not report drift between equivalent legacy and current route manifests', function () {
+    $baseManifest = [
+        'meta' => [],
+        'artifacts' => [
+            'routes' => [[
+                'method' => 'POST',
+                'uri' => 'billing/cancel',
+                'route_metadata' => [
+                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
+                    'necromancer' => ['domain' => 'billing', 'risk' => 'high', 'adr' => 'docs/adr/004.md'],
+                ],
+            ]],
+        ],
+    ];
+    $headManifest = [
+        'meta' => [
+            'manifest_schema_version' => 1,
+            'annotation_schema_version' => 1,
+            'scope' => ['complete' => true, 'artifact_types' => ['routes']],
+        ],
+        'artifacts' => [
+            'routes' => [[
+                'id' => 'routes:POST:billing/cancel',
+                'method' => 'POST',
+                'uri' => 'billing/cancel',
+                'route_metadata' => [
+                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
+                    'necromancer' => [
+                        'domain' => 'billing',
+                        'risk' => 'high',
+                        'adr' => 'docs/adr/004.md',
+                        'adrs' => ['docs/adr/004.md'],
+                    ],
+                ],
+                'annotations' => [
+                    'domain' => 'billing',
+                    'risk' => 'high',
+                    'adrs' => ['docs/adr/004.md'],
+                ],
+            ]],
+        ],
+    ];
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('No architectural drift detected')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
 test('fails when head manifest is missing', function () {
     $baseFile = writeTempManifest(makeDiffManifest());
 

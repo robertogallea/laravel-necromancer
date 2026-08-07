@@ -225,12 +225,7 @@ final readonly class ScanManifest implements JsonSerializable
      */
     private function scope(array $only): array
     {
-        $types = [
-            'routes', 'models', 'form_requests', 'jobs', 'events', 'listeners',
-            'commands', 'policies', 'enums', 'tests', 'observers', 'scheduled_tasks',
-            'middleware', 'livewire_components', 'gates', 'mailables',
-            'validation_rules', 'service_providers',
-        ];
+        $types = ArtifactId::supportedTypes();
 
         if ($only !== []) {
             $types = array_values(array_intersect($types, $only));

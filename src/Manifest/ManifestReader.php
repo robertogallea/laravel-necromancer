@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Manifest;
 
 use JsonException;
+use LaravelNecromancer\Collection\RouteMetadataNormalizer;
 
 final readonly class ManifestReader
 {
@@ -28,6 +29,19 @@ final readonly class ManifestReader
 
         /** @var array<string, mixed> $manifest */
         $manifest = (array) json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+
+        return $this->adapt($manifest);
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return array<string, mixed>
+     */
+    public function adapt(array $manifest): array
+    {
+        if (($manifest['meta']['manifest_schema_version'] ?? null) === 1) {
+            return $manifest;
+        }
 
         return $this->adaptLegacyManifest($manifest);
     }
@@ -54,6 +68,10 @@ final readonly class ManifestReader
 
             $items = array_map(static fn (mixed $item): array => (array) $item, $items);
 
+            if ($type === 'routes') {
+                $items = array_map(fn (array $route): array => $this->promoteLegacyRoute($route), $items);
+            }
+
             if ($artifactId->supports($type)) {
                 $typedArtifacts[$type] = $items;
             } else {
@@ -65,7 +83,7 @@ final readonly class ManifestReader
         $meta = is_array($manifest['meta'] ?? null) ? $manifest['meta'] : [];
         $meta['manifest_schema_version'] = 1;
         $meta['annotation_schema_version'] = 1;
-        $types = array_keys($typedArtifacts);
+        $types = array_keys($artifacts);
         sort($types, SORT_STRING);
         $meta['scope'] = is_array($meta['scope'] ?? null)
             ? $meta['scope']
@@ -73,5 +91,76 @@ final readonly class ManifestReader
         $manifest['meta'] = $meta;
 
         return $manifest;
+    }
+
+    /**
+     * @param  array<string, mixed>  $route
+     * @return array<string, mixed>
+     */
+    private function promoteLegacyRoute(array $route): array
+    {
+        $metadata = is_array($route['route_metadata'] ?? null) ? $route['route_metadata'] : [];
+        $raw = is_array($metadata['raw'] ?? null) ? $metadata['raw'] : [];
+        $declared = $metadata['necromancer'] ?? $raw['necromancer'] ?? null;
+
+        if (! is_array($declared)) {
+            return $route;
+        }
+
+        $normalized = (new RouteMetadataNormalizer)->normalize(['necromancer' => $declared]);
+        $adrs = $this->legacyAdrs($declared, $normalized['adr'] ?? null);
+
+        if ($adrs !== []) {
+            $normalized['adr'] = $adrs[0];
+            $normalized['adrs'] = $adrs;
+        }
+
+        $route['route_metadata'] = [
+            ...$metadata,
+            'necromancer' => $normalized,
+        ];
+
+        $annotations = [];
+        foreach (['domain', 'flow', 'capability', 'summary'] as $field) {
+            if (isset($normalized[$field]) && trim($normalized[$field]) !== '') {
+                $annotations[$field] = trim($normalized[$field]);
+            }
+        }
+
+        if (in_array($normalized['risk'] ?? null, ['low', 'medium', 'high', 'critical'], true)) {
+            $annotations['risk'] = $normalized['risk'];
+        }
+
+        if (($normalized['external_services'] ?? []) !== []) {
+            $annotations['external_services'] = $normalized['external_services'];
+        }
+
+        if ($adrs !== []) {
+            $annotations['adrs'] = $adrs;
+        }
+
+        if ($annotations !== []) {
+            $route['annotations'] = $annotations;
+        }
+
+        return $route;
+    }
+
+    /**
+     * @param  array<string, mixed>  $declared
+     * @return list<string>
+     */
+    private function legacyAdrs(array $declared, ?string $legacyAdr): array
+    {
+        $values = $legacyAdr === null ? [] : [$legacyAdr];
+        $plural = $declared['adrs'] ?? [];
+
+        foreach (is_array($plural) ? $plural : [$plural] as $adr) {
+            if (is_string($adr) && trim($adr) !== '') {
+                $values[] = trim($adr);
+            }
+        }
+
+        return array_values(array_unique($values));
     }
 }

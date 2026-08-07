@@ -26,6 +26,14 @@ final class ArtifactId
     }
 
     /**
+     * @return list<string>
+     */
+    public static function supportedTypes(): array
+    {
+        return self::TYPES;
+    }
+
+    /**
      * @param  array<string, list<array<string, mixed>>>  $artifacts
      * @return array<string, list<array<string, mixed>>>
      *

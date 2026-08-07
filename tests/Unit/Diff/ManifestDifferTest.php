@@ -128,6 +128,18 @@ test('uses file as canonical key for tests artifacts', function () {
         ->and($diff->removed)->toBeEmpty();
 });
 
+test('uses stored IDs without regenerating them', function () {
+    $differ = new ManifestDiffer;
+    $base = ['models' => [['id' => 'models:App\\Models\\LegacyOrder', 'class' => 'App\\Models\\Order']]];
+    $head = ['models' => [['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order']]];
+
+    $diff = $differ->diff($base, $head);
+
+    expect($diff->totalAdditions())->toBe(1)
+        ->and($diff->totalRemovals())->toBe(1)
+        ->and($diff->totalChanges())->toBe(0);
+});
+
 test('isEmpty returns false when there are additions', function () {
     $diff = new ManifestDiff(
         added: ['routes' => [['method' => 'GET', 'uri' => '/orders']]],

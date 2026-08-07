@@ -14,6 +14,7 @@ use LaravelNecromancer\Diff\ManifestDiff;
 use LaravelNecromancer\Diff\ManifestDiffer;
 use LaravelNecromancer\Inference\ManifestSummarizer;
 use LaravelNecromancer\Integrations\AiDetector;
+use LaravelNecromancer\Manifest\ManifestReader;
 
 final class DiffCommand extends Command
 {
@@ -28,7 +29,7 @@ final class DiffCommand extends Command
 
     protected $description = 'Compare the current manifest against another branch or ref';
 
-    public function handle(AiDetector $aiDetector): int
+    public function handle(AiDetector $aiDetector, ManifestReader $reader): int
     {
         $headPath = $this->resolveManifestPath();
 
@@ -39,14 +40,14 @@ final class DiffCommand extends Command
         }
 
         try {
-            $head = json_decode(file_get_contents($headPath), true, 512, JSON_THROW_ON_ERROR);
+            $head = $reader->read($headPath);
         } catch (\JsonException $e) {
             $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
             return self::FAILURE;
         }
 
-        $base = $this->loadBaseManifest();
+        $base = $this->loadBaseManifest($reader);
 
         if ($base === null) {
             return self::FAILURE;
@@ -116,7 +117,7 @@ final class DiffCommand extends Command
     /**
      * @return array<string, mixed>|null
      */
-    private function loadBaseManifest(): ?array
+    private function loadBaseManifest(ManifestReader $reader): ?array
     {
         $path = $this->option('base-manifest');
 
@@ -128,7 +129,7 @@ final class DiffCommand extends Command
             }
 
             try {
-                return json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                return $reader->read($path);
             } catch (\JsonException $e) {
                 $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
@@ -153,7 +154,10 @@ final class DiffCommand extends Command
         }
 
         try {
-            return json_decode($result->output(), true, 512, JSON_THROW_ON_ERROR);
+            /** @var array<string, mixed> $manifest */
+            $manifest = json_decode($result->output(), true, 512, JSON_THROW_ON_ERROR);
+
+            return $reader->adapt($manifest);
         } catch (\JsonException $e) {
             $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 

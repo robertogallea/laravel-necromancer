@@ -22,8 +22,8 @@ final class ManifestDiffer
         $changed = [];
 
         foreach ($allTypes as $type) {
-            $baseOfType = $this->artifactId->assign([$type => $baseArtifacts[$type] ?? []])[$type] ?? [];
-            $headOfType = $this->artifactId->assign([$type => $headArtifacts[$type] ?? []])[$type] ?? [];
+            $baseOfType = $this->withIds($type, $baseArtifacts[$type] ?? []);
+            $headOfType = $this->withIds($type, $headArtifacts[$type] ?? []);
 
             $baseIndexed = $this->index($type, $baseOfType);
             $headIndexed = $this->index($type, $headOfType);
@@ -56,6 +56,19 @@ final class ManifestDiffer
         }
 
         return new ManifestDiff($added, $removed, $changed);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $artifacts
+     * @return list<array<string, mixed>>
+     */
+    private function withIds(string $type, array $artifacts): array
+    {
+        if ($artifacts === [] || array_all($artifacts, static fn (array $artifact): bool => is_string($artifact['id'] ?? null) && $artifact['id'] !== '')) {
+            return $artifacts;
+        }
+
+        return $this->artifactId->assign([$type => $artifacts])[$type];
     }
 
     private function canonicalKey(string $type, array $artifact): string
