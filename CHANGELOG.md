@@ -5,6 +5,35 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.0
+
+### Added
+
+- `necromancer:okf-enrich` command, generating an AI-enriched sibling OKF Knowledge Bundle without altering the deterministic one produced by `necromancer:okf`. Enrichment can only add a `description` field and an "AI-Enriched Summary" body section to a concept — it never calls a concept builder itself, so facts, annotations, Artifact IDs, and links cannot be mutated. Prompts are structurally incapable of including raw framework metadata, source paths/hashes, configuration, or ADR body content. Each concept caches independently, keyed by a hash of its own prompt plus provider/model/temperature/prompt version, and every enriched concept records provider, model, prompt version, privacy policy, and cache provenance. Options: `--provider=`, `--model=`, `--temperature=`, `--refresh`, `--output=`, `--allow-stale`, `--allow-partial`. Requires `laravel/ai`.
+- `okf.enrichment` config block (`output`, `cache`, `provider`, `model`, `prompt_version`, `privacy_policy`).
+
+## 1.6.0
+
+### Added
+
+- `necromancer:okf` command, projecting the manifest into a deterministic Open Knowledge Format (OKF) 0.2 Knowledge Bundle without rescanning the application: one Artifact Concept per collected artifact (authoritative YAML front matter keeping Discovered Facts and Artifact Annotations structurally distinct, plus a concise prose mirror), synthesized Domain and Flow Concepts grouping artifacts that share an annotation value, and ADR Concepts copied with provenance (a missing local ADR fails the export). Cross-artifact relationship fields (route controller, model relationships/policy/observers, event/listener pairings) render as Markdown links when resolvable in the bundle, plain text otherwise. Output is written atomically; refuses a stale or partial-scope manifest by default (`--allow-stale`/`--allow-partial` override).
+- `okf.output` config key.
+
+## 1.5.0
+
+### Added
+
+- Canonical, deterministic Artifact IDs for every collected artifact, and manifest schema versioning (`manifest_schema_version`, `annotation_schema_version`).
+- The closed Annotation Schema v1 (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) and the public, non-repeatable `#[Necromancer]` attribute for class-backed artifacts, controllers, and middleware — a controller class attribute supplies defaults, an action attribute refines them, and native `Route::metadata()` remains the most specific source, overriding a conflicting controller-derived value with an `AN_SOURCE_CONFLICT` warning.
+- Exact-ID configuration mappings (`necromancer.annotations`) as the sole annotation source for closures, test files, gates, and scheduled tasks, and a fill-only escape hatch for registration-specific overrides on every other artifact family.
+- `necromancer:audit`, `necromancer:doctor`, `necromancer:diff`, search relevance ranking, `necromancer:generate`, and MCP artifact queries now reason about resolved Artifact Annotations for every artifact family instead of routes only. New audit checks: `IdentifierStyleCheck`, `MissingLocalAdrFileCheck`. `HighRiskRoutesWithoutAdrCheck`, `ExternalServiceRoutesWithoutTestsCheck`, and `NarrativeRouteMetadataSummaryCheck` are renamed and generalized to `HighRiskArtifactsWithoutAdrCheck`, `ExternalServiceArtifactsWithoutTestsCheck`, and `NarrativeAnnotationSummaryCheck`.
+- `necromancer:doctor`'s Route Metadata Coverage dimension becomes Artifact Annotation Coverage, scored over all annotated artifacts; its emitted key stays `route-metadata-coverage` for 1.x compatibility, and `--only` also accepts `artifact-annotation-coverage` as an alias.
+- Invalid `#[Necromancer]` attribute or exact-ID mapping declarations are reported as controlled `necromancer:scan` failures (existing manifest left untouched) instead of an uncaught exception.
+
+### Changed
+
+- `necromancer:scan` reading an unversioned ("v0") manifest now adapts it in memory — assigning canonical IDs and promoting legacy route declarations into the universal annotation shape — rather than failing.
+
 ## 1.4.0
 
 ### Added
