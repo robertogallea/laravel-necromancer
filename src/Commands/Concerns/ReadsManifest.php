@@ -14,13 +14,17 @@ trait ReadsManifest
      */
     private function warnIfStale(array $manifest): void
     {
-        if ($this->isStaleByHash($manifest)) {
+        if ($this->isStale($manifest)) {
             $this->warn('Manifest may be stale — source files have changed since it was generated. Run necromancer:scan to refresh.');
-
-            return;
         }
+    }
 
-        $this->warnIfStaleByMtime($manifest);
+    /**
+     * @param  array<string, mixed>  $manifest
+     */
+    private function isStale(array $manifest): bool
+    {
+        return $this->isStaleByHash($manifest) || $this->isStaleByMtime($manifest);
     }
 
     /**
@@ -58,12 +62,12 @@ trait ReadsManifest
     /**
      * @param  array<string, mixed>  $manifest
      */
-    private function warnIfStaleByMtime(array $manifest): void
+    private function isStaleByMtime(array $manifest): bool
     {
         $generatedAt = $manifest['meta']['generated_at'] ?? null;
 
         if (! is_string($generatedAt)) {
-            return;
+            return false;
         }
 
         $threshold = strtotime($generatedAt);
@@ -77,12 +81,12 @@ trait ReadsManifest
         foreach ($sourcePaths as $dir) {
             foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir)) as $file) {
                 if ($file->isFile() && $file->getMTime() > $threshold) {
-                    $this->warn('Manifest may be stale — source files have changed since it was generated. Run necromancer:scan to refresh.');
-
-                    return;
+                    return true;
                 }
             }
         }
+
+        return false;
     }
 
     private function resolveManifestPath(): string
