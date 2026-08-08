@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
-use FilesystemIterator;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
 use RuntimeException;
 use Throwable;
 
@@ -29,7 +26,7 @@ final readonly class BundleExporter
         private ArtifactConceptBuilder $builder = new ArtifactConceptBuilder,
         private GroupConceptBuilder $groupBuilder = new GroupConceptBuilder,
         private AdrConceptBuilder $adrBuilder = new AdrConceptBuilder,
-        private BundleSwap $swap = new BundleSwap,
+        private AtomicBundleWriter $writer = new AtomicBundleWriter,
     ) {}
 
     /**
@@ -43,19 +40,10 @@ final readonly class BundleExporter
         bool $allowPartial,
         string $basePath = '',
     ): BundleExportResult {
-        if ($stale && ! $allowStale) {
-            return BundleExportResult::failure(
-                'Manifest may be stale — source files have changed since it was generated. Run necromancer:scan to refresh, or pass --allow-stale to export anyway.',
-            );
-        }
+        $scopeError = $this->validateScope($manifest, $stale, $allowStale, $allowPartial);
 
-        $scope = is_array($manifest['meta']['scope'] ?? null) ? $manifest['meta']['scope'] : [];
-        $complete = (bool) ($scope['complete'] ?? false);
-
-        if (! $complete && ! $allowPartial) {
-            return BundleExportResult::failure(
-                'Manifest scope is partial — it was produced by a scan that did not cover every artifact type. Run a full necromancer:scan, or pass --allow-partial to export anyway.',
-            );
+        if ($scopeError !== null) {
+            return BundleExportResult::failure($scopeError);
         }
 
         $generatedAt = (string) ($manifest['meta']['generated_at'] ?? '');
@@ -76,30 +64,78 @@ final readonly class BundleExporter
     }
 
     /**
-     * Orchestrates every concept family in the order links depend on: first
-     * every artifact's cheap identity (id/title/filename), then the local
-     * ADR index (which can fail the whole export before anything is
-     * written), then the fully rendered Artifact Concepts — now able to
-     * link relationship fields and declared adrs — and finally the
-     * synthesized Domain/Flow/ADR concepts that reference those artifacts.
+     * The same stale/partial refusal export() applies, exposed so
+     * LaravelNecromancer\Okf\Enrichment\BundleEnricher can enforce an
+     * identical gate on the same manifest without duplicating the wording
+     * or risking the two commands drifting on what counts as safe input.
      *
      * @param  array<string, mixed>  $manifest
-     * @return array{0: list<ArtifactConcept>, 1: int} concepts, and how many of them are Artifact Concepts
      */
-    private function assembleConcepts(array $manifest, string $generatedAt, string $basePath): array
+    public function validateScope(array $manifest, bool $stale, bool $allowStale, bool $allowPartial): ?string
+    {
+        if ($stale && ! $allowStale) {
+            return 'Manifest may be stale — source files have changed since it was generated. Run necromancer:scan to refresh, or pass --allow-stale to export anyway.';
+        }
+
+        $scope = is_array($manifest['meta']['scope'] ?? null) ? $manifest['meta']['scope'] : [];
+        $complete = (bool) ($scope['complete'] ?? false);
+
+        if (! $complete && ! $allowPartial) {
+            return 'Manifest scope is partial — it was produced by a scan that did not cover every artifact type. Run a full necromancer:scan, or pass --allow-partial to export anyway.';
+        }
+
+        return null;
+    }
+
+    /**
+     * The same deterministic build export() performs, exposed without
+     * writing anything and with each concept family kept separate — the
+     * seam LaravelNecromancer\Okf\Enrichment\BundleEnricher needs to build
+     * an enriched sibling bundle from concepts guaranteed identical to what
+     * necromancer:okf produces, and to know each artifact's declared
+     * annotations for building privacy-bounded prompts, without duplicating
+     * any indexing/build logic and without granting the deterministic
+     * exporter itself any AI awareness.
+     *
+     * $enrichments, when given, is keyed by canonical concept id (an
+     * artifact's own id, "domain:value"/"flow:value", or "adr:path") and
+     * attaches to the matching concept only — an id with no matching
+     * concept is silently ignored, and a concept with no entry builds
+     * exactly as it would deterministically. This is BundleEnricher's only
+     * seam into concept building: it never calls a concept builder itself.
+     *
+     * @param  array<string, mixed>  $manifest
+     * @param  array<string, ConceptEnrichment>  $enrichments
+     * @return array{artifact: list<ArtifactConcept>, group: list<ArtifactConcept>, adr: list<ArtifactConcept>, identities: array<string, array{type: string, link: ConceptLink, annotations: array<string, mixed>}>}
+     */
+    public function assemble(array $manifest, string $generatedAt, string $basePath, array $enrichments = []): array
     {
         [$classIndex, $identities] = $this->indexManifest($manifest);
         $adrIndex = $this->resolveAdrIndex($manifest, $basePath);
         $groupIndex = $this->buildGroupIndex($identities);
 
-        $artifactConcepts = $this->buildArtifactConcepts($manifest, $generatedAt, $classIndex, $adrIndex, $groupIndex);
-        $groupConcepts = $this->buildGroupConcepts($identities, $generatedAt);
-        $adrConcepts = $this->buildAdrConcepts($adrIndex, $identities, $basePath, $generatedAt);
+        $assembled = [
+            'artifact' => $this->buildArtifactConcepts($manifest, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments),
+            'group' => $this->buildGroupConcepts($identities, $generatedAt, $enrichments),
+            'adr' => $this->buildAdrConcepts($adrIndex, $identities, $basePath, $generatedAt, $enrichments),
+            'identities' => $identities,
+        ];
 
-        $concepts = [...$artifactConcepts, ...$groupConcepts, ...$adrConcepts];
-        $this->assertNoFilenameCollisions($concepts);
+        $this->assertNoFilenameCollisions([...$assembled['artifact'], ...$assembled['group'], ...$assembled['adr']]);
 
-        return [$concepts, count($artifactConcepts)];
+        return $assembled;
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return array{0: list<ArtifactConcept>, 1: int} concepts, and how many of them are Artifact Concepts
+     */
+    private function assembleConcepts(array $manifest, string $generatedAt, string $basePath): array
+    {
+        $assembled = $this->assemble($manifest, $generatedAt, $basePath);
+        $concepts = [...$assembled['artifact'], ...$assembled['group'], ...$assembled['adr']];
+
+        return [$concepts, count($assembled['artifact'])];
     }
 
     /**
@@ -193,9 +229,10 @@ final readonly class BundleExporter
      * @param  array<string, ConceptLink>  $classIndex
      * @param  array<string, ConceptLink>  $adrIndex
      * @param  array<string, ConceptLink>  $groupIndex
+     * @param  array<string, ConceptEnrichment>  $enrichments
      * @return list<ArtifactConcept>
      */
-    private function buildArtifactConcepts(array $manifest, string $generatedAt, array $classIndex, array $adrIndex, array $groupIndex): array
+    private function buildArtifactConcepts(array $manifest, string $generatedAt, array $classIndex, array $adrIndex, array $groupIndex, array $enrichments): array
     {
         $concepts = [];
 
@@ -209,7 +246,8 @@ final readonly class BundleExporter
                     continue;
                 }
 
-                $concepts[] = $this->builder->build($type, $artifact, $generatedAt, $classIndex, $adrIndex, $groupIndex);
+                $id = (string) ($artifact['id'] ?? '');
+                $concepts[] = $this->builder->build($type, $artifact, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments[$id] ?? null);
             }
         }
 
@@ -218,9 +256,10 @@ final readonly class BundleExporter
 
     /**
      * @param  array<string, array{type: string, link: ConceptLink, annotations: array<string, mixed>}>  $identities
+     * @param  array<string, ConceptEnrichment>  $enrichments
      * @return list<ArtifactConcept>
      */
-    private function buildGroupConcepts(array $identities, string $generatedAt): array
+    private function buildGroupConcepts(array $identities, string $generatedAt, array $enrichments): array
     {
         $concepts = [];
 
@@ -240,7 +279,7 @@ final readonly class BundleExporter
             ksort($groups);
 
             foreach ($groups as $value => $members) {
-                $concepts[] = $this->groupBuilder->build($kind, $value, $members, $generatedAt);
+                $concepts[] = $this->groupBuilder->build($kind, $value, $members, $generatedAt, $enrichments["{$kind}:{$value}"] ?? null);
             }
         }
 
@@ -306,9 +345,10 @@ final readonly class BundleExporter
     /**
      * @param  array<string, ConceptLink>  $adrIndex
      * @param  array<string, array{type: string, link: ConceptLink, annotations: array<string, mixed>}>  $identities
+     * @param  array<string, ConceptEnrichment>  $enrichments
      * @return list<ArtifactConcept>
      */
-    private function buildAdrConcepts(array $adrIndex, array $identities, string $basePath, string $generatedAt): array
+    private function buildAdrConcepts(array $adrIndex, array $identities, string $basePath, string $generatedAt, array $enrichments): array
     {
         $concepts = [];
 
@@ -328,7 +368,7 @@ final readonly class BundleExporter
                 throw new RuntimeException("Unable to read local ADR file '{$path}'.");
             }
 
-            $concepts[] = $this->adrBuilder->build($path, $content, $referencedBy, $generatedAt);
+            $concepts[] = $this->adrBuilder->build($path, $content, $referencedBy, $generatedAt, $enrichments["adr:{$path}"] ?? null);
         }
 
         return $concepts;
@@ -353,75 +393,13 @@ final readonly class BundleExporter
     }
 
     /**
-     * Writes the whole bundle to a temp directory first, so nothing under
-     * $outputPath is touched while concept files are being generated, then
-     * hands off to BundleSwap for the final move — which itself guarantees
-     * a failed swap never leaves existing output destroyed.
-     *
      * @param  list<ArtifactConcept>  $concepts
      */
     private function writeAtomically(string $outputPath, array $concepts, int $artifactCount, string $generatedAt): void
     {
-        $tempPath = rtrim($outputPath, '/').'.tmp';
-        $this->removePath($tempPath);
-
-        $artifactsDir = $tempPath.'/artifacts';
-
-        if (! mkdir($artifactsDir, 0755, true) && ! is_dir($artifactsDir)) {
-            throw new RuntimeException("Unable to create temporary bundle directory at {$tempPath}.");
-        }
-
-        foreach ($concepts as $concept) {
-            if (file_put_contents($artifactsDir.'/'.$concept->filename, $concept->content."\n") === false) {
-                $this->removePath($tempPath);
-
-                throw new RuntimeException("Unable to write {$concept->filename}.");
-            }
-        }
-
-        $index = [
-            'okf_version' => '0.2',
-            'necromancer_schema_version' => 1,
+        $this->writer->write($outputPath, $concepts, [
             'generated_at' => $generatedAt !== '' ? $generatedAt : null,
             'artifact_count' => $artifactCount,
-        ];
-
-        if (file_put_contents($tempPath.'/bundle.json', json_encode($index, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n") === false) {
-            $this->removePath($tempPath);
-
-            throw new RuntimeException('Unable to write bundle.json.');
-        }
-
-        try {
-            $this->swap->swap($tempPath, $outputPath);
-        } catch (RuntimeException $e) {
-            $this->removePath($tempPath);
-
-            throw $e;
-        }
-    }
-
-    private function removePath(string $path): void
-    {
-        if (is_file($path) || is_link($path)) {
-            unlink($path);
-
-            return;
-        }
-
-        if (! is_dir($path)) {
-            return;
-        }
-
-        $items = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-        }
-
-        rmdir($path);
+        ]);
     }
 }

@@ -43,6 +43,14 @@ return [
 
     'okf' => [
         'output' => base_path('okf'),
+        'enrichment' => [
+            'output' => base_path('okf-enriched'),
+            'cache' => storage_path('app/necromancer/okf-enrichment-cache'),
+            'provider' => null,
+            'model' => null,
+            'prompt_version' => '1',
+            'privacy_policy' => 'excludes-source-framework-config-adr-bodies',
+        ],
     ],
 
     'boost' => [

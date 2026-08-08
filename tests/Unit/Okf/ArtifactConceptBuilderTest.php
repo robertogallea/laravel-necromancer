@@ -2,7 +2,22 @@
 
 use LaravelNecromancer\Okf\ArtifactConcept;
 use LaravelNecromancer\Okf\ArtifactConceptBuilder;
+use LaravelNecromancer\Okf\ConceptEnrichment;
 use LaravelNecromancer\Okf\ConceptLink;
+
+function sampleEnrichment(array $overrides = []): ConceptEnrichment
+{
+    return new ConceptEnrichment(
+        description: $overrides['description'] ?? 'Delivers invoice emails asynchronously.',
+        narrative: $overrides['narrative'] ?? 'This job decouples email delivery from the request cycle.',
+        provider: $overrides['provider'] ?? 'anthropic',
+        model: $overrides['model'] ?? 'claude-sonnet-4-6',
+        promptVersion: $overrides['promptVersion'] ?? '1',
+        privacyPolicy: $overrides['privacyPolicy'] ?? 'excludes-source-framework-config-adr-bodies',
+        cacheKey: $overrides['cacheKey'] ?? 'sha256:abc123',
+        cached: $overrides['cached'] ?? false,
+    );
+}
 
 function buildJobConcept(array $overrides = []): ArtifactConcept
 {
@@ -231,6 +246,57 @@ test('build() renders an unresolved domain/flow value as plain text', function (
         ->and($concept->content)->toContain('flow: invoicing')
         ->and($concept->content)->not->toContain('domain: [billing]')
         ->and($concept->content)->not->toContain('flow: [invoicing]');
+});
+
+test('build() omits the enrichment front matter and body section when no enrichment is passed', function () {
+    $concept = buildJobConcept();
+
+    expect($concept->content)->not->toContain('enrichment:')
+        ->and($concept->content)->not->toContain('## AI-Enriched Summary');
+});
+
+test('build() records enrichment provenance under necromancer.enrichment without touching facts or annotations', function () {
+    $concept = (new ArtifactConceptBuilder)->build(
+        'jobs',
+        ['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'queue' => 'emails', 'annotations' => ['domain' => 'billing'], 'source' => null],
+        '2026-08-07T12:00:00+02:00',
+        enrichment: sampleEnrichment(),
+    );
+
+    expect($concept->content)->toContain('enrichment:')
+        ->and($concept->content)->toContain('provider: "anthropic"')
+        ->and($concept->content)->toContain('model: "claude-sonnet-4-6"')
+        ->and($concept->content)->toContain('prompt_version: "1"')
+        ->and($concept->content)->toContain('privacy_policy: "excludes-source-framework-config-adr-bodies"')
+        ->and($concept->content)->toContain('cache_key: "sha256:abc123"')
+        ->and($concept->content)->toContain('cached: false')
+        // facts/annotations must be byte-identical to the non-enriched build
+        ->and($concept->content)->toContain('queue: "emails"')
+        ->and($concept->content)->toContain('domain: billing');
+});
+
+test('build() adds description to front matter and a narrative body section when enriched', function () {
+    $concept = (new ArtifactConceptBuilder)->build(
+        'jobs',
+        ['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null],
+        '2026-08-07T12:00:00+02:00',
+        enrichment: sampleEnrichment(),
+    );
+
+    expect($concept->content)->toContain('description: "Delivers invoice emails asynchronously."')
+        ->and($concept->content)->toContain('## AI-Enriched Summary')
+        ->and($concept->content)->toContain('This job decouples email delivery from the request cycle.');
+});
+
+test('build() keeps the same id and filename whether or not it is enriched', function () {
+    $artifact = ['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null];
+    $builder = new ArtifactConceptBuilder;
+
+    $plain = $builder->build('jobs', $artifact, '2026-08-07T12:00:00+02:00');
+    $enriched = $builder->build('jobs', $artifact, '2026-08-07T12:00:00+02:00', enrichment: sampleEnrichment());
+
+    expect($enriched->id)->toBe($plain->id)
+        ->and($enriched->filename)->toBe($plain->filename);
 });
 
 test('build() links a locally resolvable declared ADR and renders external ADR URIs as links too', function () {

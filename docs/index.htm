@@ -451,6 +451,26 @@ php artisan necromancer:okf --output=dist/okf</pre>
         </div>
       </div>
 
+      <!-- necromancer:okf-enrich -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:okf-enrich</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--provider=</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--model=</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--refresh</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Writes an AI-enriched <strong class="text-gray-200">sibling</strong> bundle alongside the deterministic one — the <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/</code> bundle from <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code> is never touched. Enrichment can only <em>add</em> a <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">description</code> field and an "AI-Enriched Summary" section — it structurally cannot change facts, annotations, Artifact IDs, or links, because the AI is never given access to those fields. Prompts exclude raw framework metadata, source paths/hashes, configuration, and ADR body content. Each concept caches independently and every enriched concept records provider, model, prompt version, privacy policy, and cache key. Requires <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">laravel/ai</code>.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:okf-enrich
+php artisan necromancer:okf-enrich --refresh
+php artisan necromancer:okf-enrich --provider=anthropic --model=claude-sonnet-4-6</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
     </div>
   </section>
 

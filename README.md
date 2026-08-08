@@ -720,6 +720,71 @@ A declared local ADR that doesn't exist on disk fails the whole export before an
 
 ---
 
+### Step 3j — Generate an AI-Enriched Knowledge Bundle
+
+Layer AI-generated prose onto the deterministic bundle, written to a separate sibling directory — the deterministic bundle from `necromancer:okf` is never modified:
+
+```bash
+php artisan necromancer:okf-enrich
+```
+
+Every concept in the bundle (artifact, domain, flow, and ADR) is eligible for enrichment, and enrichment can only ever *add* content — it cannot change a concept's facts, annotations, Artifact ID, or links, because the AI's output is never given access to those fields to begin with. The enriched front matter gains a `description` field and a `necromancer.enrichment` block; the body gains an `## AI-Enriched Summary` section:
+
+```markdown
+---
+title: "SendInvoiceEmail"
+type: "artifact"
+kind: "jobs"
+description: "Sends invoice emails asynchronously outside the request cycle."
+necromancer:
+  schema_version: 1
+  bundle_version: "0.2"
+  id: "jobs:App\\Jobs\\SendInvoiceEmail"
+  facts:
+    queue: "emails"
+  annotations:
+    domain: "billing"
+  enrichment:
+    provider: "anthropic"
+    model: "claude-sonnet-4-6"
+    prompt_version: "1"
+    privacy_policy: "excludes-source-framework-config-adr-bodies"
+    cache_key: "8f1c2e...:anthropic:claude-sonnet-4-6:default:1"
+    cached: false
+---
+
+# SendInvoiceEmail
+
+...
+
+## AI-Enriched Summary
+
+This job decouples invoice email delivery from the request cycle, running on the
+emails queue so a slow mail provider never blocks the HTTP response.
+```
+
+**What the AI never sees.** The prompt built for each concept excludes raw framework metadata (`route_metadata`), source file paths and hashes, application configuration, and — for ADR concepts — the ADR's own copied file content. A domain/flow concept's prompt carries only its value and member ids; an ADR concept's prompt carries only its path and the ids of artifacts that reference it. None of this is a filter applied after the fact — the code that builds each prompt has no parameter through which that content could pass.
+
+**Caching.** Each concept is cached independently, keyed by a hash of its own prompt plus the provider, model, temperature, and prompt version — so changing one artifact's annotations only invalidates that one concept's cached enrichment, not the whole bundle. Re-running the command reuses cached results and reports how many concepts were generated fresh versus reused:
+
+```bash
+php artisan necromancer:okf-enrich
+# Enriched 12 concept(s) (2 generated, 10 cached) to /path/to/okf-enriched.
+```
+
+```bash
+php artisan necromancer:okf-enrich --refresh              # bypass the cache, re-enrich every concept
+php artisan necromancer:okf-enrich --provider=anthropic --model=claude-sonnet-4-6
+php artisan necromancer:okf-enrich --output=dist/okf-enriched
+php artisan necromancer:okf-enrich --allow-stale --allow-partial
+```
+
+The same stale-manifest and partial-scope refusals as `necromancer:okf` apply, and `--allow-stale`/`--allow-partial` override them the same way. A declared local ADR that doesn't exist on disk fails the command before anything is written, exactly like `necromancer:okf`.
+
+> **Requires** `laravel/ai` installed and an AI provider configured in `config/ai.php`.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -736,6 +801,7 @@ A declared local ADR that doesn't exist on disk fails the whole export before an
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
 | `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
+| `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
 
 ## Configuration
 
@@ -769,6 +835,16 @@ return [
     // OKF Knowledge Bundle output directory (necromancer:okf)
     'okf' => [
         'output' => base_path('okf'),
+
+        // AI enrichment (necromancer:okf-enrich)
+        'enrichment' => [
+            'output' => base_path('okf-enriched'),
+            'cache' => storage_path('app/necromancer/okf-enrichment-cache'),
+            'provider' => null,
+            'model' => null,
+            'prompt_version' => '1',
+            'privacy_policy' => 'excludes-source-framework-config-adr-bodies',
+        ],
     ],
 
     // Laravel Boost integration

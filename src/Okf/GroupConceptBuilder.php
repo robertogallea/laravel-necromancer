@@ -26,7 +26,7 @@ final readonly class GroupConceptBuilder
     /**
      * @param  array<string, ConceptLink>  $members  keyed by member artifact id
      */
-    public function build(string $kind, string $value, array $members, string $generatedAt): ArtifactConcept
+    public function build(string $kind, string $value, array $members, string $generatedAt, ?ConceptEnrichment $enrichment = null): ArtifactConcept
     {
         $identity = $this->identify($kind, $value);
         ksort($members);
@@ -34,6 +34,7 @@ final readonly class GroupConceptBuilder
         $frontMatter = [
             'title' => $value,
             'type' => $kind,
+            'description' => $enrichment?->description,
             'necromancer' => [
                 'schema_version' => 1,
                 'bundle_version' => '0.2',
@@ -41,6 +42,7 @@ final readonly class GroupConceptBuilder
                 'concept_type' => $kind,
                 'generated_at' => $generatedAt,
                 'members' => array_keys($members),
+                'enrichment' => $enrichment?->toFrontMatter() ?? [],
             ],
         ];
 
@@ -52,6 +54,10 @@ final readonly class GroupConceptBuilder
                 ? array_map(fn (ConceptLink $link): string => $link->toMarkdownListItem(), array_values($members))
                 : ['_No member artifacts._']),
         ];
+
+        if ($enrichment !== null) {
+            $lines = [...$lines, '', '## AI-Enriched Summary', '', $enrichment->narrative];
+        }
 
         $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".implode("\n", $lines);
 

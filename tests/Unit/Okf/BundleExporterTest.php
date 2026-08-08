@@ -1,6 +1,7 @@
 <?php
 
 use LaravelNecromancer\Okf\BundleExporter;
+use LaravelNecromancer\Okf\ConceptEnrichment;
 
 function okfTempDir(): string
 {
@@ -180,6 +181,82 @@ test('export() is deterministic: the same manifest produces byte-identical files
     expect(basename($filesA[0]))->toBe(basename($filesB[0]))
         ->and(file_get_contents($filesA[0]))->toBe(file_get_contents($filesB[0]));
 });
+
+test('validateScope() returns the same stale/partial messages export() would fail with', function () {
+    $exporter = new BundleExporter;
+    $manifest = completeManifest([]);
+
+    expect($exporter->validateScope($manifest, stale: true, allowStale: false, allowPartial: false))
+        ->toContain('may be stale');
+
+    $partial = $manifest;
+    $partial['meta']['scope']['complete'] = false;
+    expect($exporter->validateScope($partial, stale: false, allowStale: false, allowPartial: false))
+        ->toContain('scope is partial');
+
+    expect($exporter->validateScope($manifest, stale: false, allowStale: false, allowPartial: false))
+        ->toBeNull();
+});
+
+test('assemble() returns the artifact, group, and adr concepts separately, plus identities', function () {
+    $manifest = completeManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'annotations' => ['domain' => 'billing'], 'source' => null]],
+    ]);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+
+    expect($assembled['artifact'])->toHaveCount(1)
+        ->and($assembled['group'])->toHaveCount(1)
+        ->and($assembled['adr'])->toHaveCount(0)
+        ->and($assembled['identities'])->toHaveKey('jobs:App\\Jobs\\SendInvoice');
+});
+
+test('assemble() produces byte-identical Artifact Concept content to what export() writes to disk', function () {
+    $output = okfTempDir().'/bundle';
+    $manifest = completeManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'annotations' => ['domain' => 'billing'], 'source' => null]],
+    ]);
+
+    $exporter = new BundleExporter;
+    $assembled = $exporter->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+    $exporter->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $writtenContent = file_get_contents(glob($output.'/artifacts/app-jobs-sendinvoice-*.md')[0]);
+
+    expect($assembled['artifact'][0]->content."\n")->toBe($writtenContent);
+});
+
+test('assemble() attaches a passed-in enrichment to the matching concept by id, for every concept kind', function () {
+    $base = okfTempDir();
+    mkdir($base.'/docs/adr', 0755, true);
+    file_put_contents($base.'/docs/adr/0004-x.md', 'ADR body.');
+
+    $manifest = completeManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'annotations' => ['domain' => 'billing', 'adrs' => ['docs/adr/0004-x.md']], 'source' => null]],
+    ]);
+
+    $jobEnrichment = new ConceptEnrichment('Job description.', 'Job narrative.', 'anthropic', 'sonnet', '1', 'policy', 'key', false);
+    $domainEnrichment = new ConceptEnrichment('Domain description.', 'Domain narrative.', 'anthropic', 'sonnet', '1', 'policy', 'key', false);
+    $adrEnrichment = new ConceptEnrichment('ADR description.', 'ADR narrative.', 'anthropic', 'sonnet', '1', 'policy', 'key', false);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', $base, [
+        'jobs:App\\Jobs\\SendInvoice' => $jobEnrichment,
+        'domain:billing' => $domainEnrichment,
+        'adr:docs/adr/0004-x.md' => $adrEnrichment,
+    ]);
+
+    expect($assembled['artifact'][0]->content)->toContain('Job narrative.')
+        ->and($assembled['group'][0]->content)->toContain('Domain narrative.')
+        ->and($assembled['adr'][0]->content)->toContain('ADR narrative.');
+});
+
+test('assemble() throws when a declared local ADR file is missing, the same as export() fails', function () {
+    $manifest = completeManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'annotations' => ['adrs' => ['docs/adr/missing.md']], 'source' => null]],
+    ]);
+
+    (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', okfTempDir());
+})->throws(RuntimeException::class, 'docs/adr/missing.md');
 
 test('export() succeeds for an empty manifest with zero artifacts', function () {
     $output = okfTempDir().'/bundle';
