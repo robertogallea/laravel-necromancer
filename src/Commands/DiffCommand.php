@@ -9,11 +9,12 @@ use Illuminate\Support\Facades\Process;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
 use LaravelNecromancer\Diff\DiffReviewAgent;
 use LaravelNecromancer\Diff\DiffReviewResult;
-use LaravelNecromancer\Diff\FlaggedRoutes;
+use LaravelNecromancer\Diff\FlaggedArtifacts;
 use LaravelNecromancer\Diff\ManifestDiff;
 use LaravelNecromancer\Diff\ManifestDiffer;
 use LaravelNecromancer\Inference\ManifestSummarizer;
 use LaravelNecromancer\Integrations\AiDetector;
+use LaravelNecromancer\Manifest\ManifestReader;
 
 final class DiffCommand extends Command
 {
@@ -28,7 +29,7 @@ final class DiffCommand extends Command
 
     protected $description = 'Compare the current manifest against another branch or ref';
 
-    public function handle(AiDetector $aiDetector): int
+    public function handle(AiDetector $aiDetector, ManifestReader $reader): int
     {
         $headPath = $this->resolveManifestPath();
 
@@ -39,14 +40,14 @@ final class DiffCommand extends Command
         }
 
         try {
-            $head = json_decode(file_get_contents($headPath), true, 512, JSON_THROW_ON_ERROR);
+            $head = $reader->read($headPath);
         } catch (\JsonException $e) {
             $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
             return self::FAILURE;
         }
 
-        $base = $this->loadBaseManifest();
+        $base = $this->loadBaseManifest($reader);
 
         if ($base === null) {
             return self::FAILURE;
@@ -116,7 +117,7 @@ final class DiffCommand extends Command
     /**
      * @return array<string, mixed>|null
      */
-    private function loadBaseManifest(): ?array
+    private function loadBaseManifest(ManifestReader $reader): ?array
     {
         $path = $this->option('base-manifest');
 
@@ -128,7 +129,7 @@ final class DiffCommand extends Command
             }
 
             try {
-                return json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                return $reader->read($path);
             } catch (\JsonException $e) {
                 $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
@@ -153,7 +154,10 @@ final class DiffCommand extends Command
         }
 
         try {
-            return json_decode($result->output(), true, 512, JSON_THROW_ON_ERROR);
+            /** @var array<string, mixed> $manifest */
+            $manifest = json_decode($result->output(), true, 512, JSON_THROW_ON_ERROR);
+
+            return $reader->adapt($manifest);
         } catch (\JsonException $e) {
             $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
@@ -193,14 +197,15 @@ final class DiffCommand extends Command
             return implode(PHP_EOL, $lines);
         }
 
-        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+        $flagged = FlaggedArtifacts::fromDiff($diff);
 
-        if (! empty($flaggedRoutes)) {
+        if (! empty($flagged)) {
             $lines[] = '';
-            $lines[] = '  FLAGGED ROUTES';
+            $lines[] = '  FLAGGED ARTIFACTS';
 
-            foreach ($flaggedRoutes as $route) {
-                $lines[] = "  <fg=red>⚠</>  {$this->labelArtifact('routes', $route)}  ".FlaggedRoutes::reason($route);
+            foreach ($flagged as ['type' => $type, 'artifact' => $artifact]) {
+                $id = (string) ($artifact['id'] ?? '');
+                $lines[] = "  <fg=red>⚠</>  {$type}  {$this->labelArtifact($type, $artifact)} ({$id})  ".FlaggedArtifacts::reason($artifact);
             }
         }
 
@@ -278,14 +283,15 @@ final class DiffCommand extends Command
             return implode(PHP_EOL, $lines);
         }
 
-        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+        $flagged = FlaggedArtifacts::fromDiff($diff);
 
-        if (! empty($flaggedRoutes)) {
+        if (! empty($flagged)) {
             $lines[] = '';
-            $lines[] = '### Flagged Routes';
+            $lines[] = '### Flagged Artifacts';
 
-            foreach ($flaggedRoutes as $route) {
-                $lines[] = "- `{$this->labelArtifact('routes', $route)}` — ".FlaggedRoutes::reason($route);
+            foreach ($flagged as ['type' => $type, 'artifact' => $artifact]) {
+                $id = (string) ($artifact['id'] ?? '');
+                $lines[] = "- `[{$type}]` `{$this->labelArtifact($type, $artifact)}` (`{$id}`) — ".FlaggedArtifacts::reason($artifact);
             }
         }
 
@@ -468,6 +474,14 @@ final class DiffCommand extends Command
 
         if ($type === 'tests') {
             return basename((string) ($artifact['file'] ?? ''));
+        }
+
+        if ($type === 'gates') {
+            return (string) ($artifact['ability'] ?? '');
+        }
+
+        if ($type === 'scheduled_tasks') {
+            return (string) ($artifact['command'] ?? '');
         }
 
         $class = (string) ($artifact['class'] ?? $artifact['signature'] ?? '');

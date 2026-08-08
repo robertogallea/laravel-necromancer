@@ -4,6 +4,8 @@ use App\Providers\NecromancerFixtureServiceProvider;
 use Illuminate\Auth\Access\Gate;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use LaravelNecromancer\Collection\CommandCollector;
@@ -26,17 +28,23 @@ use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerStatus;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerBroadcastedEvent;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerOrderPlaced;
 use LaravelNecromancer\Tests\Fixtures\Gates\NecromancerManageUsersGate;
+use LaravelNecromancer\Tests\Fixtures\InvalidJobs\NecromancerInvalidAnnotatedJob;
+use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerAnnotatedJob;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerQueuedJob;
 use LaravelNecromancer\Tests\Fixtures\Listeners\RecordNecromancerOrderMetrics;
 use LaravelNecromancer\Tests\Fixtures\Listeners\SendNecromancerReceipt;
 use LaravelNecromancer\Tests\Fixtures\Livewire\NecromancerIssueForm;
 use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerPasswordResetMail;
 use LaravelNecromancer\Tests\Fixtures\Mail\NecromancerWelcomeMail;
+use LaravelNecromancer\Tests\Fixtures\Middleware\NecromancerAnnotatedMiddleware;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerCustomer;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerMember;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerOrder;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerReport;
 use LaravelNecromancer\Tests\Fixtures\Models\NecromancerUnguardedModel;
+use LaravelNecromancer\Tests\Fixtures\NecromancerAnnotatedInvokableRouteController;
+use LaravelNecromancer\Tests\Fixtures\NecromancerAnnotatedRouteController;
+use LaravelNecromancer\Tests\Fixtures\NecromancerFakeMetadataRoute;
 use LaravelNecromancer\Tests\Fixtures\NecromancerInvokableRouteController;
 use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
 use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
@@ -64,6 +72,26 @@ test('the scan command writes a minimal manifest to the default path', function 
     expect(File::exists($path))->toBeTrue();
 
     expectMinimalScanManifest($path);
+});
+
+test('the scan command records complete and partial scan scope', function () {
+    $fullPath = necromancerScanTestPath('necromancer-full-scope.json');
+    $partialPath = necromancerScanTestPath('necromancer-partial-scope.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $fullPath])->assertSuccessful();
+    $this->artisan('necromancer:scan', ['--output' => $partialPath, '--only' => 'routes'])->assertSuccessful();
+
+    $full = expectScanManifest($fullPath);
+    $partial = expectScanManifest($partialPath);
+
+    expect($full->meta->scope->complete)->toBeTrue()
+        ->and($full->meta->scope->artifact_types)->toBe([
+            'commands', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
+            'livewire_components', 'mailables', 'middleware', 'models', 'observers',
+            'policies', 'routes', 'scheduled_tasks', 'service_providers', 'tests', 'validation_rules',
+        ])
+        ->and($partial->meta->scope->complete)->toBeFalse()
+        ->and($partial->meta->scope->artifact_types)->toBe(['routes']);
 });
 
 test('the scan command writes named and unnamed closure route artifacts', function () {
@@ -99,6 +127,69 @@ test('the scan command writes named and unnamed closure route artifacts', functi
         ->and($unnamedRoute->name)->toBeNull()
         ->and($unnamedRoute->method)->toBe('POST')
         ->and((string) File::get($path))->not->toContain($secret);
+});
+
+test('the scan command projects native route metadata into canonical annotations', function () {
+    $path = necromancerScanTestPath('necromancer-route-annotations.json');
+    $route = new NecromancerFakeMetadataRoute(['POST'], '/necromancer/subscriptions/cancel', ['uses' => fn () => 'ok']);
+    $route->name('necromancer.subscription.cancel');
+    $route->metadata([
+        'head' => ['title' => 'Cancel subscription'],
+        'necromancer' => [
+            'domain' => ' billing ',
+            'flow' => 'subscription-cancellation',
+            'capability' => 'subscription.cancel',
+            'summary' => 'Cancels an active subscription.',
+            'risk' => 'high',
+            'external_services' => ['stripe', 'stripe'],
+            'adr' => 'docs/adr/001.md',
+            'adrs' => ['docs/adr/002.md', 'docs/adr/001.md'],
+        ],
+    ]);
+    app(Router::class)->getRoutes()->add($route);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.subscription.cancel');
+
+    expect($route->route_metadata->raw->head->title)->toBe('Cancel subscription')
+        ->and($route->route_metadata->raw->necromancer->domain)->toBe(' billing ')
+        ->and($route->route_metadata->necromancer->adrs)->toBe(['docs/adr/001.md', 'docs/adr/002.md'])
+        ->and($route->annotations)->toEqual((object) [
+            'domain' => 'billing',
+            'flow' => 'subscription-cancellation',
+            'capability' => 'subscription.cancel',
+            'summary' => 'Cancels an active subscription.',
+            'risk' => 'high',
+            'external_services' => ['stripe'],
+            'adrs' => ['docs/adr/001.md', 'docs/adr/002.md'],
+        ]);
+});
+
+test('the scan command warns about legacy route values excluded from annotations', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-route-annotations.json');
+    $route = new NecromancerFakeMetadataRoute(['POST'], '/necromancer/legacy-invalid', ['uses' => fn () => 'ok']);
+    $route->name('necromancer.legacy.invalid');
+    $route->metadata(['necromancer' => [
+        'domain' => 'billing',
+        'risk' => 'urgent',
+        'external_services' => ['stripe', ''],
+    ]]);
+    app(Router::class)->getRoutes()->add($route);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])
+        ->expectsOutputToContain('AN_LEGACY_RISK')
+        ->expectsOutputToContain('AN_LEGACY_VALUE')
+        ->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.legacy.invalid');
+
+    expect($route->route_metadata->raw->necromancer->risk)->toBe('urgent')
+        ->and($route->route_metadata->necromancer->risk)->toBe('urgent')
+        ->and($route->annotations)->toEqual((object) [
+            'domain' => 'billing',
+            'external_services' => ['stripe'],
+        ]);
 });
 
 test('the scan command joins multiple non head methods in registered order', function () {
@@ -155,6 +246,117 @@ test('the scan command writes invokable controller route action metadata and sou
         ->and($route->action)->toBe('__invoke')
         ->and($route->source->file)->toBe('tests/Fixtures/NecromancerInvokableRouteController.php')
         ->and($route->source->line)->toBeInt();
+});
+
+test('an invokable controller resolves its #[Necromancer] attribute from __invoke as the action-level source', function () {
+    $path = necromancerScanTestPath('necromancer-routes-invokable-annotated.json');
+
+    Route::post('/necromancer/invokable-annotated-route', NecromancerAnnotatedInvokableRouteController::class)
+        ->name('necromancer.invokable-annotated-route');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.invokable-annotated-route');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'billing', 'capability' => 'billing.process']);
+});
+
+test('a controller class annotation supplies defaults for an unannotated action', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-class-annotation.json');
+
+    Route::get('/necromancer/annotated/index', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.index');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.index');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'billing', 'risk' => 'low']);
+});
+
+test('an action annotation refines the controller class defaults without a warning', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-action-annotation.json');
+
+    Route::get('/necromancer/annotated/charge', [NecromancerAnnotatedRouteController::class, 'charge'])
+        ->name('necromancer.annotated.charge');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.charge');
+
+    expect($route->annotations)->toEqual((object) [
+        'domain' => 'billing',
+        'capability' => 'billing.charge',
+        'risk' => 'low',
+    ]);
+});
+
+test('an action annotation deterministically overrides a conflicting controller class value with no warning', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-conflict-annotation.json');
+
+    Route::get('/necromancer/annotated/conflict', [NecromancerAnnotatedRouteController::class, 'conflictingDomain'])
+        ->name('necromancer.annotated.conflict');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->doesntExpectOutputToContain('AN_SOURCE_CONFLICT')
+        ->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.conflict');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'support', 'risk' => 'low']);
+});
+
+test('native route metadata overrides controller-derived annotations with a warning', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-metadata-conflict.json');
+
+    Route::get('/necromancer/annotated/native-override', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.native-override')
+        ->withNecromancer(domain: 'enterprise');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->expectsOutputToContain('AN_SOURCE_CONFLICT')
+        ->assertSuccessful();
+
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.annotated.native-override');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'enterprise', 'risk' => 'low']);
+});
+
+test('the conflict warning names the route by its canonical routes:METHOD:URI Artifact ID', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-metadata-conflict-id.json');
+
+    Route::get('/necromancer/annotated/canonical-id-override', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.canonical-id-override')
+        ->withNecromancer(domain: 'enterprise');
+
+    Artisan::call('necromancer:scan', ['--output' => $path]);
+
+    expect(Artisan::output())->toContain('routes:GET:necromancer/annotated/canonical-id-override');
+});
+
+test('two routes conflicting on the same field each surface their own warning instead of collapsing into one', function () {
+    $path = necromancerScanTestPath('necromancer-routes-controller-metadata-conflict-distinct.json');
+
+    Route::get('/necromancer/annotated/native-override-a', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.native-override-a')
+        ->withNecromancer(domain: 'enterprise');
+
+    Route::get('/necromancer/annotated/native-override-b', [NecromancerAnnotatedRouteController::class, 'index'])
+        ->name('necromancer.annotated.native-override-b')
+        ->withNecromancer(domain: 'partner');
+
+    // Each conflict warning names its own route's method+URI, so the two warnings
+    // are distinct strings and neither collapses the other via array_unique().
+    Artisan::call('necromancer:scan', ['--output' => $path]);
+    $warnings = array_values(array_filter(
+        explode("\n", Artisan::output()),
+        fn (string $line): bool => str_contains($line, 'AN_SOURCE_CONFLICT') && str_contains($line, 'domain'),
+    ));
+
+    expect($warnings)->toHaveCount(2)
+        ->and($warnings[0])->not->toBe($warnings[1])
+        ->and($warnings[0])->toContain('native-override-a')
+        ->and($warnings[1])->toContain('native-override-b');
 });
 
 test('the scan command excludes default vendor and debug route names', function (string $routeName) {
@@ -600,6 +802,23 @@ test('the scan command captures timeout on job artifacts', function () {
     expect($job->timeout)->toBeNull();
 });
 
+test('a #[Necromancer] class attribute serializes into a class-backed artifact', function () {
+    $path = necromancerScanTestPath('necromancer-jobs-annotated.json');
+
+    useNecromancerFixtureExecutables();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $job = findManifestJob(expectScanManifest($path), NecromancerAnnotatedJob::class);
+
+    expect($job->annotations)->toEqual((object) [
+        'domain' => 'billing',
+        'capability' => 'invoice.send',
+        'risk' => 'high',
+        'external_services' => ['stripe'],
+    ]);
+});
+
 test('the scan command captures broadcastable and channels on event artifacts', function () {
     $path = necromancerScanTestPath('necromancer-events-broadcastable.json');
 
@@ -777,6 +996,64 @@ test('the scan command fails clearly when the output parent path is not a direct
         ->assertExitCode(1);
 
     expect(File::exists($path))->toBeFalse();
+});
+
+test('the scan command fails clearly instead of crashing when a #[Necromancer] attribute value is invalid', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-annotation.json');
+
+    app()->bind(
+        JobCollector::class,
+        fn ($app): JobCollector => new JobCollector($app, [[
+            'path' => base_path('tests/Fixtures/InvalidJobs'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\InvalidJobs\\',
+        ]]),
+    );
+
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('Invalid Necromancer annotation')
+        ->and($output)->toContain(NecromancerInvalidAnnotatedJob::class);
+
+    expect(File::exists($path))->toBeFalse();
+});
+
+test('an existing manifest survives a scan that fails on an invalid #[Necromancer] attribute value', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-annotation-preserves-existing.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+    $before = File::get($path);
+
+    app()->bind(
+        JobCollector::class,
+        fn ($app): JobCollector => new JobCollector($app, [[
+            'path' => base_path('tests/Fixtures/InvalidJobs'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\InvalidJobs\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertExitCode(1);
+
+    expect(File::get($path))->toBe($before);
+});
+
+test('--diff also fails clearly instead of crashing on an invalid #[Necromancer] attribute value', function () {
+    $path = necromancerScanTestPath('necromancer-invalid-annotation-diff.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    app()->bind(
+        JobCollector::class,
+        fn ($app): JobCollector => new JobCollector($app, [[
+            'path' => base_path('tests/Fixtures/InvalidJobs'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\InvalidJobs\\',
+        ]]),
+    );
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true])
+        ->expectsOutputToContain('Invalid Necromancer annotation')
+        ->assertExitCode(1);
 });
 
 test('the --only option restricts the scan to the specified artifact type', function () {
@@ -972,6 +1249,33 @@ test('the scan command collects middleware artifacts with valid scope and class 
             expect($item->group)->toBeNull();
         }
     }
+});
+
+test('a middleware class annotation applies consistently to every registration of that class', function () {
+    $path = necromancerScanTestPath('necromancer-middleware-annotations.json');
+
+    // Resolving the Http Kernel syncs its own middleware groups onto the Router
+    // (Kernel::__construct() -> syncMiddlewareToRouter()), which would otherwise
+    // clobber a group pushed to beforehand. Force that sync first so the group
+    // addition below survives the collector's own Kernel resolution.
+    app(Illuminate\Contracts\Http\Kernel::class);
+
+    app(Router::class)->aliasMiddleware('necromancer-annotated', NecromancerAnnotatedMiddleware::class);
+    app(Router::class)->pushMiddlewareToGroup('web', NecromancerAnnotatedMiddleware::class);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'middleware'])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $registrations = array_values(array_filter(
+        (array) ($manifest->artifacts->middleware ?? []),
+        fn (stdClass $item): bool => $item->class === NecromancerAnnotatedMiddleware::class,
+    ));
+
+    expect($registrations)->toHaveCount(2)
+        ->and($registrations[0]->scope)->not->toBe($registrations[1]->scope)
+        ->and($registrations[0]->annotations)->toEqual((object) ['domain' => 'security', 'risk' => 'high'])
+        ->and($registrations[1]->annotations)->toEqual((object) ['domain' => 'security', 'risk' => 'high']);
 });
 
 test('the --only=middleware scan restricts to middleware artifacts', function () {
@@ -1223,6 +1527,224 @@ test('the --only=service_providers scan restricts to service_provider artifacts'
     expect(array_keys((array) $manifest->artifacts))->toBe(['service_providers']);
 });
 
+test('an exact-ID mapping annotates a gate ability', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-gate.json');
+
+    $gate = new Gate(app(), fn () => null);
+    $gate->define('edit-post', function ($user): bool {
+        return true;
+    });
+    app()->bind(Gate::class, fn () => $gate);
+
+    config(['necromancer.annotations' => [
+        'gates:ability:edit-post' => ['domain' => 'content', 'risk' => 'low'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'gates'])->assertSuccessful();
+
+    $gateArtifact = findManifestGate(expectScanManifest($path), 'edit-post');
+
+    expect($gateArtifact->annotations)->toEqual((object) ['domain' => 'content', 'risk' => 'low']);
+});
+
+test('an exact-ID mapping annotates a scheduled task using its discovered ID', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-scheduled-task.json');
+
+    $schedule = new Schedule;
+    $schedule->command('inspire')->daily();
+    app()->bind(Schedule::class, fn (): Schedule => $schedule);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'scheduled_tasks'])->assertSuccessful();
+    $taskId = findManifestScheduledTask(expectScanManifest($path), 'inspire')->id;
+
+    config(['necromancer.annotations' => [
+        $taskId => ['domain' => 'ops'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'scheduled_tasks'])->assertSuccessful();
+
+    $task = findManifestScheduledTask(expectScanManifest($path), 'inspire');
+
+    expect($task->annotations)->toEqual((object) ['domain' => 'ops']);
+});
+
+test('an exact-ID mapping annotates a test file artifact', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-test-file.json');
+
+    useNecromancerFixtureTests();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'tests'])->assertSuccessful();
+    $testId = findManifestTestByFilename(expectScanManifest($path), 'NecromancerFunctionalTest.php')->id;
+
+    config(['necromancer.annotations' => [
+        $testId => ['domain' => 'quality'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'tests'])->assertSuccessful();
+
+    $test = findManifestTestByFilename(expectScanManifest($path), 'NecromancerFunctionalTest.php');
+
+    expect($test->annotations)->toEqual((object) ['domain' => 'quality']);
+});
+
+test('an exact-ID mapping annotates a closure route with no other annotation source', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-closure-route.json');
+
+    Route::post('/necromancer/annotations-config/closure', function () {
+        return 'ok';
+    });
+
+    config(['necromancer.annotations' => [
+        'routes:POST:necromancer/annotations-config/closure' => ['domain' => 'support', 'risk' => 'low'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])->assertSuccessful();
+
+    $route = findManifestRouteByUri(expectScanManifest($path), 'necromancer/annotations-config/closure');
+
+    expect($route->annotations)->toEqual((object) ['domain' => 'support', 'risk' => 'low']);
+});
+
+test('an exact-ID mapping adds registration-specific annotations to one middleware registration without affecting others', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-middleware.json');
+
+    app(Illuminate\Contracts\Http\Kernel::class);
+    app(Router::class)->aliasMiddleware('necromancer-annotated-config', NecromancerAnnotatedMiddleware::class);
+    app(Router::class)->pushMiddlewareToGroup('web', NecromancerAnnotatedMiddleware::class);
+
+    config(['necromancer.annotations' => [
+        'middleware:alias:necromancer-annotated-config' => ['capability' => 'security.two-factor'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'middleware'])->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $alias = findManifestMiddleware($manifest, 'necromancer-annotated-config');
+    $group = array_values(array_filter(
+        (array) ($manifest->artifacts->middleware ?? []),
+        fn (stdClass $item): bool => $item->class === NecromancerAnnotatedMiddleware::class && $item->scope === 'group',
+    ))[0];
+
+    expect($alias->annotations)->toEqual((object) [
+        'domain' => 'security',
+        'risk' => 'high',
+        'capability' => 'security.two-factor',
+    ])->and($group->annotations)->toEqual((object) ['domain' => 'security', 'risk' => 'high']);
+});
+
+test('an exact-ID mapping cannot override an existing scalar and the conflict is diagnosed', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-conflict.json');
+
+    app(Illuminate\Contracts\Http\Kernel::class);
+    app(Router::class)->pushMiddlewareToGroup('web', NecromancerAnnotatedMiddleware::class);
+
+    $groupId = 'middleware:group:web:'.NecromancerAnnotatedMiddleware::class;
+
+    config(['necromancer.annotations' => [
+        $groupId => ['domain' => 'platform'],
+    ]]);
+
+    // expectsOutputToContain() checks each individual write call rather than the
+    // full buffer, which is unreliable for long strings — Artisan::output() is
+    // used instead, matching the canonical-ID assertion further up this file.
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path, '--only' => 'middleware']);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('AN_SOURCE_CONFLICT')
+        ->and($output)->toContain($groupId);
+
+    $manifest = expectScanManifest($path);
+    $group = array_values(array_filter(
+        (array) ($manifest->artifacts->middleware ?? []),
+        fn (stdClass $item): bool => $item->class === NecromancerAnnotatedMiddleware::class && $item->scope === 'group',
+    ))[0];
+
+    expect($group->annotations)->toEqual((object) ['domain' => 'security', 'risk' => 'high']);
+});
+
+test('an exact-ID mapping with no matching artifact in scope emits AN_CONFIG_UNMATCHED', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-unmatched.json');
+
+    config(['necromancer.annotations' => [
+        'gates:ability:does-not-exist' => ['domain' => 'content'],
+    ]]);
+
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path, '--only' => 'gates']);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('AN_CONFIG_UNMATCHED')
+        ->and($output)->toContain('gates:ability:does-not-exist');
+});
+
+test('an exact-ID mapping outside a partial scan scope emits no warning', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-out-of-scope.json');
+
+    config(['necromancer.annotations' => [
+        'jobs:App\\Jobs\\DoesNotExist' => ['domain' => 'billing'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])
+        ->doesntExpectOutputToContain('AN_CONFIG_UNMATCHED')
+        ->assertSuccessful();
+});
+
+test('a malformed exact-ID mapping outside a partial scan scope does not fail the scan', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-malformed-out-of-scope.json');
+
+    config(['necromancer.annotations' => [
+        'jobs:App\\Jobs\\*' => ['domain' => 'billing'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])->assertSuccessful();
+});
+
+test('the scan command fails clearly when an exact-ID mapping key contains a wildcard', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-wildcard.json');
+
+    config(['necromancer.annotations' => [
+        'jobs:App\\Jobs\\*' => ['domain' => 'billing'],
+    ]]);
+
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())->toContain('AN_SCHEMA_INVALID_VALUE');
+
+    expect(File::exists($path))->toBeFalse();
+});
+
+test('the scan command fails clearly when an exact-ID mapping declares an unknown field', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-unknown-field.json');
+
+    config(['necromancer.annotations' => [
+        'jobs:App\\Jobs\\SendInvoice' => ['owner' => 'platform-team'],
+    ]]);
+
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())->toContain('AN_SCHEMA_UNKNOWN_FIELD');
+
+    expect(File::exists($path))->toBeFalse();
+});
+
+test('an existing manifest survives a scan that fails on an invalid exact-ID mapping risk value', function () {
+    $path = necromancerScanTestPath('necromancer-annotations-config-invalid-risk.json');
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+    $before = File::get($path);
+
+    config(['necromancer.annotations' => [
+        'jobs:App\\Jobs\\SendInvoice' => ['risk' => 'urgent'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertExitCode(1);
+
+    expect(File::get($path))->toBe($before);
+});
+
 function expectMinimalScanManifest(string $path): void
 {
     expectScanManifest($path);
@@ -1239,6 +1761,9 @@ function expectScanManifest(string $path): stdClass
         ->toHaveProperty('artifacts');
 
     expect($manifest->meta)
+        ->toHaveProperty('manifest_schema_version', 1)
+        ->toHaveProperty('annotation_schema_version', 1)
+        ->toHaveProperty('scope')
         ->toHaveProperty('generated_at')
         ->toHaveProperty('content_hash')
         ->toHaveProperty('necromancer_version')
@@ -1256,6 +1781,15 @@ function expectScanManifest(string $path): stdClass
         ->and($manifest->meta->app_name)->toBe(config('app.name'))
         ->and($manifest->meta->app_url)->toBe(config('app.url'))
         ->and($manifest->meta->app_env)->toBe(app()->environment());
+
+    expect($manifest->meta->scope->complete)->toBeBool()
+        ->and($manifest->meta->scope->artifact_types)->toBeArray();
+
+    foreach ((array) $manifest->artifacts as $items) {
+        foreach ($items as $artifact) {
+            expect($artifact->id)->toBeString()->not->toBeEmpty();
+        }
+    }
 
     expect(array_keys((array) $manifest->artifacts))->each->toBeIn([
         'commands',

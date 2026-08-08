@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Routing\Router;
+use LaravelNecromancer\Metadata\Risk;
 use LaravelNecromancer\Metadata\RouteMetadataFactory;
 use LaravelNecromancer\Tests\Fixtures\NecromancerFakeMetadataRoute;
 use LaravelNecromancer\Tests\TestCase;
@@ -45,6 +46,29 @@ test('forMetadata passes an external services array through unchanged', function
     $result = app(RouteMetadataFactory::class)->forMetadata(externalServices: ['stripe', 'sendgrid']);
 
     expect($result)->toBe(['necromancer' => ['external_services' => ['stripe', 'sendgrid']]]);
+});
+
+test('forMetadata accepts a Risk enum and preserves singular and plural ADR declarations', function () {
+    $result = app(RouteMetadataFactory::class)->forMetadata(
+        risk: Risk::Critical,
+        adr: 'docs/adr/001.md',
+        adrs: ['docs/adr/002.md', 'docs/adr/001.md'],
+    );
+
+    expect($result)->toBe(['necromancer' => [
+        'risk' => 'critical',
+        'adr' => 'docs/adr/001.md',
+        'adrs' => ['docs/adr/002.md', 'docs/adr/001.md'],
+    ]]);
+});
+
+test('forMetadata rejects invalid new annotation declarations clearly', function () {
+    $factory = app(RouteMetadataFactory::class);
+
+    expect(fn () => $factory->forMetadata(risk: 'urgent'))
+        ->toThrow(InvalidArgumentException::class, 'risk')
+        ->and(fn () => $factory->forMetadata(adrs: ['docs/adr/001.md', ' ']))
+        ->toThrow(InvalidArgumentException::class, 'adrs');
 });
 
 test('forMetadata respects a custom route_metadata namespace', function () {

@@ -90,6 +90,61 @@ test('shows no drift when manifests are identical', function () {
     }
 });
 
+test('does not report drift between equivalent legacy and current route manifests', function () {
+    $baseManifest = [
+        'meta' => [],
+        'artifacts' => [
+            'routes' => [[
+                'method' => 'POST',
+                'uri' => 'billing/cancel',
+                'route_metadata' => [
+                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
+                    'necromancer' => ['domain' => 'billing', 'risk' => 'high', 'adr' => 'docs/adr/004.md'],
+                ],
+            ]],
+        ],
+    ];
+    $headManifest = [
+        'meta' => [
+            'manifest_schema_version' => 1,
+            'annotation_schema_version' => 1,
+            'scope' => ['complete' => true, 'artifact_types' => ['routes']],
+        ],
+        'artifacts' => [
+            'routes' => [[
+                'id' => 'routes:POST:billing/cancel',
+                'method' => 'POST',
+                'uri' => 'billing/cancel',
+                'route_metadata' => [
+                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
+                    'necromancer' => [
+                        'domain' => 'billing',
+                        'risk' => 'high',
+                        'adr' => 'docs/adr/004.md',
+                        'adrs' => ['docs/adr/004.md'],
+                    ],
+                ],
+                'annotations' => [
+                    'domain' => 'billing',
+                    'risk' => 'high',
+                    'adrs' => ['docs/adr/004.md'],
+                ],
+            ]],
+        ],
+    ];
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('No architectural drift detected')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
 test('fails when head manifest is missing', function () {
     $baseFile = writeTempManifest(makeDiffManifest());
 
@@ -218,7 +273,7 @@ test('flags a newly added high-risk route in text output', function () {
 
     try {
         $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
-            ->expectsOutputToContain('FLAGGED ROUTES')
+            ->expectsOutputToContain('FLAGGED ARTIFACTS')
             ->expectsOutputToContain('POST /billing/cancel')
             ->assertExitCode(0);
     } finally {
@@ -240,7 +295,7 @@ test('flags a newly added external-service route in markdown output', function (
 
     try {
         $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile, '--format' => 'markdown'])
-            ->expectsOutputToContain('### Flagged Routes')
+            ->expectsOutputToContain('### Flagged Artifacts')
             ->expectsOutputToContain('stripe')
             ->assertExitCode(0);
     } finally {
@@ -335,7 +390,76 @@ test('does not flag routes without high risk or external services', function () 
 
     try {
         $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
-            ->doesntExpectOutputToContain('Flagged Routes')
+            ->doesntExpectOutputToContain('Flagged Artifacts')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flags a newly added high-risk job in text output, not just routes', function () {
+    $baseManifest = makeDiffManifest(['jobs' => []]);
+    $headManifest = makeDiffManifest([
+        'jobs' => [[
+            'class' => 'App\\Jobs\\SyncStripeInvoices',
+            'annotations' => ['domain' => 'billing', 'risk' => 'critical', 'external_services' => ['stripe']],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('FLAGGED ARTIFACTS')
+            ->expectsOutputToContain('jobs  SyncStripeInvoices')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flagged artifact output includes the canonical artifact id, in text and markdown', function () {
+    $baseManifest = makeDiffManifest(['jobs' => []]);
+    $headManifest = makeDiffManifest([
+        'jobs' => [[
+            'class' => 'App\\Jobs\\SyncStripeInvoices',
+            'annotations' => ['risk' => 'high'],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('jobs:App\\Jobs\\SyncStripeInvoices')
+            ->assertExitCode(0);
+
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile, '--format' => 'markdown'])
+            ->expectsOutputToContain('jobs:App\\Jobs\\SyncStripeInvoices')
+            ->assertExitCode(0);
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
+test('flags a newly added high-risk gate with a non-empty label, even though gates have no class field', function () {
+    $baseManifest = makeDiffManifest(['gates' => []]);
+    $headManifest = makeDiffManifest([
+        'gates' => [[
+            'ability' => 'manage-billing', 'kind' => 'closure', 'parameters' => [],
+            'annotations' => ['risk' => 'high'],
+        ]],
+    ]);
+
+    $baseFile = writeTempManifest($baseManifest);
+    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('FLAGGED ARTIFACTS')
+            ->expectsOutputToContain('gates  manage-billing')
             ->assertExitCode(0);
     } finally {
         File::delete($baseFile);

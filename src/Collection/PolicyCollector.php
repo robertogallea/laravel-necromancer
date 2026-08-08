@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Foundation\Application;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -70,6 +72,7 @@ final readonly class PolicyCollector
             model: $this->guardedModel($reflection),
             methods: $this->policyMethods($reflection),
             source: (new SourceLocator)->forClass($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

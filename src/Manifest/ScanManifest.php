@@ -29,11 +29,15 @@ use LaravelNecromancer\Collection\SafeInventoryCollector;
 use LaravelNecromancer\Collection\ScheduledTaskCollector;
 use LaravelNecromancer\Collection\ServiceProviderCollector;
 use LaravelNecromancer\Collection\TestCollector;
+use LaravelNecromancer\Metadata\AnnotationConfigurationResolver;
 use stdClass;
 use Throwable;
 
-final readonly class ScanManifest implements JsonSerializable
+final class ScanManifest implements JsonSerializable
 {
+    /** @var list<string> */
+    private array $diagnostics = [];
+
     public function __construct(
         private Application $app,
         private RouteCollector $routeCollector,
@@ -57,7 +61,7 @@ final readonly class ScanManifest implements JsonSerializable
     ) {}
 
     /**
-     * @return array{meta: array{generated_at: string, content_hash: string, necromancer_version: string, laravel_version: string, php_version: string, app_name: string, app_url: string, app_env: string}, artifacts: stdClass|array<string, list<array<string, mixed>>>}
+     * @return array{meta: array<string, mixed>, artifacts: stdClass|array<string, list<array<string, mixed>>>}
      */
     public function jsonSerialize(): array
     {
@@ -74,15 +78,24 @@ final readonly class ScanManifest implements JsonSerializable
 
     /**
      * @param  list<string>  $only
-     * @return array{meta: array{generated_at: string, content_hash: string, necromancer_version: string, laravel_version: string, php_version: string, app_name: string, app_url: string, app_env: string}, artifacts: stdClass|array<string, list<array<string, mixed>>>}
+     * @return array{meta: array<string, mixed>, artifacts: stdClass|array<string, list<array<string, mixed>>>}
      */
     public function buildPayload(array $only = []): array
     {
         $artifacts = $this->collectArtifacts($only);
-        $contentHash = hash('sha256', json_encode($artifacts, JSON_THROW_ON_ERROR));
+        $scope = $this->scope($only);
+        $contentHash = hash('sha256', json_encode([
+            'manifest_schema_version' => 1,
+            'annotation_schema_version' => 1,
+            'scope' => $scope,
+            'artifacts' => $artifacts,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
 
         return [
             'meta' => [
+                'manifest_schema_version' => 1,
+                'annotation_schema_version' => 1,
+                'scope' => $scope,
                 'generated_at' => now()->toAtomString(),
                 'content_hash' => $contentHash,
                 'necromancer_version' => $this->necromancerVersion(),
@@ -94,6 +107,12 @@ final readonly class ScanManifest implements JsonSerializable
             ],
             'artifacts' => $artifacts === [] ? new stdClass : $artifacts,
         ];
+    }
+
+    /** @return list<string> */
+    public function diagnostics(): array
+    {
+        return $this->diagnostics;
     }
 
     /**
@@ -142,6 +161,7 @@ final readonly class ScanManifest implements JsonSerializable
      */
     private function collectArtifacts(array $only = []): array
     {
+        $this->diagnostics = [];
         $routeExclusions = config('necromancer.exclude.routes', ['horizon.*', 'telescope.*', 'debugbar.*']);
 
         if (! is_array($routeExclusions)) {
@@ -169,7 +189,12 @@ final readonly class ScanManifest implements JsonSerializable
         $observerCollector = $this->observerCollector->withModelMap($observerModelMap);
 
         $collectors = [
-            'routes' => fn (): array => $this->routeCollector->collect(),
+            'routes' => function (): array {
+                $artifacts = $this->routeCollector->collect();
+                $this->diagnostics = $this->routeCollector->diagnostics();
+
+                return $artifacts;
+            },
             // Reuse the eagerly-collected model list when it was already fetched for the
             // observer map; otherwise collect on demand.
             'models' => fn (): array => $eagerModelArtifacts !== [] ? $eagerModelArtifacts : $this->modelCollector->collect(),
@@ -207,6 +232,40 @@ final readonly class ScanManifest implements JsonSerializable
             modelExclusionFilter: new ModelExclusionFilter(array_values($modelExclusions)),
         ))->collect(artifacts: $artifacts);
 
-        return $inventory->toArray()['artifacts'];
+        $identifiedArtifacts = $inventory->toArray()['artifacts'];
+
+        // Exact-ID mappings are the sole annotation source for non-reflectable
+        // artifact families (closures, test files, gates, scheduled tasks) and a
+        // fill-only, registration-specific escape hatch for every other family.
+        // They can only be resolved after every artifact has its canonical ID.
+        $annotationConfig = config('necromancer.annotations', []);
+        $configResolver = new AnnotationConfigurationResolver(is_array($annotationConfig) ? $annotationConfig : []);
+        [$identifiedArtifacts, $configDiagnostics] = $configResolver->apply(
+            $identifiedArtifacts,
+            $this->scope($only)['artifact_types'],
+        );
+        $this->diagnostics = [...$this->diagnostics, ...$configDiagnostics];
+
+        return $identifiedArtifacts;
+    }
+
+    /**
+     * @param  list<string>  $only
+     * @return array{complete: bool, artifact_types: list<string>}
+     */
+    private function scope(array $only): array
+    {
+        $types = ArtifactId::supportedTypes();
+
+        if ($only !== []) {
+            $types = array_values(array_intersect($types, $only));
+        }
+
+        sort($types, SORT_STRING);
+
+        return [
+            'complete' => $only === [],
+            'artifact_types' => $types,
+        ];
     }
 }

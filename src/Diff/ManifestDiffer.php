@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Diff;
 
+use LaravelNecromancer\Manifest\ArtifactId;
+
 final class ManifestDiffer
 {
+    public function __construct(private readonly ArtifactId $artifactId = new ArtifactId) {}
+
     public function diff(array $baseArtifacts, array $headArtifacts): ManifestDiff
     {
         $allTypes = array_unique(array_merge(
@@ -18,8 +22,8 @@ final class ManifestDiffer
         $changed = [];
 
         foreach ($allTypes as $type) {
-            $baseOfType = $baseArtifacts[$type] ?? [];
-            $headOfType = $headArtifacts[$type] ?? [];
+            $baseOfType = $this->withIds($type, $baseArtifacts[$type] ?? []);
+            $headOfType = $this->withIds($type, $headArtifacts[$type] ?? []);
 
             $baseIndexed = $this->index($type, $baseOfType);
             $headIndexed = $this->index($type, $headOfType);
@@ -54,13 +58,22 @@ final class ManifestDiffer
         return new ManifestDiff($added, $removed, $changed);
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $artifacts
+     * @return list<array<string, mixed>>
+     */
+    private function withIds(string $type, array $artifacts): array
+    {
+        if ($artifacts === [] || array_all($artifacts, static fn (array $artifact): bool => is_string($artifact['id'] ?? null) && $artifact['id'] !== '')) {
+            return $artifacts;
+        }
+
+        return $this->artifactId->assign([$type => $artifacts])[$type];
+    }
+
     private function canonicalKey(string $type, array $artifact): string
     {
-        return match ($type) {
-            'routes' => ($artifact['method'] ?? '').':'.($artifact['uri'] ?? ''),
-            'tests' => $artifact['file'] ?? '',
-            default => $artifact['class'] ?? $artifact['signature'] ?? '',
-        };
+        return (string) ($artifact['id'] ?? '');
     }
 
     private function index(string $type, array $artifacts): array
@@ -69,7 +82,7 @@ final class ManifestDiffer
         foreach ($artifacts as $artifact) {
             $key = $this->canonicalKey($type, $artifact);
             if ($key === '') {
-                throw new \InvalidArgumentException("Artifact of type '$type' has no canonical key (missing 'class', 'signature', 'method', or 'uri'): ".json_encode($artifact, JSON_THROW_ON_ERROR));
+                throw new \InvalidArgumentException("Artifact of type '$type' has no Artifact ID: ".json_encode($artifact, JSON_THROW_ON_ERROR));
             }
             $indexed[$key] = $artifact;
         }

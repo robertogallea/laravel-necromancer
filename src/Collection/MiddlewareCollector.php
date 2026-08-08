@@ -7,7 +7,10 @@ namespace LaravelNecromancer\Collection;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Routing\Router;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ArtifactAnnotations;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use Throwable;
 
@@ -21,6 +24,7 @@ final readonly class MiddlewareCollector
     public function collect(): array
     {
         $artifacts = [];
+        $annotationsByClass = [];
 
         $router = $this->app->make(Router::class);
 
@@ -36,6 +40,7 @@ final readonly class MiddlewareCollector
                 scope: 'global',
                 group: null,
                 source: $this->sourceFor($class),
+                annotations: $this->annotationsFor($class, $annotationsByClass),
             );
         }
 
@@ -56,6 +61,7 @@ final readonly class MiddlewareCollector
                     scope: 'group',
                     group: $groupName,
                     source: $this->sourceFor($entry),
+                    annotations: $this->annotationsFor($entry, $annotationsByClass),
                 );
             }
         }
@@ -79,10 +85,29 @@ final readonly class MiddlewareCollector
                 scope: 'alias',
                 group: null,
                 source: $this->sourceFor($classString),
+                annotations: $this->annotationsFor($classString, $annotationsByClass),
             );
         }
 
         return $artifacts;
+    }
+
+    /**
+     * A middleware class annotation applies to every collected registration of that
+     * class, so the attribute is only read once per class and reused across scopes.
+     *
+     * @param  array<string, ArtifactAnnotations>  $cache
+     */
+    private function annotationsFor(string $class, array &$cache): ArtifactAnnotations
+    {
+        if (! isset($cache[$class])) {
+            $cache[$class] = (new ClassAnnotationResolver)->resolve(
+                AttributeReader::first(new ReflectionClass($class), Necromancer::class),
+                $class,
+            );
+        }
+
+        return $cache[$class];
     }
 
     /**

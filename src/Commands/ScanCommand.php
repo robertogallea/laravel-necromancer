@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
+use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ScanManifest;
@@ -36,10 +38,22 @@ final class ScanCommand extends Command
             return self::FAILURE;
         }
 
-        if (@file_put_contents($path, $manifest->toJson(only: $this->parseOnly()).PHP_EOL) === false) {
+        try {
+            $payload = $manifest->toJson(only: $this->parseOnly()).PHP_EOL;
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        if (@file_put_contents($path, $payload) === false) {
             $this->error("Unable to write Necromancer manifest to {$path}.");
 
             return self::FAILURE;
+        }
+
+        foreach (array_unique($manifest->diagnostics()) as $diagnostic) {
+            $this->warn($diagnostic);
         }
 
         $this->info("Necromancer manifest written to {$path}");
@@ -59,7 +73,13 @@ final class ScanCommand extends Command
             return self::FAILURE;
         }
 
-        $new = $manifest->buildPayload(only: $this->parseOnly());
+        try {
+            $new = $manifest->buildPayload(only: $this->parseOnly());
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
 
         $oldArtifacts = is_array($old['artifacts']) ? $old['artifacts'] : [];
         $newArtifacts = is_array($new['artifacts']) ? $new['artifacts'] : [];
@@ -125,15 +145,13 @@ final class ScanCommand extends Command
 
     private function artifactKey(string $type, array $item): string
     {
-        if ($type === 'routes') {
-            return (string) ($item['method'] ?? '').':'.($item['uri'] ?? '');
+        $id = $item['id'] ?? null;
+
+        if (is_string($id) && $id !== '') {
+            return $id;
         }
 
-        if ($type === 'tests') {
-            return (string) ($item['file'] ?? json_encode($item));
-        }
-
-        return (string) ($item['class'] ?? $item['signature'] ?? json_encode($item));
+        return (new ArtifactId)->for($type, $item);
     }
 
     private function resolveOutputPath(): string

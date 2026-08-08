@@ -9,7 +9,9 @@ use Illuminate\Console\Command as LaravelCommand;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Console\ClosureCommand;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 use Throwable;
@@ -74,6 +76,7 @@ final readonly class CommandCollector
             description: $command->getDescription(),
             source: (new SourceLocator)->forClass($reflection),
             aliases: $this->aliases($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

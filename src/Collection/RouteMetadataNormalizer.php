@@ -15,7 +15,7 @@ final readonly class RouteMetadataNormalizer
 
     /**
      * @param  array<string, mixed>  $raw
-     * @return array{domain?: string, flow?: string, capability?: string, summary?: string, risk?: string, external_services?: list<string>, adr?: string}
+     * @return array{domain?: string, flow?: string, capability?: string, summary?: string, risk?: string, external_services?: list<string>, adr?: string, adrs?: list<string>}
      */
     public function normalize(array $raw): array
     {
@@ -33,13 +33,14 @@ final readonly class RouteMetadataNormalizer
             'risk' => $this->stringOrNull($namespaced['risk'] ?? null),
             'external_services' => $this->stringList($namespaced['external_services'] ?? null),
             'adr' => $this->stringOrNull($namespaced['adr'] ?? null),
+            'adrs' => $this->stringList($namespaced['adrs'] ?? null),
         ], fn (mixed $value): bool => $value !== null && $value !== []);
     }
 
     private function stringOrNull(mixed $value): ?string
     {
         if (is_string($value) || is_int($value) || is_float($value)) {
-            return (string) $value;
+            return trim((string) $value);
         }
 
         return null;

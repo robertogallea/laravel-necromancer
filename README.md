@@ -31,6 +31,8 @@ The manifest covers 18 artifact types across the full Laravel application struct
 
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
+Every class-backed type in the table above — `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
+
 ## Requirements
 
 | | Version |
@@ -117,7 +119,65 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
     ]);
 ```
 
-All fields are optional and the feature is entirely opt-in — apps that don't declare route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
+All fields are optional and the feature is entirely opt-in — apps that don't declare route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and — resolved alongside annotations declared on every other artifact family — is used by `necromancer:doctor` (Artifact Annotation Coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (route table columns and the Architectural Context column on every other section), and `necromancer:diff` (flagged high-risk/external-service artifacts) — see each command's section below.
+
+#### Annotating class-backed artifacts, controllers, and middleware
+
+The same `domain`/`flow`/`capability`/`summary`/`risk`/`externalServices`/`adrs` fields can be declared directly on a class or method with the `#[Necromancer]` attribute, so artifacts that aren't routes get the same declared-intent signal:
+
+```php
+use LaravelNecromancer\Attributes\Necromancer;
+use LaravelNecromancer\Metadata\Risk;
+
+#[Necromancer(domain: 'billing', capability: 'invoice.send', risk: Risk::High, externalServices: ['stripe'])]
+final class SendInvoiceEmail implements ShouldQueue
+{
+    // ...
+}
+```
+
+The attribute is a single, non-repeatable declaration and applies directly to every class-backed artifact type: models, form requests, jobs, events, listeners, commands, policies, enums, observers, Livewire components, mailables, validation rules, and service providers.
+
+On a controller, a class-level attribute supplies defaults for every action, and a method-level attribute refines them — the action wins for any field it declares, silently, with no warning:
+
+```php
+#[Necromancer(domain: 'billing', risk: Risk::Low)]
+final class SubscriptionController
+{
+    #[Necromancer(capability: 'subscription.cancel', risk: Risk::High)]
+    public function cancel(): RedirectResponse { /* ... */ }
+}
+```
+
+`cancel()`'s route annotations resolve to `domain: billing` (inherited), `capability: subscription.cancel`, and `risk: high` (refined). Native `Route::metadata()` — including the `withNecromancer()` macro — remains the most specific declaration and overrides a conflicting controller-derived value; when it does, `necromancer:scan` prints an `AN_SOURCE_CONFLICT` warning naming the field so the disagreement isn't silent.
+
+A middleware class annotation applies to every place that middleware is registered — globally, in a group, or under an alias each produce their own manifest entry, but all of them carry the same annotations:
+
+```php
+#[Necromancer(domain: 'security', risk: Risk::High)]
+final class EnsureTwoFactorIsEnabled
+{
+    // ...
+}
+```
+
+#### Annotating non-reflectable artifacts with exact-ID mappings
+
+Closures, test files, gates, and scheduled tasks have no class or method to carry a `#[Necromancer]` attribute. The `annotations` key in `config/necromancer.php` covers these — and adds a registration-specific override on top of any other family, including middleware — by mapping an exact, opaque canonical Artifact ID (the same `id` every artifact already carries in the manifest) to a Schema v1 field array:
+
+```php
+'annotations' => [
+    'gates:ability:edit-post' => [
+        'domain' => 'content',
+        'risk' => 'low',
+    ],
+    'middleware:group:web:App\\Http\\Middleware\\EnsureTwoFactorIsEnabled' => [
+        'capability' => 'security.two-factor',
+    ],
+],
+```
+
+Keys must be exact IDs — there is no wildcard or pattern syntax, and an unresolvable made-up ID is never allowed to invent an artifact. A mapping only **fills** an annotation field left absent by every other declaration source; when it disagrees with an already-resolved value (a `#[Necromancer]` attribute, a controller annotation, or native route metadata), the existing value wins and `necromancer:scan` prints an `AN_SOURCE_CONFLICT` warning. List fields (`external_services`, `adrs`) are additive: config values are appended after whatever was already resolved, with exact deduplication. An unknown field name, an empty scalar, an invalid `risk` value, or a wildcard/malformed key fails the scan before anything is written, leaving an existing manifest untouched — the same controlled-failure behavior invalid `#[Necromancer]` attribute values already produce. A mapping whose artifact type is included in the current scan but whose exact ID matches nothing collected prints a non-fatal `AN_CONFIG_UNMATCHED` warning; a mapping for a type outside a `--only` scan's scope is silently skipped.
 
 Check for manifest drift without writing a new file (CI use):
 
@@ -149,7 +209,7 @@ Check how well your application can be understood by an AI coding agent:
 php artisan necromancer:audit
 ```
 
-Each finding is grouped by severity (error / warning / suggestion). The score is a weighted pass-rate across all checks — normalized by the number of applicable artifacts — so an app with 1 unnamed route out of 50 scores far better than one with 1 out of 1. Errors weigh 3×, warnings 2×, and suggestions 1× in the calculation. Routes using `Route::metadata()` are checked for quality too: a `risk: high`/`critical` route with no `adr` reference, an `external_services` route with no matching test subject, a `summary` over 200 characters (narrative content that belongs in an ADR instead), and routes sharing the same `flow` that disagree on `domain` or `risk` (a single business process should agree on both) all produce findings — but only for routes that have actually declared metadata, so adopting the feature is never required to keep a clean audit. Output a shareable or machine-readable report, or enforce a CI gate:
+Each finding is grouped by severity (error / warning / suggestion). The score is a weighted pass-rate across all checks — normalized by the number of applicable artifacts — so an app with 1 unnamed route out of 50 scores far better than one with 1 out of 1. Errors weigh 3×, warnings 2×, and suggestions 1× in the calculation. Any artifact carrying declared Artifact Annotations — not just routes — is checked for quality: a `risk: high`/`critical` artifact with no `adrs` reference, an `external_services` artifact with no matching test subject, a `summary` over 200 characters (narrative content that belongs in an ADR instead), artifacts sharing the same `flow` that disagree on `domain` or `risk` (a single business process should agree on both), non-canonical or near-duplicate `domain`/`flow`/`capability`/`external_services` spelling, and `adrs` entries pointing at a local file that doesn't exist all produce findings — but only for artifacts that have actually declared annotations, so adopting the feature is never required to keep a clean audit. Output a shareable or machine-readable report, or enforce a CI gate:
 
 ```bash
 php artisan necromancer:audit --format=markdown              # paste into a GitHub issue or PR
@@ -181,12 +241,12 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
   Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
-  Route Metadata Coverage████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service routes tested · 4/4 flow-consistent)
+  Artifact Annotation Cov.████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.
 ```
 
-Route Metadata Coverage scores N/A (and doesn't affect the overall score) until at least one route declares `necromancer` route metadata — adopting the feature is entirely optional.
+Artifact Annotation Coverage scores N/A (and doesn't affect the overall score) until at least one artifact of any family declares Artifact Annotations — adopting the feature is entirely optional. Its emitted dimension key stays `route-metadata-coverage` throughout 1.x for CI/automation compatibility; `--only=artifact-annotation-coverage` is accepted as a forward-compatible alias for the same key.
 
 Output a machine-readable score or enforce a CI gate:
 
@@ -213,6 +273,17 @@ Produces `NECROMANCER.md` at the project root. The generated file includes a `##
 | tests/Unit/Models/OrderTest.php | unit | Order | it creates an order, it calculates total |
 | tests/Feature/OrderCheckoutTest.php | feature | | test_it_completes_checkout |
 ```
+
+Routes render their Domain/Risk/External Services/ADR columns from resolved Artifact Annotations (declared via route metadata, a `#[Necromancer]` attribute, or an exact-ID configuration mapping). Every other artifact section — models, jobs, events, and the rest — renders a single compact `Architectural Context` column whenever at least one of its artifacts declares annotations, so developer intent stays visible without a dedicated column per field:
+
+```markdown
+## Jobs (1)
+| Name | Queue | Connection | Tries | Architectural Context |
+|---|---|---|---|---|
+| SyncStripeInvoices | billing | redis | 3 | domain: billing · risk: high · external services: stripe |
+```
+
+The column is omitted entirely for a section where no artifact declares annotations.
 
 Generate only specific sections:
 
@@ -264,7 +335,7 @@ php artisan necromancer:ask "What routes require authentication?"
 
 If you omit the question, the command prompts you interactively. The manifest is injected verbatim into the AI's context, so answers are grounded in your actual application — not a model's prior knowledge. A warning is shown if the manifest may be stale.
 
-The full manifest is always included — nothing is discarded — but a "Most Relevant Evidence" section is prepended ahead of it, ranking the artifacts most related to your question so the AI's attention is prioritized rather than left to search the whole payload unguided. Ranking uses the same keyword scoring as `necromancer:prompt`, boosted for declared route metadata: a route's `domain`/`flow`/`capability` count as strongly as its name or class, since that's an intentional signal from the developer rather than something inferred from naming.
+The full manifest is always included — nothing is discarded — but a "Most Relevant Evidence" section is prepended ahead of it, ranking the artifacts most related to your question so the AI's attention is prioritized rather than left to search the whole payload unguided. Ranking uses the same keyword scoring as `necromancer:prompt`, boosted for declared Artifact Annotations on any artifact family: a `domain`/`flow`/`capability` counts as strongly as its name or class, since that's an intentional signal from the developer rather than something inferred from naming.
 
 ```bash
 php artisan necromancer:ask                                        # interactive prompt
@@ -446,11 +517,11 @@ php artisan necromancer:diff main
 
 Compares the current manifest against the manifest on the `main` branch. The output shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts.
 
-When an added or changed route declares `risk: high`/`critical` or a non-empty `external_services` via route metadata, it's called out in a dedicated "Flagged Routes" section before the rest of the diff — this is a deterministic check, so it shows up even without `--review`/`laravel/ai`. Each flagged route also shows its `domain`, `flow`, and `capability` when declared, so reviewers see business context alongside the trigger:
+When an added or changed artifact of any family — not just routes — declares `risk: high`/`critical` or a non-empty `external_services` via its resolved Artifact Annotations, it's called out in a dedicated "Flagged Artifacts" section before the rest of the diff — this is a deterministic check, so it shows up even without `--review`/`laravel/ai`. Each flagged artifact also shows its `domain`, `flow`, and `capability` when declared, so reviewers see business context alongside the trigger:
 
 ```text
-FLAGGED ROUTES
-⚠  POST /billing/cancel (billing.cancel)  domain: billing · flow: subscription-cancellation · capability: subscription.cancel · risk: high
+FLAGGED ARTIFACTS
+⚠  routes  POST /billing/cancel (billing.cancel)  domain: billing · flow: subscription-cancellation · capability: subscription.cancel · risk: high
 ```
 
 #### Options
@@ -520,7 +591,7 @@ This PR introduces a subscription model with activation workflow.
 
 > **Note:** The `--review` option requires `laravel/ai` to be installed and configured. Without it, only the basic diff is shown. Both branches must have a committed `necromancer.json` manifest.
 
-The AI reviewer's prompt includes the same "Flagged Routes" signal shown in the deterministic diff (high/critical-risk and external-service routes, with `domain`/`flow`/`capability` when declared) — so its risk assessment is grounded in what you actually declared via route metadata, not left to infer risk purely from the raw diff.
+The AI reviewer's prompt includes the same "Flagged Artifacts" signal shown in the deterministic diff (high/critical-risk and external-service artifacts of any family, with `domain`/`flow`/`capability` when declared) — so its risk assessment is grounded in what you actually declared via Artifact Annotations, not left to infer risk purely from the raw diff.
 
 ---
 
@@ -599,6 +670,17 @@ return [
     // Route metadata (Laravel 13.17+ Route::metadata()) — the namespace key Necromancer reads
     'route_metadata' => [
         'namespace' => 'necromancer',
+    ],
+
+    // Exact-ID annotation mappings for non-reflectable artifacts (closures, test
+    // files, gates, scheduled tasks) and registration-specific overrides for
+    // reflectable ones. Keys MUST be exact canonical Artifact IDs — no wildcards.
+    'annotations' => [
+        // 'jobs:App\\Jobs\\SendInvoice' => [
+        //     'domain' => 'billing',
+        //     'capability' => 'invoice.send',
+        //     'risk' => 'high',
+        // ],
     ],
 
 ];

@@ -30,6 +30,7 @@ test('default vendor and debug route patterns are excluded from the inventory', 
         ->toMatchArray([
             [
                 'name' => 'orders.index',
+                'id' => 'routes:GET:/orders',
                 'method' => 'GET',
                 'uri' => '/orders',
                 'middleware' => ['auth'],
@@ -155,6 +156,7 @@ test('unnamed routes remain in the inventory', function () {
         ->toMatchArray([
             [
                 'name' => null,
+                'id' => 'routes:GET:/health',
                 'method' => 'GET',
                 'uri' => '/health',
                 'middleware' => ['web'],

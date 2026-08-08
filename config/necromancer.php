@@ -23,6 +23,17 @@ return [
         'namespace' => 'necromancer',
     ],
 
+    // Exact-ID annotation mappings for non-reflectable artifacts (closures, test
+    // files, gates, scheduled tasks) and registration-specific overrides for
+    // reflectable ones. Keys MUST be exact canonical Artifact IDs — no wildcards.
+    'annotations' => [
+        // 'jobs:App\\Jobs\\SendInvoice' => [
+        //     'domain' => 'billing',
+        //     'capability' => 'invoice.send',
+        //     'risk' => 'high',
+        // ],
+    ],
+
     'output' => [
         'manifest' => base_path('necromancer.json'),
         'context' => base_path('NECROMANCER.md'),

@@ -8,7 +8,9 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Http\Attributes\ErrorBag;
 use Illuminate\Foundation\Http\Attributes\StopOnFirstFailure;
 use Illuminate\Foundation\Http\FormRequest;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use Throwable;
 
@@ -83,6 +85,7 @@ final readonly class FormRequestCollector
             source: (new SourceLocator)->forClass($reflection),
             stopOnFirstFailure: AttributeReader::first($reflection, StopOnFirstFailure::class) !== null,
             errorBag: AttributeReader::first($reflection, ErrorBag::class)?->name,
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

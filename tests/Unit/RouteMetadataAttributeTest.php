@@ -59,6 +59,8 @@ test('RouteCollector extracts and normalizes route metadata when Route::getMetad
             'domain' => 'billing',
             'risk' => 'high',
             'external_services' => ['stripe'],
+            'adr' => 'docs/adr/001.md',
+            'adrs' => ['docs/adr/002.md', 'docs/adr/001.md'],
         ],
     ]);
 
@@ -80,6 +82,14 @@ test('RouteCollector extracts and normalizes route metadata when Route::getMetad
             'domain' => 'billing',
             'risk' => 'high',
             'external_services' => ['stripe'],
+            'adr' => 'docs/adr/001.md',
+            'adrs' => ['docs/adr/001.md', 'docs/adr/002.md'],
+        ])
+        ->and($data['annotations'])->toBe([
+            'domain' => 'billing',
+            'risk' => 'high',
+            'external_services' => ['stripe'],
+            'adrs' => ['docs/adr/001.md', 'docs/adr/002.md'],
         ]);
 });
 

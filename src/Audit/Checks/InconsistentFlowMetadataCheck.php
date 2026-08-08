@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Audit\Checks;
 
 use LaravelNecromancer\Audit\CheckResult;
 use LaravelNecromancer\Audit\Finding;
+use LaravelNecromancer\Metadata\AnnotatedArtifact;
 
 final class InconsistentFlowMetadataCheck implements CheckInterface
 {
@@ -15,11 +16,11 @@ final class InconsistentFlowMetadataCheck implements CheckInterface
     {
         $byFlow = [];
 
-        foreach ($artifacts['routes'] ?? [] as $route) {
-            $flow = $route['route_metadata']['necromancer']['flow'] ?? null;
+        foreach (AnnotatedArtifact::collect($artifacts) as $artifact) {
+            $flow = $artifact->annotations['flow'] ?? null;
 
             if (! empty($flow)) {
-                $byFlow[$flow][] = $route;
+                $byFlow[$flow][] = $artifact;
             }
         }
 
@@ -39,15 +40,15 @@ final class InconsistentFlowMetadataCheck implements CheckInterface
     }
 
     /**
-     * Builds at most one Finding per route, even when a route disagrees with
+     * Builds at most one Finding per artifact, even when it disagrees with
      * its flow siblings on more than one checked field.
      *
-     * @param  list<array<string, mixed>>  $group
+     * @param  list<AnnotatedArtifact>  $group
      * @return list<Finding>
      */
     private function flowFindings(string $flow, array $group): array
     {
-        $summariesByRoute = [];
+        $summariesByIndex = [];
 
         foreach (self::CHECKED_FIELDS as $field) {
             $distinct = $this->distinctValues($group, $field);
@@ -59,26 +60,24 @@ final class InconsistentFlowMetadataCheck implements CheckInterface
             sort($distinct);
             $summary = "{$field}: ".implode(', ', $distinct);
 
-            foreach ($group as $index => $route) {
-                if (! empty($route['route_metadata']['necromancer'][$field] ?? null)) {
-                    $summariesByRoute[$index][] = $summary;
+            foreach ($group as $index => $artifact) {
+                if (! empty($artifact->annotations[$field] ?? null)) {
+                    $summariesByIndex[$index][] = $summary;
                 }
             }
         }
 
         $findings = [];
 
-        foreach ($summariesByRoute as $index => $summaries) {
-            $route = $group[$index];
+        foreach ($summariesByIndex as $index => $summaries) {
+            $artifact = $group[$index];
 
             $findings[] = new Finding(
                 severity: 'warning',
-                message: "Routes in flow '{$flow}' declare inconsistent ".implode('; ', $summaries),
-                artifactType: 'route',
-                context: $route['uri'] ?? '',
-                source: isset($route['source'])
-                    ? ($route['source']['file'] ?? '').':'.($route['source']['line'] ?? '')
-                    : null,
+                message: "Artifacts in flow '{$flow}' declare inconsistent ".implode('; ', $summaries),
+                artifactType: $artifact->type,
+                context: $artifact->label,
+                source: $artifact->source,
             );
         }
 
@@ -86,13 +85,13 @@ final class InconsistentFlowMetadataCheck implements CheckInterface
     }
 
     /**
-     * @param  list<array<string, mixed>>  $group
+     * @param  list<AnnotatedArtifact>  $group
      * @return list<string>
      */
     private function distinctValues(array $group, string $field): array
     {
         return array_values(array_unique(array_filter(array_map(
-            fn (array $r): string => (string) ($r['route_metadata']['necromancer'][$field] ?? ''),
+            fn (AnnotatedArtifact $a): string => (string) ($a->annotations[$field] ?? ''),
             $group,
         ), fn (string $v): bool => $v !== '')));
     }

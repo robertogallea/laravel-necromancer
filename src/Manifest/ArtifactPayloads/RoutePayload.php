@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Manifest\ArtifactPayloads;
 
 use JsonSerializable;
+use LaravelNecromancer\Metadata\ArtifactAnnotations;
 
 final readonly class RoutePayload implements JsonSerializable
 {
@@ -14,7 +15,7 @@ final readonly class RoutePayload implements JsonSerializable
      * @param  list<array{ability: string, models: list<string>}>  $authorization
      * @param  array<string, mixed>|null  $source
      * @param  array<string, mixed>  $metadata
-     * @param  array{domain?: string, flow?: string, capability?: string, summary?: string, risk?: string, external_services?: list<string>, adr?: string}  $necromancerMetadata
+     * @param  array{domain?: string, flow?: string, capability?: string, summary?: string, risk?: string, external_services?: list<string>, adr?: string, adrs?: list<string>}  $necromancerMetadata
      */
     public function __construct(
         public ?string $name,
@@ -28,6 +29,7 @@ final readonly class RoutePayload implements JsonSerializable
         public array $authorization = [],
         public array $metadata = [],
         public array $necromancerMetadata = [],
+        public ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ) {}
 
     /**
@@ -61,6 +63,10 @@ final readonly class RoutePayload implements JsonSerializable
                 'raw' => $this->metadata,
                 'necromancer' => $this->necromancerMetadata,
             ], fn (array $v): bool => ! empty($v));
+        }
+
+        if (! $this->annotations->isEmpty()) {
+            $data['annotations'] = $this->annotations->jsonSerialize();
         }
 
         return $data;

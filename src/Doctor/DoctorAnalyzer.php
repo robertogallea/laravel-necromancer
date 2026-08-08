@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Doctor;
 
 use LaravelNecromancer\Collection\RouteMetadataNormalizer;
 use LaravelNecromancer\Collection\TestSubjectMatcher;
+use LaravelNecromancer\Metadata\AnnotatedArtifact;
 
 final class DoctorAnalyzer
 {
@@ -27,7 +28,7 @@ final class DoctorAnalyzer
             $this->asyncClarity(),
             $this->codebaseVocabulary(),
             $this->testPresence(),
-            $this->routeMetadataCoverage(),
+            $this->artifactAnnotationCoverage(),
         ];
     }
 
@@ -289,37 +290,32 @@ final class DoctorAnalyzer
         return new DimensionResult('test-presence', 'Test Presence', $score, implode(' · ', $detailParts), 0.10);
     }
 
-    private function routeMetadataCoverage(): DimensionResult
+    private function artifactAnnotationCoverage(): DimensionResult
     {
-        $routes = (array) ($this->artifacts['routes'] ?? []);
-
-        $annotated = array_values(array_filter(
-            $routes,
-            fn (array $r): bool => ! empty($r['route_metadata']['necromancer'] ?? null),
-        ));
+        $annotated = AnnotatedArtifact::collect($this->artifacts);
         $annotatedTotal = count($annotated);
 
         if ($annotatedTotal === 0) {
-            return new DimensionResult('route-metadata-coverage', 'Route Metadata Coverage', 1.0, 'N/A', 0.10);
+            return new DimensionResult('route-metadata-coverage', 'Artifact Annotation Coverage', 1.0, 'N/A', 0.10);
         }
 
         $withDomain = count(array_filter(
             $annotated,
-            fn (array $r): bool => ! empty($r['route_metadata']['necromancer']['domain'] ?? null),
+            fn (AnnotatedArtifact $a): bool => ! empty($a->annotations['domain'] ?? null),
         ));
 
         $highRisk = array_values(array_filter(
             $annotated,
-            fn (array $r): bool => in_array($r['route_metadata']['necromancer']['risk'] ?? null, RouteMetadataNormalizer::HIGH_RISK_LEVELS, true),
+            fn (AnnotatedArtifact $a): bool => in_array($a->annotations['risk'] ?? null, RouteMetadataNormalizer::HIGH_RISK_LEVELS, true),
         ));
         $highRiskTotal = count($highRisk);
         $highRiskWithAdr = $highRiskTotal > 0
-            ? count(array_filter($highRisk, fn (array $r): bool => ! empty($r['route_metadata']['necromancer']['adr'] ?? null)))
+            ? count(array_filter($highRisk, fn (AnnotatedArtifact $a): bool => ! empty($a->annotations['adrs'] ?? null)))
             : 0;
 
         $externalService = array_values(array_filter(
             $annotated,
-            fn (array $r): bool => ! empty($r['route_metadata']['necromancer']['external_services'] ?? null),
+            fn (AnnotatedArtifact $a): bool => ! empty($a->annotations['external_services'] ?? null),
         ));
         $externalServiceTotal = count($externalService);
 
@@ -328,7 +324,7 @@ final class DoctorAnalyzer
             fn (?string $s): bool => $s !== null,
         );
         $externalServiceTested = $externalServiceTotal > 0
-            ? count(array_filter($externalService, fn (array $r): bool => TestSubjectMatcher::matches((string) ($r['controller'] ?? ''), $testedSubjects)))
+            ? count(array_filter($externalService, fn (AnnotatedArtifact $a): bool => $a->subject !== null && TestSubjectMatcher::matches($a->subject, $testedSubjects)))
             : 0;
 
         $ratios = [$withDomain / $annotatedTotal];
@@ -341,15 +337,15 @@ final class DoctorAnalyzer
 
         if ($externalServiceTotal > 0) {
             $ratios[] = $externalServiceTested / $externalServiceTotal;
-            $detailParts[] = "{$externalServiceTested}/{$externalServiceTotal} external-service routes tested";
+            $detailParts[] = "{$externalServiceTested}/{$externalServiceTotal} external-service artifacts tested";
         }
 
         $byFlow = [];
-        foreach ($annotated as $route) {
-            $flow = $route['route_metadata']['necromancer']['flow'] ?? null;
+        foreach ($annotated as $artifact) {
+            $flow = $artifact->annotations['flow'] ?? null;
 
             if (! empty($flow)) {
-                $byFlow[$flow][] = $route;
+                $byFlow[$flow][] = $artifact;
             }
         }
 
@@ -377,16 +373,16 @@ final class DoctorAnalyzer
 
         $score = array_sum($ratios) / count($ratios);
 
-        return new DimensionResult('route-metadata-coverage', 'Route Metadata Coverage', $score, implode(' · ', $detailParts), 0.10);
+        return new DimensionResult('route-metadata-coverage', 'Artifact Annotation Coverage', $score, implode(' · ', $detailParts), 0.10);
     }
 
     /**
-     * @param  list<array<string, mixed>>  $group
+     * @param  list<AnnotatedArtifact>  $group
      */
     private function hasFieldConflict(array $group, string $field): bool
     {
         $distinct = array_unique(array_filter(array_map(
-            fn (array $r): ?string => $r['route_metadata']['necromancer'][$field] ?? null,
+            fn (AnnotatedArtifact $a): ?string => $a->annotations[$field] ?? null,
             $group,
         )));
 

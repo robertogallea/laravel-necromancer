@@ -6,7 +6,9 @@ namespace LaravelNecromancer\Collection;
 
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Foundation\Application;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 use Throwable;
 
@@ -86,6 +88,7 @@ final readonly class EventCollector
             broadcastable: $broadcastable,
             channels: $broadcastable ? $this->broadcastChannels($reflection) : [],
             source: (new SourceLocator)->forClass($reflection),
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

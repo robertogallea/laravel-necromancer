@@ -15,7 +15,9 @@ use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
+use LaravelNecromancer\Attributes\Necromancer;
 use LaravelNecromancer\Manifest\StructuralArtifact;
+use LaravelNecromancer\Metadata\ClassAnnotationResolver;
 use ReflectionClass;
 
 final readonly class JobCollector
@@ -91,6 +93,7 @@ final readonly class JobCollector
             source: (new SourceLocator)->forClass($reflection),
             backoff: $backoffAttr !== null ? $backoffAttr->backoff : null,
             maxExceptions: $maxExcAttr !== null ? $maxExcAttr->maxExceptions : null,
+            annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );
     }
 

@@ -276,6 +276,159 @@ test('routes without necromancer route metadata omit the metadata columns', func
         ->and($content)->not->toContain('| ADR |');
 });
 
+test('routes source their domain risk external services and adr columns from resolved annotations, not route_metadata', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp', 'manifest_schema_version' => 1, 'annotation_schema_version' => 1, 'scope' => ['complete' => true, 'artifact_types' => ['routes']]],
+        'artifacts' => [
+            'routes' => [
+                [
+                    'id' => 'routes:POST:billing/cancel',
+                    'name' => 'billing.cancel',
+                    'method' => 'POST',
+                    'uri' => '/billing/cancel',
+                    'controller' => 'App\\Http\\Controllers\\BillingController',
+                    'action' => 'cancel',
+                    'middleware' => [],
+                    'source' => null,
+                    // route_metadata deliberately disagrees with annotations, to prove the
+                    // table reads the resolved annotations rather than the compat projection.
+                    'route_metadata' => [
+                        'raw' => ['necromancer' => ['domain' => 'stale-domain']],
+                        'necromancer' => ['domain' => 'stale-domain', 'risk' => 'low'],
+                    ],
+                    'annotations' => [
+                        'domain' => 'billing',
+                        'risk' => 'high',
+                        'external_services' => ['stripe'],
+                        'adrs' => ['docs/adr/004-subscription-cancellation.md'],
+                    ],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('| Name | Method | URI | Controller | Middleware | Domain | Risk | External Services | ADR |')
+        ->and($content)->toContain('billing')
+        ->and($content)->not->toContain('stale-domain')
+        ->and($content)->toContain('high')
+        ->and($content)->not->toContain('| low |')
+        ->and($content)->toContain('stripe')
+        ->and($content)->toContain('docs/adr/004-subscription-cancellation.md');
+});
+
+test('models with annotations render an Architectural Context column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => ['name'], 'casts' => [],
+                    'relationships' => [], 'source' => null,
+                    'annotations' => ['domain' => 'billing', 'risk' => 'high', 'adrs' => ['docs/adr/004.md']],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->toContain('Architectural Context')
+        ->and($content)->toContain('domain: billing · risk: high · adrs: docs/adr/004.md');
+});
+
+test('a model annotated with only a summary renders it in the Architectural Context cell', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                [
+                    'class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => [], 'casts' => [],
+                    'relationships' => [], 'source' => null,
+                    'annotations' => ['summary' => 'Represents a customer order.'],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('summary: Represents a customer order.');
+});
+
+test('models without any annotations omit the Architectural Context column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => [], 'casts' => [], 'relationships' => [], 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('Architectural Context');
+});
+
+test('jobs with annotations render an Architectural Context column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'jobs' => [
+                [
+                    'class' => 'App\\Jobs\\SyncStripeInvoices', 'queue' => 'billing', 'source' => null,
+                    'annotations' => ['external_services' => ['stripe']],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('external services: stripe');
+});
+
+test('gates with annotations render an Architectural Context column, even with no class field', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'gates' => [
+                [
+                    'ability' => 'edit-post', 'kind' => 'closure', 'parameters' => [], 'source' => null,
+                    'annotations' => ['domain' => 'content'],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('domain: content');
+});
+
+test('scheduled tasks with annotations render an Architectural Context column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'scheduled_tasks' => [
+                [
+                    'command' => 'orders:prune', 'expression' => '0 0 * * *', 'human_readable' => 'Daily at midnight',
+                    'without_overlapping' => false, 'run_in_background' => false, 'even_in_maintenance' => false, 'source' => null,
+                    'annotations' => ['domain' => 'ops', 'risk' => 'low'],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('domain: ops · risk: low');
+});
+
 test('a manifest with no routes does not include a routes section', function () {
     File::put(base_path('necromancer.json'), json_encode([
         'meta' => ['app_name' => 'TestApp'],

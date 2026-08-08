@@ -94,7 +94,7 @@
   Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
   Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
-  Route Metadata Coverage████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service routes tested · 4/4 flow-consistent)
+  Artifact Annotation Cov.████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.</pre>
       </div>
@@ -276,7 +276,7 @@ php artisan necromancer:map --type=models</pre>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--fail-on=SEVERITY</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Scored AI-readability report (0–100). Findings grouped by severity: <strong class="text-gray-200">error</strong> (−10), <strong class="text-gray-200">warning</strong> (−5), <strong class="text-gray-200">suggestion</strong> (−1). Checks unnamed routes, missing model casts, dead events, unconfigured jobs, high-risk routes without an ADR, external-service routes without tests, and more.</p>
+        <p class="text-gray-400 text-sm mb-3">Scored AI-readability report (0–100). Findings grouped by severity: <strong class="text-gray-200">error</strong> (−10), <strong class="text-gray-200">warning</strong> (−5), <strong class="text-gray-200">suggestion</strong> (−1). Checks unnamed routes, missing model casts, dead events, unconfigured jobs, high-risk artifacts without an ADR, external-service artifacts without tests, and more.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:audit
 php artisan necromancer:audit --format=markdown --output=audit.md
@@ -296,7 +296,7 @@ php artisan necromancer:audit --fail-on=warning    <span class="text-gray-600">#
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--only=KEYS</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Eight-dimension AI readability percentage dashboard with progress bars. Dimensions: Route Clarity, Model Expressiveness, Authorization Coverage, Validation Coverage, Async Clarity, Codebase Vocabulary, Test Presence, Route Metadata Coverage.</p>
+        <p class="text-gray-400 text-sm mb-3">Eight-dimension AI readability percentage dashboard with progress bars. Dimensions: Route Clarity, Model Expressiveness, Authorization Coverage, Validation Coverage, Async Clarity, Codebase Vocabulary, Test Presence, Artifact Annotation Coverage.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:doctor
 php artisan necromancer:doctor --json
@@ -400,7 +400,7 @@ php artisan necromancer:infer --fresh               <span class="text-gray-600">
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Compares the current manifest against a branch or snapshot. Shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts. Added or changed routes tagged high/critical risk or declaring external services surface in a dedicated "Flagged Routes" section — no AI required. With <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--review</code>, an AI agent summarises the architectural impact and surfaces risks, grounded in the same flagged-routes signal.</p>
+        <p class="text-gray-400 text-sm mb-3">Compares the current manifest against a branch or snapshot. Shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts. Added or changed artifacts of any family tagged high/critical risk or declaring external services surface in a dedicated "Flagged Artifacts" section — no AI required. With <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--review</code>, an AI agent summarises the architectural impact and surfaces risks, grounded in the same flagged-artifacts signal.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:diff main
 php artisan necromancer:diff main --review --format=markdown
@@ -625,6 +625,24 @@ php artisan necromancer:generate</pre>
                 <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">error_bag</code>
               </td>
             </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Universal annotations</td>
+              <td class="py-3 pr-6 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Necromancer]</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> on every class-backed artifact, controllers (class default + action refinement), and middleware classes
+              </td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-gray-300 font-medium align-top">Exact-ID mappings</td>
+              <td class="py-3 pr-6 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">config('necromancer.annotations')</code>
+              </td>
+              <td class="py-3 text-gray-500 align-top">
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> on closures, test files, gates, scheduled tasks, and registration-specific middleware — keyed by exact canonical Artifact ID, no wildcards
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -693,19 +711,19 @@ Route::singleton('profile', ProfileController::class)->withNecromancer(domain: '
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="border border-gray-800 rounded-lg p-4">
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">necromancer:doctor</div>
-          <div class="text-gray-500 text-sm">Route Metadata Coverage dimension: tagged with domain, high-risk routes with an ADR, external-service routes with tests, flow-consistent domain/risk.</div>
+          <div class="text-gray-500 text-sm">Artifact Annotation Coverage dimension: tagged with domain, high-risk artifacts with an ADR, external-service artifacts with tests, flow-consistent domain/risk — across every artifact family, not just routes.</div>
         </div>
         <div class="border border-gray-800 rounded-lg p-4">
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">necromancer:audit</div>
-          <div class="text-gray-500 text-sm">Four checks: high-risk routes without an ADR, external-service routes without tests, narrative/overlong summaries, and flows that disagree on domain or risk.</div>
+          <div class="text-gray-500 text-sm">Six checks: high-risk artifacts without an ADR, external-service artifacts without tests, narrative/overlong summaries, flows that disagree on domain or risk, non-canonical/near-duplicate identifiers, and missing local ADR files.</div>
         </div>
         <div class="border border-gray-800 rounded-lg p-4">
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">necromancer:generate &amp; :ask</div>
-          <div class="text-gray-500 text-sm">Conditional Domain/Risk/External Services/ADR table columns, and a relevance boost for declared metadata when ranking evidence for a question.</div>
+          <div class="text-gray-500 text-sm">Conditional Domain/Risk/External Services/ADR table columns for routes, a compact Architectural Context column for every other artifact family, and a relevance boost for declared annotations when ranking evidence for a question.</div>
         </div>
         <div class="border border-gray-800 rounded-lg p-4">
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">necromancer:diff</div>
-          <div class="text-gray-500 text-sm">A deterministic "Flagged Routes" section for any added/changed route tagged high/critical risk or declaring external services — no AI required.</div>
+          <div class="text-gray-500 text-sm">A deterministic "Flagged Artifacts" section for any added/changed artifact of any family tagged high/critical risk or declaring external services — no AI required.</div>
         </div>
       </div>
     </div>

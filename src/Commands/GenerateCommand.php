@@ -308,16 +308,16 @@ final class GenerateCommand extends Command
                 $row .= ' | '.$this->sourceCell($route);
             }
             if ($hasDomain) {
-                $row .= ' | '.(string) ($route['route_metadata']['necromancer']['domain'] ?? '');
+                $row .= ' | '.(string) ($route['annotations']['domain'] ?? '');
             }
             if ($hasRisk) {
-                $row .= ' | '.(string) ($route['route_metadata']['necromancer']['risk'] ?? '');
+                $row .= ' | '.(string) ($route['annotations']['risk'] ?? '');
             }
             if ($hasExternalServices) {
-                $row .= ' | '.implode(', ', $route['route_metadata']['necromancer']['external_services'] ?? []);
+                $row .= ' | '.implode(', ', $route['annotations']['external_services'] ?? []);
             }
             if ($hasAdr) {
-                $row .= ' | '.(string) ($route['route_metadata']['necromancer']['adr'] ?? '');
+                $row .= ' | '.implode(', ', $route['annotations']['adrs'] ?? []);
             }
 
             $lines[] = $row.' |';
@@ -328,8 +328,9 @@ final class GenerateCommand extends Command
 
     /**
      * Determines, in a single pass over $routes, whether any route declares each of the
-     * Domain/Risk/External Services/ADR route-metadata fields — used to decide which
-     * optional columns to render.
+     * Domain/Risk/External Services/ADR annotation fields — used to decide which
+     * optional columns to render. Sourced from resolved `annotations` (AN-GENERATE-002),
+     * not the deprecated `route_metadata.necromancer` compatibility projection.
      *
      * @param  array<int, array<string, mixed>>  $routes
      * @return array{bool, bool, bool, bool}
@@ -342,12 +343,12 @@ final class GenerateCommand extends Command
         $hasAdr = false;
 
         foreach ($routes as $route) {
-            $necromancer = $route['route_metadata']['necromancer'] ?? [];
+            $annotations = $route['annotations'] ?? [];
 
-            $hasDomain = $hasDomain || ! empty($necromancer['domain'] ?? null);
-            $hasRisk = $hasRisk || ! empty($necromancer['risk'] ?? null);
-            $hasExternalServices = $hasExternalServices || ! empty($necromancer['external_services'] ?? null);
-            $hasAdr = $hasAdr || ! empty($necromancer['adr'] ?? null);
+            $hasDomain = $hasDomain || ! empty($annotations['domain'] ?? null);
+            $hasRisk = $hasRisk || ! empty($annotations['risk'] ?? null);
+            $hasExternalServices = $hasExternalServices || ! empty($annotations['external_services'] ?? null);
+            $hasAdr = $hasAdr || ! empty($annotations['adrs'] ?? null);
 
             if ($hasDomain && $hasRisk && $hasExternalServices && $hasAdr) {
                 break;
@@ -398,9 +399,14 @@ final class GenerateCommand extends Command
 
         $count = count($models);
         $hasSources = $this->hasSources($models);
+        $hasAnnotations = $this->hasAnnotations($models);
 
         $header = '| Name | Table | Fillable | Casts | Relationships | Soft Deletes';
         $divider = '|---|---|---|---|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -459,6 +465,9 @@ final class GenerateCommand extends Command
             }
 
             $row = "| {$basename} | {$table} | {$fillable} | {$casts} | {$relationships} | {$softDeletes}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($model);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($model);
             }
@@ -532,6 +541,7 @@ final class GenerateCommand extends Command
         $hasSources = $this->hasSources($formRequests);
         $hasStopOnFirstFailure = ! empty(array_filter($formRequests, fn (array $r): bool => isset($r['stop_on_first_failure'])));
         $hasErrorBag = ! empty(array_filter($formRequests, fn (array $r): bool => isset($r['error_bag']) && $r['error_bag'] !== ''));
+        $hasAnnotations = $this->hasAnnotations($formRequests);
 
         $header = '| Class | Rules';
         $divider = '|---|---';
@@ -541,6 +551,10 @@ final class GenerateCommand extends Command
         }
         if ($hasErrorBag) {
             $header .= ' | error_bag';
+            $divider .= '|---';
+        }
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
             $divider .= '|---';
         }
         if ($hasSources) {
@@ -568,6 +582,9 @@ final class GenerateCommand extends Command
                 $errorBag = (string) ($request['error_bag'] ?? '');
                 $row .= " | {$errorBag}";
             }
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($request);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($request);
             }
@@ -590,6 +607,7 @@ final class GenerateCommand extends Command
         $hasSources = $this->hasSources($jobs);
         $hasBackoff = ! empty(array_filter($jobs, fn (array $j): bool => ! empty($j['backoff'])));
         $hasMaxExceptions = ! empty(array_filter($jobs, fn (array $j): bool => isset($j['max_exceptions'])));
+        $hasAnnotations = $this->hasAnnotations($jobs);
 
         $header = '| Name | Queue | Connection | Tries';
         $divider = '|---|---|---|---';
@@ -599,6 +617,10 @@ final class GenerateCommand extends Command
         }
         if ($hasMaxExceptions) {
             $header .= ' | max_exceptions';
+            $divider .= '|---';
+        }
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
             $divider .= '|---';
         }
         if ($hasSources) {
@@ -624,6 +646,9 @@ final class GenerateCommand extends Command
                 $maxExceptions = isset($job['max_exceptions']) ? (string) $job['max_exceptions'] : '';
                 $row .= " | {$maxExceptions}";
             }
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($job);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($job);
             }
@@ -644,9 +669,14 @@ final class GenerateCommand extends Command
 
         $count = count($events);
         $hasSources = $this->hasSources($events);
+        $hasAnnotations = $this->hasAnnotations($events);
 
         $header = '| Name | Listeners';
         $divider = '|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -662,6 +692,9 @@ final class GenerateCommand extends Command
             );
             $listeners = implode(', ', $listenerNames);
             $row = "| {$basename} | {$listeners}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($event);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($event);
             }
@@ -682,9 +715,14 @@ final class GenerateCommand extends Command
 
         $count = count($listeners);
         $hasSources = $this->hasSources($listeners);
+        $hasAnnotations = $this->hasAnnotations($listeners);
 
         $header = '| Name | Handles | Queued';
         $divider = '|---|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -701,6 +739,9 @@ final class GenerateCommand extends Command
             $handles = implode(', ', $eventNames);
             $queued = (bool) ($listener['queued'] ?? false) ? 'yes' : '';
             $row = "| {$basename} | {$handles} | {$queued}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($listener);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($listener);
             }
@@ -722,11 +763,16 @@ final class GenerateCommand extends Command
         $count = count($commands);
         $hasSources = $this->hasSources($commands);
         $hasAliases = ! empty(array_filter($commands, fn (array $c): bool => ! empty($c['aliases'])));
+        $hasAnnotations = $this->hasAnnotations($commands);
 
         $header = '| Signature | Description';
         $divider = '|---|---';
         if ($hasAliases) {
             $header .= ' | Aliases';
+            $divider .= '|---';
+        }
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
             $divider .= '|---';
         }
         if ($hasSources) {
@@ -743,6 +789,9 @@ final class GenerateCommand extends Command
             if ($hasAliases) {
                 $aliases = implode(', ', $command['aliases'] ?? []);
                 $row .= " | {$aliases}";
+            }
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($command);
             }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($command);
@@ -764,9 +813,14 @@ final class GenerateCommand extends Command
 
         $count = count($policies);
         $hasSources = $this->hasSources($policies);
+        $hasAnnotations = $this->hasAnnotations($policies);
 
         $header = '| Class | Model | Methods';
         $divider = '|---|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -779,6 +833,9 @@ final class GenerateCommand extends Command
             $model = isset($policy['model']) ? class_basename((string) $policy['model']) : '';
             $methods = implode(', ', $policy['methods'] ?? []);
             $row = "| {$basename} | {$model} | {$methods}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($policy);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($policy);
             }
@@ -799,9 +856,14 @@ final class GenerateCommand extends Command
 
         $count = count($observers);
         $hasSources = $this->hasSources($observers);
+        $hasAnnotations = $this->hasAnnotations($observers);
 
         $header = '| Class | Model | Hooks | Queued';
         $divider = '|---|---|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -815,6 +877,9 @@ final class GenerateCommand extends Command
             $hooks = implode(', ', $observer['hooks'] ?? []);
             $queued = (bool) ($observer['queued'] ?? false) ? 'yes' : '';
             $row = "| {$basename} | {$model} | {$hooks} | {$queued}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($observer);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($observer);
             }
@@ -835,9 +900,14 @@ final class GenerateCommand extends Command
 
         $count = count($enums);
         $hasSources = $this->hasSources($enums);
+        $hasAnnotations = $this->hasAnnotations($enums);
 
         $header = '| Class | Type | Cases';
         $divider = '|---|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -854,6 +924,9 @@ final class GenerateCommand extends Command
             );
             $cases = implode(', ', $caseLabels);
             $row = "| {$basename} | {$type} | {$cases}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($enum);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($enum);
             }
@@ -874,9 +947,14 @@ final class GenerateCommand extends Command
 
         $count = count($tests);
         $hasSources = $this->hasSources($tests);
+        $hasAnnotations = $this->hasAnnotations($tests);
 
         $header = '| File | Type | Subject | Tests';
         $divider = '|---|---|---|---';
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
         if ($hasSources) {
             $header .= ' | Source';
             $divider .= '|---';
@@ -890,6 +968,9 @@ final class GenerateCommand extends Command
             $subject = isset($test['subject']) ? class_basename((string) $test['subject']) : '';
             $methods = implode(', ', (array) ($test['methods'] ?? []));
             $row = "| {$file} | {$type} | {$subject} | {$methods}";
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($test);
+            }
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($test);
             }
@@ -914,6 +995,7 @@ final class GenerateCommand extends Command
         $hasNoOverlap = ! empty(array_filter($scheduledTasks, fn (array $t): bool => ! empty($t['without_overlapping'])));
         $hasBackground = ! empty(array_filter($scheduledTasks, fn (array $t): bool => ! empty($t['run_in_background'])));
         $hasInMaintenance = ! empty(array_filter($scheduledTasks, fn (array $t): bool => ! empty($t['even_in_maintenance'])));
+        $hasAnnotations = $this->hasAnnotations($scheduledTasks);
 
         $header = '| Command | Schedule | Description';
         $divider = '|---|---|---';
@@ -935,6 +1017,11 @@ final class GenerateCommand extends Command
 
         if ($hasInMaintenance) {
             $header .= ' | In Maintenance';
+            $divider .= '|---';
+        }
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
             $divider .= '|---';
         }
 
@@ -973,6 +1060,10 @@ final class GenerateCommand extends Command
                 $row .= ' | '.(! empty($task['even_in_maintenance']) ? 'yes' : '');
             }
 
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($task);
+            }
+
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($task);
             }
@@ -995,12 +1086,18 @@ final class GenerateCommand extends Command
         $count = count($middleware);
         $hasSources = $this->hasSources($middleware);
         $hasGroup = ! empty(array_filter($middleware, fn (array $m): bool => isset($m['scope']) && $m['scope'] === 'group'));
+        $hasAnnotations = $this->hasAnnotations($middleware);
 
         $header = '| Alias | Class | Scope';
         $divider = '|---|---|---';
 
         if ($hasGroup) {
             $header .= ' | Group';
+            $divider .= '|---';
+        }
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
             $divider .= '|---';
         }
 
@@ -1020,6 +1117,10 @@ final class GenerateCommand extends Command
 
             if ($hasGroup) {
                 $row .= ' | '.((string) ($item['group'] ?? ''));
+            }
+
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($item);
             }
 
             if ($hasSources) {
@@ -1043,9 +1144,15 @@ final class GenerateCommand extends Command
 
         $count = count($livewireComponents);
         $hasSources = $this->hasSources($livewireComponents);
+        $hasAnnotations = $this->hasAnnotations($livewireComponents);
 
         $header = '| Component | View | Properties | Actions | Listens';
         $divider = '|---|---|---|---|---';
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
 
         if ($hasSources) {
             $header .= ' | Source';
@@ -1071,6 +1178,10 @@ final class GenerateCommand extends Command
 
             $row = "| {$basename} | {$view} | {$properties} | {$actions} | {$listens}";
 
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($component);
+            }
+
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($component);
             }
@@ -1092,9 +1203,15 @@ final class GenerateCommand extends Command
 
         $count = count($gates);
         $hasSources = $this->hasSources($gates);
+        $hasAnnotations = $this->hasAnnotations($gates);
 
         $header = '| Ability | Kind | Parameters';
         $divider = '|---|---|---';
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
 
         if ($hasSources) {
             $header .= ' | Source';
@@ -1109,6 +1226,10 @@ final class GenerateCommand extends Command
             $parameters = implode(', ', (array) ($gate['parameters'] ?? []));
 
             $row = "| {$ability} | {$kind} | {$parameters}";
+
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($gate);
+            }
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($gate);
@@ -1132,6 +1253,7 @@ final class GenerateCommand extends Command
         $count = count($mailables);
         $hasSources = $this->hasSources($mailables);
         $hasQueue = ! empty(array_filter($mailables, fn (array $m): bool => isset($m['queue'])));
+        $hasAnnotations = $this->hasAnnotations($mailables);
 
         $header = '| Class | Subject | Queued';
         $divider = '|---|---|---';
@@ -1143,6 +1265,11 @@ final class GenerateCommand extends Command
 
         $header .= ' | View';
         $divider .= '|---';
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
 
         if ($hasSources) {
             $header .= ' | Source';
@@ -1165,6 +1292,10 @@ final class GenerateCommand extends Command
 
             $row .= " | {$view}";
 
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($mailable);
+            }
+
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($mailable);
             }
@@ -1186,9 +1317,15 @@ final class GenerateCommand extends Command
 
         $count = count($validationRules);
         $hasSources = $this->hasSources($validationRules);
+        $hasAnnotations = $this->hasAnnotations($validationRules);
 
         $header = '| Class | Implicit | Description';
         $divider = '|---|---|---';
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
+            $divider .= '|---';
+        }
 
         if ($hasSources) {
             $header .= ' | Source';
@@ -1203,6 +1340,10 @@ final class GenerateCommand extends Command
             $description = (string) ($rule['description'] ?? '');
 
             $row = "| {$basename} | {$implicit} | {$description}";
+
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($rule);
+            }
 
             if ($hasSources) {
                 $row .= ' | '.$this->sourceCell($rule);
@@ -1227,6 +1368,7 @@ final class GenerateCommand extends Command
         $hasSources = $this->hasSources($serviceProviders);
         $hasBindings = ! empty(array_filter($serviceProviders, fn (array $p): bool => ! empty($p['bindings'])));
         $hasSingletons = ! empty(array_filter($serviceProviders, fn (array $p): bool => ! empty($p['singletons'])));
+        $hasAnnotations = $this->hasAnnotations($serviceProviders);
 
         $header = '| Class | Deferred';
         $divider = '|---|---';
@@ -1238,6 +1380,11 @@ final class GenerateCommand extends Command
 
         if ($hasSingletons) {
             $header .= ' | Singletons';
+            $divider .= '|---';
+        }
+
+        if ($hasAnnotations) {
+            $header .= ' | Architectural Context';
             $divider .= '|---';
         }
 
@@ -1268,6 +1415,10 @@ final class GenerateCommand extends Command
                     $provider['singletons'] ?? [],
                 );
                 $row .= ' | '.implode(', ', $singletonPairs);
+            }
+
+            if ($hasAnnotations) {
+                $row .= ' | '.$this->architecturalContextCell($provider);
             }
 
             if ($hasSources) {
@@ -1304,6 +1455,62 @@ final class GenerateCommand extends Command
         }
 
         return $item['source']['file'].':'.($item['source']['line'] ?? '?');
+    }
+
+    /**
+     * AN-GENERATE-001: every generated artifact section renders a compact
+     * Architectural Context column when at least one of its artifacts
+     * declares resolved Artifact Annotations.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function hasAnnotations(array $items): bool
+    {
+        foreach ($items as $item) {
+            if (! empty($item['annotations'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function architecturalContextCell(array $item): string
+    {
+        $annotations = $item['annotations'] ?? [];
+
+        if (empty($annotations)) {
+            return '';
+        }
+
+        $parts = [];
+
+        foreach (['domain', 'flow', 'capability'] as $field) {
+            if (! empty($annotations[$field] ?? null)) {
+                $parts[] = "{$field}: {$annotations[$field]}";
+            }
+        }
+
+        if (! empty($annotations['summary'] ?? null)) {
+            $parts[] = 'summary: '.$annotations['summary'];
+        }
+
+        if (! empty($annotations['risk'] ?? null)) {
+            $parts[] = 'risk: '.$annotations['risk'];
+        }
+
+        if (! empty($annotations['external_services'] ?? null)) {
+            $parts[] = 'external services: '.implode(', ', $annotations['external_services']);
+        }
+
+        if (! empty($annotations['adrs'] ?? null)) {
+            $parts[] = 'adrs: '.implode(', ', $annotations['adrs']);
+        }
+
+        return implode(' · ', $parts);
     }
 
     /**

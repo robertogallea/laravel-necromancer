@@ -10,16 +10,18 @@ use LaravelNecromancer\Audit\Checks\BroadcastableEventsWithNoChannelCheck;
 use LaravelNecromancer\Audit\Checks\ClosureRoutesCheck;
 use LaravelNecromancer\Audit\Checks\EmptyCommandDescriptionsCheck;
 use LaravelNecromancer\Audit\Checks\EventsWithNoListenersCheck;
-use LaravelNecromancer\Audit\Checks\ExternalServiceRoutesWithoutTestsCheck;
-use LaravelNecromancer\Audit\Checks\HighRiskRoutesWithoutAdrCheck;
+use LaravelNecromancer\Audit\Checks\ExternalServiceArtifactsWithoutTestsCheck;
+use LaravelNecromancer\Audit\Checks\HighRiskArtifactsWithoutAdrCheck;
+use LaravelNecromancer\Audit\Checks\IdentifierStyleCheck;
 use LaravelNecromancer\Audit\Checks\InconsistentFlowMetadataCheck;
 use LaravelNecromancer\Audit\Checks\JobsWithNoQueueNameCheck;
 use LaravelNecromancer\Audit\Checks\JobsWithNoTimeoutCheck;
 use LaravelNecromancer\Audit\Checks\JobsWithNoTriesCheck;
 use LaravelNecromancer\Audit\Checks\MissingCastsCheck;
 use LaravelNecromancer\Audit\Checks\MissingFillableCheck;
+use LaravelNecromancer\Audit\Checks\MissingLocalAdrFileCheck;
 use LaravelNecromancer\Audit\Checks\ModelsWithOpenGuardCheck;
-use LaravelNecromancer\Audit\Checks\NarrativeRouteMetadataSummaryCheck;
+use LaravelNecromancer\Audit\Checks\NarrativeAnnotationSummaryCheck;
 use LaravelNecromancer\Audit\Checks\NonGetRoutesWithoutAuthCheck;
 use LaravelNecromancer\Audit\Checks\UnnamedRoutesCheck;
 use LaravelNecromancer\Audit\Finding;
@@ -65,10 +67,12 @@ final class AuditCommand extends Command
             new JobsWithNoQueueNameCheck,
             new JobsWithNoTimeoutCheck,
             new JobsWithNoTriesCheck,
-            new HighRiskRoutesWithoutAdrCheck,
-            new ExternalServiceRoutesWithoutTestsCheck,
-            new NarrativeRouteMetadataSummaryCheck,
+            new HighRiskArtifactsWithoutAdrCheck,
+            new ExternalServiceArtifactsWithoutTestsCheck,
+            new NarrativeAnnotationSummaryCheck,
             new InconsistentFlowMetadataCheck,
+            new IdentifierStyleCheck,
+            new MissingLocalAdrFileCheck(base_path()),
         ];
 
         $artifacts = $manifest['artifacts'] ?? [];

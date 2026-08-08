@@ -71,7 +71,7 @@ test('query_artifacts uses form_requests and does not support legacy requests', 
     $formRequests = json_decode($tool->handle(app(ManifestReader::class), new Request(['type' => 'form_requests']))->content()->__toString(), true);
     $legacy = json_decode($tool->handle(app(ManifestReader::class), new Request(['type' => 'requests']))->content()->__toString(), true);
 
-    expect($formRequests)->toBe([['class' => 'App\\Http\\Requests\\StoreIssueRequest']])
+    expect($formRequests)->toBe([['id' => 'form_requests:App\\Http\\Requests\\StoreIssueRequest', 'class' => 'App\\Http\\Requests\\StoreIssueRequest']])
         ->and($legacy)->toBe([]);
 });
 
@@ -110,7 +110,7 @@ test('search_artifacts supports current type filters and ignores legacy requests
     ]))->content()->__toString(), true);
 
     expect($found)->toBe([
-        ['type' => 'form_requests', 'artifact' => ['class' => 'App\\Http\\Requests\\StoreIssueRequest']],
+        ['type' => 'form_requests', 'artifact' => ['id' => 'form_requests:App\\Http\\Requests\\StoreIssueRequest', 'class' => 'App\\Http\\Requests\\StoreIssueRequest']],
     ])->and($notFound)->toBe([]);
 });
 
