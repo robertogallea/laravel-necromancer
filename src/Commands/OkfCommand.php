@@ -39,6 +39,7 @@ final class OkfCommand extends Command
             stale: $this->isStale($manifest),
             allowStale: (bool) $this->option('allow-stale'),
             allowPartial: (bool) $this->option('allow-partial'),
+            basePath: base_path(),
         );
 
         if (! $result->successful) {
