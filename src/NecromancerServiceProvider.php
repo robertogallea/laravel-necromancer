@@ -16,6 +16,7 @@ use LaravelNecromancer\Commands\GenerateCommand;
 use LaravelNecromancer\Commands\InferCommand;
 use LaravelNecromancer\Commands\InspectPayloadCommand;
 use LaravelNecromancer\Commands\MapCommand;
+use LaravelNecromancer\Commands\OkfCommand;
 use LaravelNecromancer\Commands\PromptCommand;
 use LaravelNecromancer\Commands\ScanCommand;
 use LaravelNecromancer\Inference\AdrCriticAgent;
@@ -66,6 +67,7 @@ final class NecromancerServiceProvider extends ServiceProvider
                 PromptCommand::class,
                 InspectPayloadCommand::class,
                 BenchmarkCommand::class,
+                OkfCommand::class,
             ]);
         }
 

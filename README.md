@@ -617,6 +617,67 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 
 ---
 
+### Step 3i — Export an OKF Knowledge Bundle
+
+Project the manifest into a portable, deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact, with authoritative YAML front matter and a concise prose mirror:
+
+```bash
+php artisan necromancer:okf
+```
+
+Writes to `okf/` at the project root by default: `okf/bundle.json` (a small index with the bundle version and artifact count) plus one file per artifact under `okf/artifacts/`, named from a readable slug and a short hash of the artifact's canonical ID (e.g. `app-jobs-sendinvoice-20237e38.md`) — the filename is for browsability only, never authoritative; the `necromancer.id` field inside each file's front matter is.
+
+```markdown
+---
+title: "SendInvoiceEmail"
+type: "artifact"
+kind: "jobs"
+tags:
+  - "billing"
+necromancer:
+  schema_version: 1
+  bundle_version: "0.2"
+  id: "jobs:App\\Jobs\\SendInvoiceEmail"
+  artifact_type: "jobs"
+  generated_at: "2026-08-07T12:00:00+02:00"
+  facts:
+    queue: "emails"
+    tries: 3
+  annotations:
+    domain: "billing"
+    risk: "high"
+---
+
+# SendInvoiceEmail
+
+_jobs artifact_
+
+## Architectural Context
+
+domain: billing · risk: high
+
+## Discovered Facts
+
+- **queue**: `emails`
+- **tries**: `3`
+```
+
+Every field is deterministic: `generated_at` always comes from the manifest's own `meta.generated_at`, never the export clock, so re-exporting an unchanged manifest produces byte-identical files. The bundle never becomes a competing source of truth — it's a read-only projection of the manifest, safe to regenerate at any time and never consulted by Necromancer itself.
+
+By default the command refuses to export a manifest that looks stale (source files changed since the last scan) or whose scan was partial (`--only=` was used, or it's an old unversioned manifest) — both are exit-1 failures with an actionable message, not silent best-effort output:
+
+```bash
+php artisan necromancer:okf --allow-stale      # export anyway, e.g. in a throwaway CI check
+php artisan necromancer:okf --allow-partial    # export a deliberately narrow bundle
+php artisan necromancer:okf --output=dist/okf  # write elsewhere
+```
+
+Output replacement is safe to interrupt: the whole bundle is built in a temporary directory first, and the real output directory is only ever replaced once every file has been written successfully — a failed export never leaves a previously-generated bundle damaged.
+
+> **Note:** This command emits one Artifact Concept per artifact only. Synthesized Domain/Flow Concepts, cross-artifact relationship links, and copying declared ADRs into the bundle are a separate, later capability — not yet implemented.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -632,6 +693,7 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
 | `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
+| `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 
@@ -660,6 +722,11 @@ return [
     'output' => [
         'manifest' => base_path('necromancer.json'),
         'context'  => base_path('NECROMANCER.md'),
+    ],
+
+    // OKF Knowledge Bundle output directory (necromancer:okf)
+    'okf' => [
+        'output' => base_path('okf'),
     ],
 
     // Laravel Boost integration

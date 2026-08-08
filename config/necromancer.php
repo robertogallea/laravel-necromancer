@@ -41,6 +41,10 @@ return [
         'agents' => base_path('AGENTS.md'),
     ],
 
+    'okf' => [
+        'output' => base_path('okf'),
+    ],
+
     'boost' => [
         'context_path' => base_path('.ai/guidelines/necromancer.md'),
         'skill_path' => base_path('.ai/skills/necromancer.md'),
