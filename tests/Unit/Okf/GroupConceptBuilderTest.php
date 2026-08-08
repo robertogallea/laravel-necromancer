@@ -1,7 +1,22 @@
 <?php
 
+use LaravelNecromancer\Okf\ConceptEnrichment;
 use LaravelNecromancer\Okf\ConceptLink;
 use LaravelNecromancer\Okf\GroupConceptBuilder;
+
+function sampleGroupEnrichment(): ConceptEnrichment
+{
+    return new ConceptEnrichment(
+        description: 'Everything belonging to the billing domain.',
+        narrative: 'These artifacts together implement billing.',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        promptVersion: '1',
+        privacyPolicy: 'excludes-source-framework-config-adr-bodies',
+        cacheKey: 'sha256:def456',
+        cached: true,
+    );
+}
 
 test('identify() derives id, title, and filename for a domain value', function () {
     $builder = new GroupConceptBuilder;
@@ -46,6 +61,29 @@ test('build() renders a fallback line when there are no members', function () {
     $concept = (new GroupConceptBuilder)->build('domain', 'orphan', [], '2026-08-07T12:00:00+02:00');
 
     expect($concept->content)->toContain('_No member artifacts._');
+});
+
+test('build() omits enrichment front matter and body section when no enrichment is passed', function () {
+    $concept = (new GroupConceptBuilder)->build('domain', 'billing', [], '2026-08-07T12:00:00+02:00');
+
+    expect($concept->content)->not->toContain('enrichment:')
+        ->and($concept->content)->not->toContain('## AI-Enriched Summary');
+});
+
+test('build() records enrichment provenance and narrative when enriched, without touching members or id', function () {
+    $members = ['jobs:App\\Jobs\\SendInvoice' => new ConceptLink('App\\Jobs\\SendInvoice', '/artifacts/send-invoice.md')];
+
+    $plain = (new GroupConceptBuilder)->build('domain', 'billing', $members, '2026-08-07T12:00:00+02:00');
+    $enriched = (new GroupConceptBuilder)->build('domain', 'billing', $members, '2026-08-07T12:00:00+02:00', sampleGroupEnrichment());
+
+    expect($enriched->id)->toBe($plain->id)
+        ->and($enriched->filename)->toBe($plain->filename)
+        ->and($enriched->content)->toContain('"jobs:App\\\\Jobs\\\\SendInvoice"')
+        ->and($enriched->content)->toContain('description: "Everything belonging to the billing domain."')
+        ->and($enriched->content)->toContain('cache_key: "sha256:def456"')
+        ->and($enriched->content)->toContain('cached: true')
+        ->and($enriched->content)->toContain('## AI-Enriched Summary')
+        ->and($enriched->content)->toContain('These artifacts together implement billing.');
 });
 
 test('build() is deterministic regardless of member insertion order', function () {

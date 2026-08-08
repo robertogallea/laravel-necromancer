@@ -1,7 +1,22 @@
 <?php
 
 use LaravelNecromancer\Okf\AdrConceptBuilder;
+use LaravelNecromancer\Okf\ConceptEnrichment;
 use LaravelNecromancer\Okf\ConceptLink;
+
+function sampleAdrEnrichment(): ConceptEnrichment
+{
+    return new ConceptEnrichment(
+        description: 'Explains why subscription cancellation moved to a listener.',
+        narrative: 'The team chose to decouple cancellation from the controller.',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        promptVersion: '1',
+        privacyPolicy: 'excludes-source-framework-config-adr-bodies',
+        cacheKey: 'sha256:ghi789',
+        cached: false,
+    );
+}
 
 test('identify() derives id, title, and filename from the ADR path, without reading the file', function () {
     $builder = new AdrConceptBuilder;
@@ -58,6 +73,27 @@ test('build() renders a fallback line when nothing references the ADR', function
     $concept = (new AdrConceptBuilder)->build('docs/adr/0004-x.md', 'Body.', [], '2026-08-07T12:00:00+02:00');
 
     expect($concept->content)->toContain('_No referencing artifacts._');
+});
+
+test('build() omits enrichment front matter and body section when no enrichment is passed', function () {
+    $concept = (new AdrConceptBuilder)->build('docs/adr/0004-x.md', 'Body.', [], '2026-08-07T12:00:00+02:00');
+
+    expect($concept->content)->not->toContain('enrichment:')
+        ->and($concept->content)->not->toContain('## AI-Enriched Summary');
+});
+
+test('build() records enrichment provenance and narrative without altering source or copied content', function () {
+    $plain = (new AdrConceptBuilder)->build('docs/adr/0004-x.md', "# ADR 0004\n\nDecision text.", [], '2026-08-07T12:00:00+02:00');
+    $enriched = (new AdrConceptBuilder)->build('docs/adr/0004-x.md', "# ADR 0004\n\nDecision text.", [], '2026-08-07T12:00:00+02:00', sampleAdrEnrichment());
+
+    expect($enriched->id)->toBe($plain->id)
+        ->and($enriched->filename)->toBe($plain->filename)
+        ->and($enriched->content)->toContain('file: "docs/adr/0004-x.md"')
+        ->and($enriched->content)->toContain("# ADR 0004\n\nDecision text.")
+        ->and($enriched->content)->toContain('description: "Explains why subscription cancellation moved to a listener."')
+        ->and($enriched->content)->toContain('cache_key: "sha256:ghi789"')
+        ->and($enriched->content)->toContain('## AI-Enriched Summary')
+        ->and($enriched->content)->toContain('The team chose to decouple cancellation from the controller.');
 });
 
 test('build() is deterministic regardless of referencedBy insertion order', function () {

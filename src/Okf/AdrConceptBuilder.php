@@ -30,7 +30,7 @@ final readonly class AdrConceptBuilder
     /**
      * @param  array<string, ConceptLink>  $referencedBy  keyed by referencing artifact id
      */
-    public function build(string $path, string $content, array $referencedBy, string $generatedAt): ArtifactConcept
+    public function build(string $path, string $content, array $referencedBy, string $generatedAt, ?ConceptEnrichment $enrichment = null): ArtifactConcept
     {
         $identity = $this->identify($path);
         ksort($referencedBy);
@@ -38,6 +38,7 @@ final readonly class AdrConceptBuilder
         $frontMatter = [
             'title' => $identity['title'],
             'type' => 'adr',
+            'description' => $enrichment?->description,
             'necromancer' => [
                 'schema_version' => 1,
                 'bundle_version' => '0.2',
@@ -46,6 +47,7 @@ final readonly class AdrConceptBuilder
                 'generated_at' => $generatedAt,
                 'source' => ['file' => $path],
                 'referenced_by' => array_keys($referencedBy),
+                'enrichment' => $enrichment?->toFrontMatter() ?? [],
             ],
         ];
 
@@ -56,11 +58,13 @@ final readonly class AdrConceptBuilder
             ...($referencedBy !== []
                 ? array_map(fn (ConceptLink $link): string => $link->toMarkdownListItem(), array_values($referencedBy))
                 : ['_No referencing artifacts._']),
-            '',
-            '---',
-            '',
-            rtrim($content),
         ];
+
+        if ($enrichment !== null) {
+            $lines = [...$lines, '', '## AI-Enriched Summary', '', $enrichment->narrative];
+        }
+
+        $lines = [...$lines, '', '---', '', rtrim($content)];
 
         $body = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".implode("\n", $lines);
 

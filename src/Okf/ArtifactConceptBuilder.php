@@ -14,8 +14,15 @@ namespace LaravelNecromancer\Okf;
  */
 final readonly class ArtifactConceptBuilder
 {
-    /** @var list<string> */
-    private const EXCLUDED_FACT_KEYS = ['id', 'annotations', 'source', 'route_metadata'];
+    /**
+     * The Discovered Facts exclusion list — also the privacy boundary
+     * LaravelNecromancer\Okf\Enrichment\EnrichmentPromptBuilder reuses
+     * verbatim, so an enrichment prompt can never see more of an artifact
+     * than its own Artifact Concept body does.
+     *
+     * @var list<string>
+     */
+    public const EXCLUDED_FACT_KEYS = ['id', 'annotations', 'source', 'route_metadata'];
 
     /**
      * Identity only — no facts/annotations rendering. Cheap enough to call
@@ -39,7 +46,7 @@ final readonly class ArtifactConceptBuilder
      * @param  array<string, ConceptLink>  $adrIndex  local ADR path → link, for rendering declared adrs
      * @param  array<string, ConceptLink>  $groupIndex  "domain:value"/"flow:value" → link, for linking back to the synthesized group concept
      */
-    public function build(string $type, array $artifact, string $manifestGeneratedAt, array $classIndex = [], array $adrIndex = [], array $groupIndex = []): ArtifactConcept
+    public function build(string $type, array $artifact, string $manifestGeneratedAt, array $classIndex = [], array $adrIndex = [], array $groupIndex = [], ?ConceptEnrichment $enrichment = null): ArtifactConcept
     {
         $identity = $this->identify($type, $artifact);
         $id = $identity['id'];
@@ -57,6 +64,7 @@ final readonly class ArtifactConceptBuilder
             'type' => 'artifact',
             'kind' => $type,
             'summary' => $annotations['summary'] ?? null,
+            'description' => $enrichment?->description,
             'tags' => $this->tags($annotations),
             'necromancer' => [
                 'schema_version' => 1,
@@ -68,10 +76,11 @@ final readonly class ArtifactConceptBuilder
                 'framework_metadata' => is_array($artifact['route_metadata'] ?? null) ? $artifact['route_metadata'] : [],
                 'facts' => $facts,
                 'annotations' => $annotations,
+                'enrichment' => $enrichment?->toFrontMatter() ?? [],
             ],
         ];
 
-        $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".$this->body($title, $type, $facts, $annotations, $classIndex, $adrIndex, $groupIndex);
+        $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".$this->body($title, $type, $facts, $annotations, $classIndex, $adrIndex, $groupIndex, $enrichment);
 
         return new ArtifactConcept($id, $identity['filename'], $content);
     }
@@ -115,7 +124,7 @@ final readonly class ArtifactConceptBuilder
      * @param  array<string, ConceptLink>  $adrIndex
      * @param  array<string, ConceptLink>  $groupIndex
      */
-    private function body(string $title, string $type, array $facts, array $annotations, array $classIndex, array $adrIndex, array $groupIndex): string
+    private function body(string $title, string $type, array $facts, array $annotations, array $classIndex, array $adrIndex, array $groupIndex, ?ConceptEnrichment $enrichment): string
     {
         $lines = ["# {$title}", '', "_{$type} artifact_", ''];
 
@@ -143,7 +152,13 @@ final readonly class ArtifactConceptBuilder
             $facts,
         )));
 
-        return implode("\n", [...$lines, ...($factLines !== [] ? $factLines : ['_No discovered facts._'])]);
+        $lines = [...$lines, ...($factLines !== [] ? $factLines : ['_No discovered facts._'])];
+
+        if ($enrichment !== null) {
+            $lines = [...$lines, '', '## AI-Enriched Summary', '', $enrichment->narrative];
+        }
+
+        return implode("\n", $lines);
     }
 
     private function factLine(string $key, mixed $value): ?string
