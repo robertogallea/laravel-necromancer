@@ -18,20 +18,19 @@ test('RoutePayload route_metadata field is omitted when empty', function () {
     expect($artifact->jsonSerialize())->not->toHaveKey('route_metadata');
 });
 
-test('RoutePayload serializes raw and necromancer route_metadata', function () {
+test('RoutePayload serializes raw route_metadata only, with no compatibility projection', function () {
     $artifact = StructuralArtifact::route(
         name: 'billing.cancel',
         method: 'POST',
         uri: '/billing/cancel',
-        metadata: ['head' => ['title' => 'Cancel']],
-        necromancerMetadata: ['domain' => 'billing', 'risk' => 'high'],
+        metadata: ['head' => ['title' => 'Cancel'], 'necromancer' => ['domain' => 'billing', 'risk' => 'high']],
     );
 
     $data = $artifact->jsonSerialize();
 
     expect($data)->toHaveKey('route_metadata')
-        ->and($data['route_metadata']['raw'])->toBe(['head' => ['title' => 'Cancel']])
-        ->and($data['route_metadata']['necromancer'])->toBe(['domain' => 'billing', 'risk' => 'high']);
+        ->and($data['route_metadata']['raw'])->toBe(['head' => ['title' => 'Cancel'], 'necromancer' => ['domain' => 'billing', 'risk' => 'high']])
+        ->and($data['route_metadata'])->not->toHaveKey('necromancer');
 });
 
 test('RouteCollector omits route_metadata on Laravel versions without Route::getMetadata()', function () {
@@ -78,13 +77,7 @@ test('RouteCollector extracts and normalizes route metadata when Route::getMetad
 
     expect($data)->toHaveKey('route_metadata')
         ->and($data['route_metadata']['raw']['head']['title'])->toBe('Cancel subscription')
-        ->and($data['route_metadata']['necromancer'])->toBe([
-            'domain' => 'billing',
-            'risk' => 'high',
-            'external_services' => ['stripe'],
-            'adr' => 'docs/adr/001.md',
-            'adrs' => ['docs/adr/001.md', 'docs/adr/002.md'],
-        ])
+        ->and($data['route_metadata'])->not->toHaveKey('necromancer')
         ->and($data['annotations'])->toBe([
             'domain' => 'billing',
             'risk' => 'high',

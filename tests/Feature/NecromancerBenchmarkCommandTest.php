@@ -9,7 +9,7 @@ use LaravelNecromancer\Integrations\AiDetector;
 function benchmarkManifest(): string
 {
     return json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'generated_at' => now()->toISOString(),
             'content_hash' => 'abc123',
@@ -269,7 +269,7 @@ test('fails clearly when the benchmark dump path cannot be created as a director
 
 test('task is skipped and reported when required_key resolves to null', function () {
     $manifest = json_encode([
-        'meta' => ['app_name' => 'T', 'generated_at' => now()->toISOString(), 'content_hash' => 'x', 'laravel_version' => '13', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'T', 'generated_at' => now()->toISOString(), 'content_hash' => 'x', 'laravel_version' => '13', 'php_version' => '8.4'],
         'artifacts' => ['routes' => [], 'models' => [], 'jobs' => [], 'events' => [], 'policies' => []],
     ], JSON_THROW_ON_ERROR);
 
@@ -297,7 +297,7 @@ test('task is skipped and reported when required_key resolves to null', function
 
 test('task is skipped when required_key resolves to an empty list', function () {
     $manifest = json_encode([
-        'meta' => ['app_name' => 'T', 'generated_at' => now()->toISOString(), 'content_hash' => 'x', 'laravel_version' => '13', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'T', 'generated_at' => now()->toISOString(), 'content_hash' => 'x', 'laravel_version' => '13', 'php_version' => '8.4'],
         'artifacts' => [
             'routes' => [['name' => 'welcome', 'method' => 'GET', 'uri' => '/', 'middleware' => [], 'controller' => null, 'action' => null, 'source' => null]],
             'models' => [], 'jobs' => [], 'events' => [], 'policies' => [],
@@ -445,7 +445,7 @@ test('--generate-suite writes a PHP task file and exits without benchmarking', f
 
 test('--generate-suite generates tasks grounded to manifest artifacts', function () {
     $manifest = json_encode([
-        'meta' => ['app_name' => 'TestApp', 'generated_at' => now()->toISOString(), 'content_hash' => 'abc', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'generated_at' => now()->toISOString(), 'content_hash' => 'abc', 'laravel_version' => '13.0', 'php_version' => '8.4'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => ['auth'], 'controller' => 'OrderController', 'action' => 'index', 'source' => null],

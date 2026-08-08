@@ -15,7 +15,6 @@ final readonly class RoutePayload implements JsonSerializable
      * @param  list<array{ability: string, models: list<string>}>  $authorization
      * @param  array<string, mixed>|null  $source
      * @param  array<string, mixed>  $metadata
-     * @param  array{domain?: string, flow?: string, capability?: string, summary?: string, risk?: string, external_services?: list<string>, adr?: string, adrs?: list<string>}  $necromancerMetadata
      */
     public function __construct(
         public ?string $name,
@@ -28,7 +27,6 @@ final readonly class RoutePayload implements JsonSerializable
         public ?array $source,
         public array $authorization = [],
         public array $metadata = [],
-        public array $necromancerMetadata = [],
         public ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ) {}
 
@@ -58,11 +56,8 @@ final readonly class RoutePayload implements JsonSerializable
             $data['source'] = $this->source;
         }
 
-        if (! empty($this->metadata) || ! empty($this->necromancerMetadata)) {
-            $data['route_metadata'] = array_filter([
-                'raw' => $this->metadata,
-                'necromancer' => $this->necromancerMetadata,
-            ], fn (array $v): bool => ! empty($v));
+        if (! empty($this->metadata)) {
+            $data['route_metadata'] = ['raw' => $this->metadata];
         }
 
         if (! $this->annotations->isEmpty()) {

@@ -18,14 +18,14 @@ test('the doctor command fails with a clear message when the manifest is absent'
 });
 
 test('the doctor command succeeds when a valid manifest exists', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:doctor')
         ->assertSuccessful();
 });
 
 test('the doctor command shows 100% score for an empty manifest', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:doctor')
         ->expectsOutputToContain('Score: 100%')
@@ -34,7 +34,7 @@ test('the doctor command shows 100% score for an empty manifest', function () {
 
 test('all named controller-backed routes give route clarity 100 percent', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => 'orders.index', 'controller' => 'OrderController', 'middleware' => []],
@@ -51,7 +51,7 @@ test('all named controller-backed routes give route clarity 100 percent', functi
 
 test('an unnamed route reduces the route clarity score below 100 percent', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => 'OrderController', 'middleware' => []],
@@ -70,7 +70,7 @@ test('an unnamed route reduces the route clarity score below 100 percent', funct
 
 test('models with casts and fillable and relationships give 100 percent model expressiveness', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 [
@@ -94,7 +94,7 @@ test('models with casts and fillable and relationships give 100 percent model ex
 
 test('models without casts fillable or relationships give 0 percent model expressiveness', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -111,7 +111,7 @@ test('models without casts fillable or relationships give 0 percent model expres
 
 test('jobs with queue tries timeout and backoff give 100 percent async clarity', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoice', 'queue' => 'emails', 'tries' => 3, 'timeout' => 60, 'backoff' => 5],
@@ -131,7 +131,7 @@ test('jobs with queue tries timeout and backoff give 100 percent async clarity',
 
 test('a job without a queue name reduces async clarity score', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoice', 'queue' => null, 'tries' => 3, 'timeout' => 60],
@@ -148,7 +148,7 @@ test('a job without a queue name reduces async clarity score', function () {
 
 test('commands with descriptions and backed enums give 100 percent codebase vocabulary', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'commands' => [
                 ['class' => 'App\\Console\\Commands\\PruneOrders', 'signature' => 'orders:prune', 'description' => 'Remove old orders'],
@@ -168,7 +168,7 @@ test('commands with descriptions and backed enums give 100 percent codebase voca
 
 test('commands without descriptions reduce codebase vocabulary score', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'commands' => [
                 ['class' => 'App\\Console\\Commands\\PruneOrders', 'signature' => 'orders:prune', 'description' => ''],
@@ -185,7 +185,7 @@ test('commands without descriptions reduce codebase vocabulary score', function 
 
 test('write routes covered by form requests give 100 percent validation coverage', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'POST', 'uri' => '/orders', 'name' => 'orders.store', 'controller' => 'OrderController', 'middleware' => []],
@@ -205,7 +205,7 @@ test('write routes covered by form requests give 100 percent validation coverage
 
 test('models with corresponding policies give full authorization coverage', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => []],
@@ -225,7 +225,7 @@ test('models with corresponding policies give full authorization coverage', func
 });
 
 test('--json outputs valid JSON with score and dimensions keys', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     Artisan::call('necromancer:doctor', ['--json' => true]);
     $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
@@ -236,7 +236,7 @@ test('--json outputs valid JSON with score and dimensions keys', function () {
 });
 
 test('--json dimension entries have key label score detail and weight', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     Artisan::call('necromancer:doctor', ['--json' => true]);
     $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
@@ -247,7 +247,7 @@ test('--json dimension entries have key label score detail and weight', function
 
 test('--min-score exits non-zero when overall score is below the threshold', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => null, 'middleware' => []],
@@ -260,14 +260,14 @@ test('--min-score exits non-zero when overall score is below the threshold', fun
 });
 
 test('--min-score exits successfully when overall score meets the threshold', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:doctor', ['--min-score' => '100'])
         ->assertSuccessful();
 });
 
 test('--only limits the output to the specified dimensions', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:doctor', ['--only' => 'route-clarity'])
         ->expectsOutputToContain('Route Clarity')
@@ -276,7 +276,7 @@ test('--only limits the output to the specified dimensions', function () {
 });
 
 test('--only with json only includes the specified dimensions in dimensions array', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'route-clarity,async-clarity']);
     $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
@@ -286,15 +286,24 @@ test('--only with json only includes the specified dimensions in dimensions arra
     expect($keys)->toContain('route-clarity')->toContain('async-clarity');
 });
 
-test('--only accepts artifact-annotation-coverage as an alias for the route-metadata-coverage dimension key', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+test('--only=artifact-annotation-coverage selects the dimension by its canonical key', function () {
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'artifact-annotation-coverage']);
     $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
 
     expect($decoded['dimensions'])->toHaveCount(1)
-        ->and($decoded['dimensions'][0]['key'])->toBe('route-metadata-coverage')
+        ->and($decoded['dimensions'][0]['key'])->toBe('artifact-annotation-coverage')
         ->and($decoded['dimensions'][0]['label'])->toBe('Artifact Annotation Coverage');
+});
+
+test('--only=route-metadata-coverage no longer matches anything — the legacy alias was removed in 2.0', function () {
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'route-metadata-coverage']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'])->toHaveCount(0);
 });
 
 test('the doctor command warns when manifest is stale', function () {
@@ -302,7 +311,7 @@ test('the doctor command warns when manifest is stale', function () {
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '1970-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '1970-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -321,7 +330,7 @@ test('the doctor command resolves the manifest path from config', function () {
         ->expectsOutputToContain('necromancer:scan')
         ->assertFailed();
 
-    File::put($path, json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put($path, json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:doctor')
         ->assertSuccessful();
@@ -332,7 +341,7 @@ test('the doctor command resolves the manifest path from config', function () {
 test('doctor async clarity scores higher when all jobs have backoff configured', function () {
     // One job with backoff, one without
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\A', 'queue' => 'default', 'connection' => 'redis', 'tries' => 3, 'timeout' => 60, 'backoff' => 30],
@@ -347,7 +356,7 @@ test('doctor async clarity scores higher when all jobs have backoff configured',
 
     // Both jobs with backoff
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\A', 'queue' => 'default', 'connection' => 'redis', 'tries' => 3, 'timeout' => 60, 'backoff' => 30],
@@ -365,7 +374,7 @@ test('doctor async clarity scores higher when all jobs have backoff configured',
 
 test('test presence returns N/A when tests key is absent from manifest', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -382,7 +391,7 @@ test('test presence returns N/A when tests key is absent from manifest', functio
 
 test('test presence scores 0 percent when tests key is present but empty and models exist', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -400,7 +409,7 @@ test('test presence scores 0 percent when tests key is present but empty and mod
 
 test('test presence returns N/A when tests are present but no models or jobs exist', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'tests' => [
                 ['file' => 'tests/Unit/SomeTest.php', 'type' => 'unit', 'subject' => 'App\\Services\\SomeService', 'methods' => []],
@@ -417,7 +426,7 @@ test('test presence returns N/A when tests are present but no models or jobs exi
 
 test('test presence scores 100 percent when all models and jobs have matching test subjects', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -441,7 +450,7 @@ test('test presence scores 100 percent when all models and jobs have matching te
 
 test('test presence scores 50 percent when half of models are covered by tests', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -462,7 +471,7 @@ test('test presence scores 50 percent when half of models are covered by tests',
 
 test('test presence scores 0 percent when tests exist but all subjects are absent', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -482,7 +491,7 @@ test('test presence scores 0 percent when tests exist but all subjects are absen
 
 test('test presence uses only the models ratio when no jobs are present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'casts' => [], 'fillable' => [], 'relationships' => [], 'guarded' => ['*']],
@@ -504,7 +513,7 @@ test('test presence uses only the models ratio when no jobs are present', functi
 
 test('test presence uses only the jobs ratio when no models are present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoice'],

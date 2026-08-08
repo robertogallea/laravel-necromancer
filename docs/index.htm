@@ -37,7 +37,7 @@
     <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="font-bold text-red-400 tracking-tight">Laravel Necromancer</span>
-        <span class="text-xs text-gray-600 font-mono">v1.7</span>
+        <span class="text-xs text-gray-600 font-mono">v2.0</span>
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm text-gray-400">
         <a href="#artifacts" class="hover:text-red-400 transition-colors">Artifacts</a>
@@ -46,6 +46,7 @@
         <a href="#install" class="hover:text-red-400 transition-colors">Install</a>
         <a href="#ci" class="hover:text-red-400 transition-colors">CI</a>
         <a href="#mcp" class="hover:text-red-400 transition-colors">MCP</a>
+        <a href="#upgrading" class="hover:text-red-400 transition-colors">Upgrading</a>
       </div>
       <a href="https://github.com/robertogallea/laravel-necromancer"
          target="_blank" rel="noopener"
@@ -713,7 +714,7 @@ php artisan necromancer:generate</pre>
         summary: 'Cancels an active subscription.',
         risk: 'high',
         externalServices: ['stripe'],
-        adr: 'docs/adr/004-subscription-cancellation.md',
+        adrs: ['docs/adr/004-subscription-cancellation.md'],
     );</pre>
         <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
       </div>
@@ -786,6 +787,42 @@ Route::singleton('profile', ProfileController::class)->withNecromancer(domain: '
     'models' => [],
     'tests'  => [],
 ],</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Upgrading to 2.0 -->
+  <section id="upgrading" class="py-16 px-4 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-red-400 mb-2">Upgrading to 2.0</h2>
+      <p class="text-gray-500 mb-8">
+        2.0 removes the 1.x-only compatibility surfaces that eased the transition to universal Artifact Annotations
+        and Knowledge Bundles. Declaring annotations is unchanged — <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">#[Necromancer]</code>,
+        <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">withNecromancer()</code>, and exact-ID config mappings all work as before.
+        What changes is what 2.0 stops reading, emitting, and accepting. Full details and a diff example are in the
+        <a href="https://github.com/robertogallea/laravel-necromancer#upgrading-to-20" target="_blank" rel="noopener" class="text-red-400 hover:underline">README migration guide</a>.
+      </p>
+      <div class="grid grid-cols-1 gap-4">
+        <div class="border border-gray-800 rounded-lg p-4">
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">Manifests older than schema v1 are rejected, not upgraded</div>
+          <div class="text-gray-500 text-sm">Every command that reads <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer.json</code> now treats a pre-1.5 manifest exactly like a missing one. Run <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">php artisan necromancer:scan</code> once after upgrading.</div>
+        </div>
+        <div class="border border-gray-800 rounded-lg p-4">
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1"><code class="font-mono text-sm">route_metadata.necromancer</code> no longer appears in the manifest</div>
+          <div class="text-gray-500 text-sm">Resolved annotations for every artifact family, routes included, live in the universal <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> key. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">route_metadata.raw</code> — native <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">Route::getMetadata()</code> output — is unaffected.</div>
+        </div>
+        <div class="border border-gray-800 rounded-lg p-4">
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1"><code class="font-mono text-sm">--only=route-metadata-coverage</code> no longer matches</div>
+          <div class="text-gray-500 text-sm">Use the canonical <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--only=artifact-annotation-coverage</code> dimension key on <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:doctor</code> instead.</div>
+        </div>
+        <div class="border border-gray-800 rounded-lg p-4">
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">Two scan diagnostic codes were renamed</div>
+          <div class="text-gray-500 text-sm"><code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AN_LEGACY_VALUE</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AN_LEGACY_RISK</code> are now <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AN_SCHEMA_INCOMPATIBLE_VALUE</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AN_SCHEMA_INCOMPATIBLE_RISK</code>. The check is unchanged, only the name.</div>
+        </div>
+        <div class="border border-gray-800 rounded-lg p-4">
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">The singular <code class="font-mono text-sm">adr</code> parameter was removed</div>
+          <div class="text-gray-500 text-sm"><code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">withNecromancer()</code> and <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">RouteMetadataFactory::forMetadata()</code> only accept the plural <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">adrs</code> array now — swap <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">adr: '...'</code> for <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">adrs: ['...']</code>.</div>
         </div>
       </div>
     </div>

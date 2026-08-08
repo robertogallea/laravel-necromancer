@@ -17,14 +17,14 @@ test('the audit command fails with a clear message when the manifest is absent',
 });
 
 test('the audit command succeeds when a valid manifest exists at the configured path', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit')
         ->assertSuccessful();
 });
 
 test('the audit command shows score 100 and all checks passed when manifest has no violations', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit')
         ->expectsOutputToContain('Score: 100/100')
@@ -33,7 +33,7 @@ test('the audit command shows score 100 and all checks passed when manifest has 
 });
 
 test('the audit command shows zero counts in the counts line when manifest has no violations', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit')
         ->expectsOutputToContain('0 errors · 0 warnings · 0 suggestions')
@@ -42,7 +42,7 @@ test('the audit command shows zero counts in the counts line when manifest has n
 
 test('a manifest with an unnamed route produces an error finding in the output', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -58,7 +58,7 @@ test('a manifest with an unnamed route produces an error finding in the output',
 
 test('a manifest with a closure route produces a suggestion finding in the output', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'POST', 'uri' => '/checkout', 'name' => 'checkout', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -74,7 +74,7 @@ test('a manifest with a closure route produces a suggestion finding in the outpu
 
 test('a manifest with a model missing fillable produces a warning finding in the output', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [],
             'models' => [
@@ -90,7 +90,7 @@ test('a manifest with a model missing fillable produces a warning finding in the
 
 test('a manifest with a model missing casts produces a suggestion finding in the output', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [],
             'models' => [
@@ -106,7 +106,7 @@ test('a manifest with a model missing casts produces a suggestion finding in the
 
 test('one unnamed route out of one total route shows a proportional pass-rate score', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -124,7 +124,7 @@ test('one unnamed route out of one total route shows a proportional pass-rate sc
 
 test('all named routes and models with fillable and casts show all checks passed and score 100', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => 'orders.index', 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -143,7 +143,7 @@ test('all named routes and models with fillable and casts show all checks passed
 
 test('a manifest with a command that has an empty description produces a warning finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [],
             'models' => [],
@@ -162,7 +162,7 @@ test('a manifest with a command that has an empty description produces a warning
 
 test('a manifest with an event that has no listeners produces a warning finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [],
             'models' => [],
@@ -181,7 +181,7 @@ test('a manifest with an event that has no listeners produces a warning finding'
 
 test('a manifest with a job that has no queue name produces a suggestion finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [],
             'models' => [],
@@ -200,7 +200,7 @@ test('a manifest with a job that has no queue name produces a suggestion finding
 
 test('one command with an empty description out of one total command shows score 0 out of 100', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [],
             'models' => [],
@@ -220,7 +220,7 @@ test('one command with an empty description out of one total command shows score
 
 test('two routes with one unnamed shows proportional score that does not bottom out', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -239,7 +239,7 @@ test('two routes with one unnamed shows proportional score that does not bottom 
 
 test('commands with descriptions events with listeners and jobs with queue names show all checks passed', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => 'orders.index', 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -266,7 +266,7 @@ test('commands with descriptions events with listeners and jobs with queue names
 });
 
 test('--format=json outputs valid JSON with score counts and findings keys', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     Artisan::call('necromancer:audit', ['--format' => 'json']);
     $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
@@ -276,7 +276,7 @@ test('--format=json outputs valid JSON with score counts and findings keys', fun
 
 test('--format=json with violations includes the correct finding in the findings array', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -293,7 +293,7 @@ test('--format=json with violations includes the correct finding in the findings
 });
 
 test('--format=json with no violations outputs score 100 and empty findings array', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     Artisan::call('necromancer:audit', ['--format' => 'json']);
     $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
@@ -307,7 +307,7 @@ test('--output= writes the text report to a file and produces no terminal output
     $reportPath = storage_path('framework/testing/audit-report.txt');
     File::delete($reportPath);
 
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit', ['--output' => $reportPath])
         ->assertSuccessful();
@@ -322,7 +322,7 @@ test('--format=json --output= writes the JSON report to a file', function () {
     $reportPath = storage_path('framework/testing/audit-report.json');
     File::delete($reportPath);
 
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit', ['--format' => 'json', '--output' => $reportPath])
         ->assertSuccessful();
@@ -336,7 +336,7 @@ test('--format=json --output= writes the JSON report to a file', function () {
 
 test('--format=markdown outputs a markdown heading and bullet findings', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'GET', 'uri' => '/orders', 'name' => null, 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -352,7 +352,7 @@ test('--format=markdown outputs a markdown heading and bullet findings', functio
 });
 
 test('--format=markdown with no violations outputs the all-checks-passed message', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit', ['--format' => 'markdown'])
         ->expectsOutputToContain('_All checks passed._')
@@ -360,7 +360,7 @@ test('--format=markdown with no violations outputs the all-checks-passed message
 });
 
 test('--output= with a non-writable path fails with a clear error and exits non-zero', function () {
-    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit', ['--output' => '/nonexistent-directory/report.txt'])
         ->expectsOutputToContain('Unable to write audit report')
@@ -372,7 +372,7 @@ test('the audit command warns when app files are newer than the manifest generat
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '1970-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '1970-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -388,7 +388,7 @@ test('the audit command does not warn when the manifest generated_at is in the f
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '2099-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '2099-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -401,7 +401,7 @@ test('the audit command does not warn when the manifest generated_at is in the f
 
 test('a manifest with a model with guarded=[] produces a warning finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => [], 'casts' => [], 'relationships' => [], 'guarded' => [], 'source' => null],
@@ -416,7 +416,7 @@ test('a manifest with a model with guarded=[] produces a warning finding', funct
 
 test('a manifest with a non-GET route without auth middleware produces a suggestion finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'POST', 'uri' => '/orders', 'name' => 'orders.store', 'controller' => 'OrderController', 'action' => 'store', 'middleware' => [], 'source' => null],
@@ -431,7 +431,7 @@ test('a manifest with a non-GET route without auth middleware produces a suggest
 
 test('a non-GET route with auth middleware does not produce a suggestion finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['method' => 'POST', 'uri' => '/orders', 'name' => 'orders.store', 'controller' => 'OrderController', 'action' => 'store', 'middleware' => ['auth'], 'source' => null],
@@ -446,7 +446,7 @@ test('a non-GET route with auth middleware does not produce a suggestion finding
 
 test('a manifest with a job that has no timeout produces a warning finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoiceEmail', 'queue' => 'emails', 'connection' => 'redis', 'tries' => 3, 'timeout' => null, 'source' => null],
@@ -461,7 +461,7 @@ test('a manifest with a job that has no timeout produces a warning finding', fun
 
 test('a manifest with a job that has no tries produces a suggestion finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoiceEmail', 'queue' => 'emails', 'connection' => 'redis', 'tries' => null, 'timeout' => 60, 'source' => null],
@@ -476,7 +476,7 @@ test('a manifest with a job that has no tries produces a suggestion finding', fu
 
 test('a manifest with a broadcastable event with no channel produces a warning finding', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'events' => [
                 ['class' => 'App\\Events\\OrderShipped', 'listeners' => [], 'broadcastable' => true, 'channels' => [], 'source' => null],
@@ -497,7 +497,7 @@ test('the audit command resolves the manifest path from config', function () {
         ->expectsOutputToContain('necromancer:scan')
         ->assertFailed();
 
-    File::put($path, json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put($path, json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:audit')
         ->assertSuccessful();

@@ -59,7 +59,7 @@ test('query_artifacts filters artifacts by query and limit', function () {
 test('query_artifacts uses form_requests and does not support legacy requests', function () {
     writeNecromancerMcpManifest([
         'form_requests' => [
-            ['class' => 'App\\Http\\Requests\\StoreIssueRequest'],
+            ['id' => 'form_requests:App\\Http\\Requests\\StoreIssueRequest', 'class' => 'App\\Http\\Requests\\StoreIssueRequest'],
         ],
         'requests' => [
             ['class' => 'App\\Http\\Requests\\LegacyIssueRequest'],
@@ -88,7 +88,7 @@ test('query_artifacts returns an empty list when the manifest is missing', funct
 test('search_artifacts supports current type filters and ignores legacy requests', function () {
     writeNecromancerMcpManifest([
         'form_requests' => [
-            ['class' => 'App\\Http\\Requests\\StoreIssueRequest'],
+            ['id' => 'form_requests:App\\Http\\Requests\\StoreIssueRequest', 'class' => 'App\\Http\\Requests\\StoreIssueRequest'],
         ],
         'requests' => [
             ['class' => 'App\\Http\\Requests\\LegacyIssueRequest'],
@@ -132,7 +132,7 @@ function writeNecromancerMcpManifest(array $artifacts): void
 {
     File::ensureDirectoryExists(dirname(necromancerMcpManifestPath()));
     File::put(necromancerMcpManifestPath(), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => $artifacts,
     ], JSON_THROW_ON_ERROR));
 }

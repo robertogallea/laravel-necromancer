@@ -85,7 +85,6 @@ final class RouteCollector
             parameters: $this->parameters($route),
             authorization: $this->authorization($controller, $action),
             metadata: $metadata,
-            necromancerMetadata: $resolvedAnnotations->compatibility,
             annotations: $annotations,
         );
     }

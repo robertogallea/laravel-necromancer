@@ -14,6 +14,7 @@ use LaravelNecromancer\Diff\ManifestDiff;
 use LaravelNecromancer\Diff\ManifestDiffer;
 use LaravelNecromancer\Inference\ManifestSummarizer;
 use LaravelNecromancer\Integrations\AiDetector;
+use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 
 final class DiffCommand extends Command
@@ -134,6 +135,10 @@ final class DiffCommand extends Command
                 $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
                 return null;
+            } catch (ManifestNotFoundException $e) {
+                $this->error($e->getMessage());
+
+                return null;
             }
         }
 
@@ -156,13 +161,19 @@ final class DiffCommand extends Command
         try {
             /** @var array<string, mixed> $manifest */
             $manifest = json_decode($result->output(), true, 512, JSON_THROW_ON_ERROR);
-
-            return $reader->adapt($manifest);
         } catch (\JsonException $e) {
             $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
             return null;
         }
+
+        if (! $reader->isCurrentSchema($manifest)) {
+            $this->error("The manifest on '{$branch}' predates schema v1 and is no longer supported. Run `php artisan necromancer:scan` on that branch and commit the manifest.");
+
+            return null;
+        }
+
+        return $manifest;
     }
 
     private function resolveManifestRelativePath(): string

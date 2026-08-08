@@ -88,7 +88,7 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
         summary: 'Cancels an active subscription.',
         risk: 'high',
         externalServices: ['stripe'],
-        adr: 'docs/adr/004-subscription-cancellation.md',
+        adrs: ['docs/adr/004-subscription-cancellation.md'],
     );
 ```
 
@@ -246,7 +246,7 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   Tip: run necromancer:audit for a detailed findings list.
 ```
 
-Artifact Annotation Coverage scores N/A (and doesn't affect the overall score) until at least one artifact of any family declares Artifact Annotations — adopting the feature is entirely optional. Its emitted dimension key stays `route-metadata-coverage` throughout 1.x for CI/automation compatibility; `--only=artifact-annotation-coverage` is accepted as a forward-compatible alias for the same key.
+Artifact Annotation Coverage scores N/A (and doesn't affect the overall score) until at least one artifact of any family declares Artifact Annotations — adopting the feature is entirely optional. Its emitted dimension key is `artifact-annotation-coverage`; pass it to `--only` to score just this dimension.
 
 Output a machine-readable score or enforce a CI gate:
 
@@ -921,6 +921,50 @@ Add these steps to your CI pipeline to enforce manifest freshness and AI-readabi
 - name: Enforce minimum AI readability score
   run: php artisan necromancer:doctor --min-score=80
 ```
+
+## Upgrading to 2.0
+
+Version 2.0 removes the 1.x-only compatibility surfaces that existed to ease the transition to universal Artifact Annotations (1.5.0) and Knowledge Bundles (1.6.0/1.7.0). Nothing about how you *declare* annotations changes — `#[Necromancer]`, `withNecromancer()`, and exact-ID config mappings all work exactly as before. What changes is what 2.0 stops reading, emitting, and accepting.
+
+**1. Manifests older than schema v1 are now rejected, not upgraded.**
+
+Every command that reads `necromancer.json` (`map`, `audit`, `doctor`, `generate`, `ask`, `prompt`, `infer`, `diff`, `okf`, the MCP tools, and more) previously detected a pre-1.5 manifest and silently promoted it in memory. In 2.0 that promotion step is gone: a manifest missing `meta.manifest_schema_version: 1` is treated exactly like a missing manifest, and every command shows the same "Necromancer manifest not found. Run necromancer:scan first." error.
+
+> **Action:** run `php artisan necromancer:scan` once after upgrading to regenerate `necromancer.json`. If you commit the manifest to git, commit the regenerated file too. CI pipelines that only run `necromancer:audit`/`necromancer:doctor`/etc. against a checked-in manifest will fail until it's rescanned with 2.0 installed.
+
+**2. `route_metadata.necromancer` no longer appears in the manifest.**
+
+Routes still carry `route_metadata.raw` — the untouched output of Laravel's native `Route::getMetadata()` — but the `route_metadata.necromancer` projection that mirrored resolved annotations back onto routes specifically has been removed. Resolved annotations for routes (and every other artifact family) live in the universal `annotations` key, which has been present on every artifact since 1.5.0.
+
+> **Action:** if any of your own tooling reads `route_metadata.necromancer.*` from `necromancer.json` directly, switch it to read the artifact's `annotations.*` key instead. Every built-in consumer (`doctor`, `audit`, `generate`, `diff`, `ask`, MCP tools) already reads `annotations` and requires no changes.
+
+**3. `necromancer:doctor --only=route-metadata-coverage` no longer matches anything.**
+
+The dimension's canonical key has been `artifact-annotation-coverage` since 1.5.0; 2.0 removes the `route-metadata-coverage` alias that `--only` accepted for backward compatibility.
+
+> **Action:** update any CI script or shell alias using `--only=route-metadata-coverage` to `--only=artifact-annotation-coverage`.
+
+**4. Two scan diagnostic codes were renamed.**
+
+`AN_LEGACY_VALUE` and `AN_LEGACY_RISK` — printed by `necromancer:scan` when a native `Route::metadata()` declaration carries a value that can't fit Annotation Schema v1 (e.g. `risk: 'yolo'`) — are renamed to `AN_SCHEMA_INCOMPATIBLE_VALUE` and `AN_SCHEMA_INCOMPATIBLE_RISK`. The check itself is unchanged; only the code name changed, since it was never actually about manifest schema age.
+
+> **Action:** update any log parsing or CI assertions that grep scan output for `AN_LEGACY_VALUE`/`AN_LEGACY_RISK`.
+
+**5. The singular `adr` parameter was removed from `withNecromancer()` and `RouteMetadataFactory::forMetadata()`.**
+
+Both accept a plural `adrs` array parameter (added in 1.5.0 alongside `adr`) — that's now the only way to declare ADR references through the macro or factory.
+
+```diff
+ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+     ->withNecromancer(
+         domain: 'billing',
+         risk: 'high',
+-        adr: 'docs/adr/004-subscription-cancellation.md',
++        adrs: ['docs/adr/004-subscription-cancellation.md'],
+     );
+```
+
+> **Action:** search your route files for `->withNecromancer(` calls passing `adr:` and switch them to `adrs: [...]`. The raw-array form (`->metadata(['necromancer' => ['adr' => ...]])`) is unaffected — Necromancer still reads a singular `adr` key there and merges it into `adrs`, since that's native Laravel data Necromancer doesn't control, not a Necromancer-specific compatibility shim.
 
 ## Contributing
 

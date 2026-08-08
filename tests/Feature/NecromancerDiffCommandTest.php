@@ -14,7 +14,7 @@ use LaravelNecromancer\Integrations\AiDetector;
 function makeDiffManifest(array $artifacts = []): array
 {
     return [
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'generated_at' => '2026-01-01T00:00:00Z',
             'content_hash' => hash('sha256', json_encode($artifacts, JSON_THROW_ON_ERROR)),
             'necromancer_version' => '1.0.0',
@@ -90,56 +90,17 @@ test('shows no drift when manifests are identical', function () {
     }
 });
 
-test('does not report drift between equivalent legacy and current route manifests', function () {
-    $baseManifest = [
-        'meta' => [],
-        'artifacts' => [
-            'routes' => [[
-                'method' => 'POST',
-                'uri' => 'billing/cancel',
-                'route_metadata' => [
-                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
-                    'necromancer' => ['domain' => 'billing', 'risk' => 'high', 'adr' => 'docs/adr/004.md'],
-                ],
-            ]],
-        ],
-    ];
-    $headManifest = [
-        'meta' => [
-            'manifest_schema_version' => 1,
-            'annotation_schema_version' => 1,
-            'scope' => ['complete' => true, 'artifact_types' => ['routes']],
-        ],
-        'artifacts' => [
-            'routes' => [[
-                'id' => 'routes:POST:billing/cancel',
-                'method' => 'POST',
-                'uri' => 'billing/cancel',
-                'route_metadata' => [
-                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
-                    'necromancer' => [
-                        'domain' => 'billing',
-                        'risk' => 'high',
-                        'adr' => 'docs/adr/004.md',
-                        'adrs' => ['docs/adr/004.md'],
-                    ],
-                ],
-                'annotations' => [
-                    'domain' => 'billing',
-                    'risk' => 'high',
-                    'adrs' => ['docs/adr/004.md'],
-                ],
-            ]],
-        ],
-    ];
-
-    $baseFile = writeTempManifest($baseManifest);
-    File::put(base_path('necromancer.json'), json_encode($headManifest, JSON_THROW_ON_ERROR));
+test('fails with a clear message when --base-manifest predates schema v1', function () {
+    $baseFile = writeTempManifest([
+        'meta' => ['generated_at' => '2026-01-01T00:00:00Z'],
+        'artifacts' => ['routes' => [['method' => 'POST', 'uri' => 'billing/cancel']]],
+    ]);
+    File::put(base_path('necromancer.json'), json_encode(makeDiffManifest(['routes' => []]), JSON_THROW_ON_ERROR));
 
     try {
         $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
-            ->expectsOutputToContain('No architectural drift detected')
-            ->assertExitCode(0);
+            ->expectsOutputToContain('predates schema v1')
+            ->assertFailed();
     } finally {
         File::delete($baseFile);
     }
@@ -264,7 +225,7 @@ test('flags a newly added high-risk route in text output', function () {
     $headManifest = makeDiffManifest([
         'routes' => [[
             'method' => 'POST', 'uri' => '/billing/cancel', 'name' => 'billing.cancel', 'middleware' => [],
-            'route_metadata' => ['necromancer' => ['domain' => 'billing', 'risk' => 'high']],
+            'annotations' => ['domain' => 'billing', 'risk' => 'high'],
         ]],
     ]);
 
@@ -286,7 +247,7 @@ test('flags a newly added external-service route in markdown output', function (
     $headManifest = makeDiffManifest([
         'routes' => [[
             'method' => 'POST', 'uri' => '/stripe/webhook', 'name' => 'stripe.webhook', 'middleware' => [],
-            'route_metadata' => ['necromancer' => ['domain' => 'billing', 'external_services' => ['stripe']]],
+            'annotations' => ['domain' => 'billing', 'external_services' => ['stripe']],
         ]],
     ]);
 
@@ -308,12 +269,12 @@ test('flagged route text output shows domain flow and capability when available'
     $headManifest = makeDiffManifest([
         'routes' => [[
             'method' => 'POST', 'uri' => '/billing/cancel', 'name' => 'billing.cancel', 'middleware' => [],
-            'route_metadata' => ['necromancer' => [
+            'annotations' => [
                 'domain' => 'billing',
                 'flow' => 'subscription-cancellation',
                 'capability' => 'subscription.cancel',
                 'risk' => 'high',
-            ]],
+            ],
         ]],
     ]);
 
@@ -334,12 +295,12 @@ test('flagged route markdown output shows domain flow and capability when availa
     $headManifest = makeDiffManifest([
         'routes' => [[
             'method' => 'POST', 'uri' => '/stripe/webhook', 'name' => 'stripe.webhook', 'middleware' => [],
-            'route_metadata' => ['necromancer' => [
+            'annotations' => [
                 'domain' => 'billing',
                 'flow' => 'stripe-webhook-processing',
                 'capability' => 'billing.webhook.receive',
                 'external_services' => ['stripe'],
-            ]],
+            ],
         ]],
     ]);
 
@@ -360,7 +321,7 @@ test('flagged route output omits domain flow and capability when not declared', 
     $headManifest = makeDiffManifest([
         'routes' => [[
             'method' => 'POST', 'uri' => '/billing/cancel', 'name' => 'billing.cancel', 'middleware' => [],
-            'route_metadata' => ['necromancer' => ['risk' => 'high']],
+            'annotations' => ['risk' => 'high'],
         ]],
     ]);
 

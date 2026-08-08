@@ -5,6 +5,21 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.0.0
+
+### Removed
+
+- **BREAKING:** `necromancer:scan` no longer adapts pre-1.5 ("v0"/unversioned) manifests in memory. `ManifestReader::read()` now rejects any manifest whose `meta.manifest_schema_version` isn't `1`, treating it identically to a missing manifest — every command shows the same "Necromancer manifest not found. Run necromancer:scan first." error. Run `php artisan necromancer:scan` once after upgrading to regenerate a current-schema manifest.
+- **BREAKING:** `route_metadata.necromancer` is no longer written to the manifest. `route_metadata.raw` (untouched native `Route::getMetadata()` output) is unaffected. Resolved annotations for routes — like every other artifact family since 1.5.0 — are available only through the universal `annotations` key.
+- **BREAKING:** `necromancer:doctor --only=route-metadata-coverage` no longer matches the Artifact Annotation Coverage dimension. Use the canonical `--only=artifact-annotation-coverage` key.
+- **BREAKING:** The singular `adr` parameter was removed from `withNecromancer()` and `RouteMetadataFactory::forMetadata()`. Use the plural `adrs` array parameter instead (available since 1.5.0). The raw-array form (`->metadata(['necromancer' => ['adr' => '...']])`) is unaffected and still merges into `adrs`.
+
+### Changed
+
+- **BREAKING:** The `necromancer:scan` diagnostic codes `AN_LEGACY_VALUE` and `AN_LEGACY_RISK` are renamed to `AN_SCHEMA_INCOMPATIBLE_VALUE` and `AN_SCHEMA_INCOMPATIBLE_RISK`. The underlying check — a native `Route::metadata()` value that can't fit Annotation Schema v1 — is unchanged; only the code name changed, since the condition was never actually tied to manifest schema age.
+
+See the [README's "Upgrading to 2.0" section](README.md#upgrading-to-20) for a full migration guide.
+
 ## 1.7.0
 
 ### Added

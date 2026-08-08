@@ -296,7 +296,7 @@ final class DoctorAnalyzer
         $annotatedTotal = count($annotated);
 
         if ($annotatedTotal === 0) {
-            return new DimensionResult('route-metadata-coverage', 'Artifact Annotation Coverage', 1.0, 'N/A', 0.10);
+            return new DimensionResult('artifact-annotation-coverage', 'Artifact Annotation Coverage', 1.0, 'N/A', 0.10);
         }
 
         $withDomain = count(array_filter(
@@ -373,7 +373,7 @@ final class DoctorAnalyzer
 
         $score = array_sum($ratios) / count($ratios);
 
-        return new DimensionResult('route-metadata-coverage', 'Artifact Annotation Coverage', $score, implode(' · ', $detailParts), 0.10);
+        return new DimensionResult('artifact-annotation-coverage', 'Artifact Annotation Coverage', $score, implode(' · ', $detailParts), 0.10);
     }
 
     /**

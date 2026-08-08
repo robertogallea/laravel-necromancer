@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\File;
 function okfManifest(array $artifacts = [], bool $complete = true): array
 {
     return [
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'generated_at' => now()->addMinute()->toIso8601String(),
             'scope' => ['complete' => $complete, 'artifact_types' => array_keys($artifacts)],
         ],
@@ -54,7 +54,7 @@ test('the okf command refuses a stale manifest by default', function () {
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '1970-01-01T00:00:00+00:00', 'scope' => ['complete' => true, 'artifact_types' => []]],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '1970-01-01T00:00:00+00:00', 'scope' => ['complete' => true, 'artifact_types' => []]],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -72,7 +72,7 @@ test('the okf command exports a stale manifest with --allow-stale', function () 
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '1970-01-01T00:00:00+00:00', 'scope' => ['complete' => true, 'artifact_types' => []]],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '1970-01-01T00:00:00+00:00', 'scope' => ['complete' => true, 'artifact_types' => []]],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 

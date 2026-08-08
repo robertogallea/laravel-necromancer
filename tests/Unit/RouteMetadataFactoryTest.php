@@ -16,7 +16,7 @@ test('forMetadata returns only the supplied fields under the necromancer namespa
         summary: 'Cancels an active subscription.',
         risk: 'high',
         externalServices: ['stripe'],
-        adr: 'docs/adr/004-subscription-cancellation.md',
+        adrs: ['docs/adr/004-subscription-cancellation.md'],
     );
 
     expect($result)->toBe([
@@ -27,9 +27,18 @@ test('forMetadata returns only the supplied fields under the necromancer namespa
             'summary' => 'Cancels an active subscription.',
             'risk' => 'high',
             'external_services' => ['stripe'],
-            'adr' => 'docs/adr/004-subscription-cancellation.md',
+            'adrs' => ['docs/adr/004-subscription-cancellation.md'],
         ],
     ]);
+});
+
+test('forMetadata no longer declares a singular adr parameter', function () {
+    $parameters = array_map(
+        fn (ReflectionParameter $p): string => $p->getName(),
+        (new ReflectionMethod(RouteMetadataFactory::class, 'forMetadata'))->getParameters(),
+    );
+
+    expect($parameters)->not->toContain('adr');
 });
 
 test('forMetadata called with no arguments returns an empty array', function () {
@@ -48,16 +57,14 @@ test('forMetadata passes an external services array through unchanged', function
     expect($result)->toBe(['necromancer' => ['external_services' => ['stripe', 'sendgrid']]]);
 });
 
-test('forMetadata accepts a Risk enum and preserves singular and plural ADR declarations', function () {
+test('forMetadata accepts a Risk enum and passes through plural ADR declarations', function () {
     $result = app(RouteMetadataFactory::class)->forMetadata(
         risk: Risk::Critical,
-        adr: 'docs/adr/001.md',
         adrs: ['docs/adr/002.md', 'docs/adr/001.md'],
     );
 
     expect($result)->toBe(['necromancer' => [
         'risk' => 'critical',
-        'adr' => 'docs/adr/001.md',
         'adrs' => ['docs/adr/002.md', 'docs/adr/001.md'],
     ]]);
 });
