@@ -674,7 +674,49 @@ php artisan necromancer:okf --output=dist/okf  # write elsewhere
 
 Output replacement is safe to interrupt: the whole bundle is built in a temporary directory first, and the real output directory is only ever replaced once every file has been written successfully — a failed export never leaves a previously-generated bundle damaged.
 
-> **Note:** This command emits one Artifact Concept per artifact only. Synthesized Domain/Flow Concepts, cross-artifact relationship links, and copying declared ADRs into the bundle are a separate, later capability — not yet implemented.
+#### Relationships, Domain/Flow concepts, and ADRs
+
+When an artifact's already-collected fields name another artifact by class — a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model` — the Artifact Concept's body gains a `## Relationships` section rendering each as a Markdown link to that artifact's own concept file when it's resolvable in the bundle, or as plain text when it isn't (a vendor class, or one Necromancer didn't collect):
+
+```markdown
+## Relationships
+
+- **controller**: [App\Http\Controllers\OrderController](/artifacts/order-controller-9f21ab34.md)
+```
+
+Every artifact tagged with the same `domain` or `flow` annotation value is also made navigable through a synthesized **Domain Concept** or **Flow Concept** — one file per distinct value, linking every member artifact:
+
+```markdown
+---
+title: "billing"
+type: "domain"
+necromancer:
+  schema_version: 1
+  bundle_version: "0.2"
+  id: "domain:billing"
+  concept_type: "domain"
+  members:
+    - "jobs:App\\Jobs\\SendInvoiceEmail"
+    - "routes:POST:billing/cancel"
+---
+
+# billing
+
+_domain concept_
+
+## Artifacts
+
+- [App\Jobs\SendInvoiceEmail](/artifacts/app-jobs-sendinvoiceemail-20237e38.md)
+- [POST billing/cancel](/artifacts/post-billing-cancel-9f21ab34.md)
+```
+
+A locally declared `adrs` reference (anything that isn't an absolute URI) is resolved against the application's base path, copied into the bundle as its own **ADR Concept** with provenance, and linked from every artifact that declared it — an absolute URI stays an external Markdown link instead of being copied:
+
+```markdown
+adrs: [docs/adr/0004-subscription-cancellation.md](/artifacts/0004-subscription-cancellation-1a2b3c4d.md)
+```
+
+A declared local ADR that doesn't exist on disk fails the whole export before anything is written, naming the missing path — the same controlled-failure behavior as a stale or partial manifest.
 
 ---
 

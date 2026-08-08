@@ -114,6 +114,35 @@ test('--output overrides the default bundle directory', function () {
     File::deleteDirectory($customPath);
 });
 
+test('the okf command fails when a declared local ADR file is missing', function () {
+    File::put(base_path('necromancer.json'), json_encode(okfManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'annotations' => ['adrs' => ['docs/adr/missing.md']], 'source' => null]],
+    ]), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:okf')
+        ->expectsOutputToContain('docs/adr/missing.md')
+        ->assertFailed();
+
+    expect(File::isDirectory(base_path('okf')))->toBeFalse();
+});
+
+test('the okf command copies a declared local ADR and synthesizes domain/flow concepts', function () {
+    File::ensureDirectoryExists(base_path('docs/adr'));
+    File::put(base_path('docs/adr/0004-x.md'), "# ADR 0004\n\nDecision text.");
+
+    File::put(base_path('necromancer.json'), json_encode(okfManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'annotations' => ['domain' => 'billing', 'flow' => 'invoicing', 'adrs' => ['docs/adr/0004-x.md']], 'source' => null]],
+    ]), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:okf')
+        ->expectsOutputToContain('1 artifact concept')
+        ->assertSuccessful();
+
+    expect(count(File::glob(base_path('okf/artifacts/*.md'))))->toBe(4);
+
+    File::deleteDirectory(base_path('docs/adr'));
+});
+
 test('the okf command resolves the manifest path from config', function () {
     $path = storage_path('framework/testing/necromancer-okf-config.json');
     config(['necromancer.output.manifest' => $path]);

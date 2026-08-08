@@ -2,6 +2,7 @@
 
 use LaravelNecromancer\Okf\ArtifactConcept;
 use LaravelNecromancer\Okf\ArtifactConceptBuilder;
+use LaravelNecromancer\Okf\ConceptLink;
 
 function buildJobConcept(array $overrides = []): ArtifactConcept
 {
@@ -111,4 +112,136 @@ test('build() exposes the artifact id on the concept value object', function () 
     $concept = buildJobConcept();
 
     expect($concept->id)->toBe('jobs:App\\Jobs\\SendInvoice');
+});
+
+test('identify() returns the same id, title, and filename that build() would produce', function () {
+    $artifact = ['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null];
+    $builder = new ArtifactConceptBuilder;
+
+    $identity = $builder->identify('jobs', $artifact);
+    $concept = $builder->build('jobs', $artifact, '2026-08-07T12:00:00+02:00');
+
+    expect($identity['id'])->toBe($concept->id)
+        ->and($identity['filename'])->toBe($concept->filename)
+        ->and($identity['title'])->toBe('App\\Jobs\\SendInvoice');
+});
+
+test('build() omits the Relationships section for a type with no relationship fields', function () {
+    $concept = buildJobConcept();
+
+    expect($concept->content)->not->toContain('## Relationships');
+});
+
+test('build() links a route controller present in the class index', function () {
+    $artifact = ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null];
+    $classIndex = ['App\\Http\\Controllers\\OrderController' => new ConceptLink('OrderController', '/artifacts/order-controller-abcd1234.md')];
+
+    $concept = (new ArtifactConceptBuilder)->build('routes', $artifact, '2026-08-07T12:00:00+02:00', $classIndex);
+
+    expect($concept->content)->toContain('## Relationships')
+        ->and($concept->content)->toContain('- **controller**: [App\\Http\\Controllers\\OrderController](/artifacts/order-controller-abcd1234.md)');
+});
+
+test('build() renders an unresolved route controller as plain text', function () {
+    $artifact = ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null];
+
+    $concept = (new ArtifactConceptBuilder)->build('routes', $artifact, '2026-08-07T12:00:00+02:00');
+
+    expect($concept->content)->toContain('- **controller**: App\\Http\\Controllers\\OrderController')
+        ->and($concept->content)->not->toContain('[App\\Http\\Controllers\\OrderController](');
+});
+
+test('build() links model relationships, policy, and observers when resolvable', function () {
+    $classIndex = [
+        'App\\Models\\Customer' => new ConceptLink('Customer', '/artifacts/customer.md'),
+        'App\\Policies\\OrderPolicy' => new ConceptLink('OrderPolicy', '/artifacts/order-policy.md'),
+        'App\\Observers\\OrderObserver' => new ConceptLink('OrderObserver', '/artifacts/order-observer.md'),
+    ];
+
+    $artifact = [
+        'id' => 'models:App\\Models\\Order',
+        'class' => 'App\\Models\\Order',
+        'relationships' => [
+            ['type' => 'belongsTo', 'related' => 'App\\Models\\Customer', 'method' => 'customer'],
+            ['type' => 'belongsTo', 'related' => 'App\\Models\\Unknown', 'method' => 'unknown'],
+        ],
+        'policy' => 'App\\Policies\\OrderPolicy',
+        'observers' => ['App\\Observers\\OrderObserver'],
+        'source' => null,
+    ];
+
+    $concept = (new ArtifactConceptBuilder)->build('models', $artifact, '2026-08-07T12:00:00+02:00', $classIndex);
+
+    expect($concept->content)->toContain('- **customer**: belongsTo → [App\\Models\\Customer](/artifacts/customer.md)')
+        ->and($concept->content)->toContain('- **unknown**: belongsTo → App\\Models\\Unknown')
+        ->and($concept->content)->toContain('- **policy**: [App\\Policies\\OrderPolicy](/artifacts/order-policy.md)')
+        ->and($concept->content)->toContain('- **observers**: [App\\Observers\\OrderObserver](/artifacts/order-observer.md)');
+});
+
+test('build() links event listeners and listener handled events', function () {
+    $classIndex = ['App\\Listeners\\SendOrderConfirmation' => new ConceptLink('SendOrderConfirmation', '/artifacts/listener.md')];
+
+    $event = ['id' => 'events:App\\Events\\OrderPlaced', 'class' => 'App\\Events\\OrderPlaced', 'listeners' => ['App\\Listeners\\SendOrderConfirmation'], 'source' => null];
+    $concept = (new ArtifactConceptBuilder)->build('events', $event, '2026-08-07T12:00:00+02:00', $classIndex);
+
+    expect($concept->content)->toContain('- **listeners**: [App\\Listeners\\SendOrderConfirmation](/artifacts/listener.md)');
+
+    $classIndex2 = ['App\\Events\\OrderPlaced' => new ConceptLink('OrderPlaced', '/artifacts/event.md')];
+    $listener = ['id' => 'listeners:App\\Listeners\\SendOrderConfirmation', 'class' => 'App\\Listeners\\SendOrderConfirmation', 'handles' => ['App\\Events\\OrderPlaced'], 'source' => null];
+    $listenerConcept = (new ArtifactConceptBuilder)->build('listeners', $listener, '2026-08-07T12:00:00+02:00', $classIndex2);
+
+    expect($listenerConcept->content)->toContain('- **handles**: [App\\Events\\OrderPlaced](/artifacts/event.md)');
+});
+
+test('build() links a policy or observer model when resolvable', function () {
+    $classIndex = ['App\\Models\\Order' => new ConceptLink('Order', '/artifacts/order.md')];
+
+    $policy = ['id' => 'policies:App\\Policies\\OrderPolicy', 'class' => 'App\\Policies\\OrderPolicy', 'model' => 'App\\Models\\Order', 'source' => null];
+    $policyConcept = (new ArtifactConceptBuilder)->build('policies', $policy, '2026-08-07T12:00:00+02:00', $classIndex);
+
+    expect($policyConcept->content)->toContain('- **model**: [App\\Models\\Order](/artifacts/order.md)');
+
+    $observer = ['id' => 'observers:App\\Observers\\OrderObserver', 'class' => 'App\\Observers\\OrderObserver', 'model' => 'App\\Models\\Order', 'source' => null];
+    $observerConcept = (new ArtifactConceptBuilder)->build('observers', $observer, '2026-08-07T12:00:00+02:00', $classIndex);
+
+    expect($observerConcept->content)->toContain('- **model**: [App\\Models\\Order](/artifacts/order.md)');
+});
+
+test('build() links a declared domain/flow value back to its synthesized group concept when resolvable', function () {
+    $groupIndex = [
+        'domain:billing' => new ConceptLink('billing', '/artifacts/domain-billing.md'),
+        'flow:invoicing' => new ConceptLink('invoicing', '/artifacts/flow-invoicing.md'),
+    ];
+
+    $concept = (new ArtifactConceptBuilder)->build('jobs', [
+        'id' => 'jobs:App\\Jobs\\SendInvoice',
+        'class' => 'App\\Jobs\\SendInvoice',
+        'annotations' => ['domain' => 'billing', 'flow' => 'invoicing'],
+        'source' => null,
+    ], '2026-08-07T12:00:00+02:00', [], [], $groupIndex);
+
+    expect($concept->content)->toContain('domain: [billing](/artifacts/domain-billing.md)')
+        ->and($concept->content)->toContain('flow: [invoicing](/artifacts/flow-invoicing.md)');
+});
+
+test('build() renders an unresolved domain/flow value as plain text', function () {
+    $concept = buildJobConcept(['annotations' => ['domain' => 'billing', 'flow' => 'invoicing']]);
+
+    expect($concept->content)->toContain('domain: billing')
+        ->and($concept->content)->toContain('flow: invoicing')
+        ->and($concept->content)->not->toContain('domain: [billing]')
+        ->and($concept->content)->not->toContain('flow: [invoicing]');
+});
+
+test('build() links a locally resolvable declared ADR and renders external ADR URIs as links too', function () {
+    $adrIndex = ['docs/adr/0004-x.md' => new ConceptLink('0004-x', '/artifacts/adr-0004-x.md')];
+
+    $concept = (new ArtifactConceptBuilder)->build('jobs', [
+        'id' => 'jobs:App\\Jobs\\SendInvoice',
+        'class' => 'App\\Jobs\\SendInvoice',
+        'annotations' => ['adrs' => ['docs/adr/0004-x.md', 'https://example.com/adr/0005']],
+        'source' => null,
+    ], '2026-08-07T12:00:00+02:00', [], $adrIndex);
+
+    expect($concept->content)->toContain('adrs: [docs/adr/0004-x.md](/artifacts/adr-0004-x.md), [https://example.com/adr/0005](https://example.com/adr/0005)');
 });
