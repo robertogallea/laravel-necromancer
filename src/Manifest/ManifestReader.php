@@ -37,11 +37,10 @@ final readonly class ManifestReader
     }
 
     /**
-     * Whether a manifest is schema v1 — the only shape read() (and every
-     * command built on it) accepts. Exposed separately from read() for
-     * DiffCommand, which loads a manifest from `git show` rather than the
-     * filesystem and needs to report the same rejection in its own error
-     * style instead of catching an exception.
+     * Whether a manifest is schema v1 — the only shape this class accepts.
+     * Exposed separately from read() for callers that load a manifest from
+     * somewhere other than the filesystem and need to report the same
+     * rejection in their own error style instead of catching an exception.
      *
      * @param  array<string, mixed>  $manifest
      */

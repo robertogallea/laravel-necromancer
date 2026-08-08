@@ -10,7 +10,7 @@ use LaravelNecromancer\Collection\RouteMetadataNormalizer;
  * Resolves native Laravel route metadata into the canonical Annotation
  * Schema v1 projection. RouteMetadataNormalizer stays an internal
  * extraction step only — its output is never itself exposed in the
- * manifest (that compatibility projection was removed in 2.0).
+ * manifest.
  */
 final readonly class RouteAnnotationResolver
 {

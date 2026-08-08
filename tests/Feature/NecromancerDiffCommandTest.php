@@ -106,6 +106,22 @@ test('fails with a clear message when --base-manifest predates schema v1', funct
     }
 });
 
+test('fails with a clear message when the head manifest predates schema v1', function () {
+    $baseFile = writeTempManifest(makeDiffManifest(['routes' => []]));
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['generated_at' => '2026-01-01T00:00:00Z'],
+        'artifacts' => ['routes' => [['method' => 'POST', 'uri' => 'billing/cancel']]],
+    ], JSON_THROW_ON_ERROR));
+
+    try {
+        $this->artisan('necromancer:diff', ['--base-manifest' => $baseFile])
+            ->expectsOutputToContain('predates schema v1')
+            ->assertFailed();
+    } finally {
+        File::delete($baseFile);
+    }
+});
+
 test('fails when head manifest is missing', function () {
     $baseFile = writeTempManifest(makeDiffManifest());
 

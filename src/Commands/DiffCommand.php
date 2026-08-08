@@ -46,6 +46,10 @@ final class DiffCommand extends Command
             $this->error("Manifest is not valid JSON: {$e->getMessage()}");
 
             return self::FAILURE;
+        } catch (ManifestNotFoundException $e) {
+            $this->error($e->getMessage());
+
+            return self::FAILURE;
         }
 
         $base = $this->loadBaseManifest($reader);
