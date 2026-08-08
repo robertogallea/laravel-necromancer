@@ -36,7 +36,7 @@ final readonly class AnnotatedArtifact
         $collected = [];
 
         foreach ($artifacts as $type => $items) {
-            if (! is_string($type) || ! is_array($items)) {
+            if (! is_array($items)) {
                 continue;
             }
 
