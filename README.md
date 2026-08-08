@@ -617,6 +617,174 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 
 ---
 
+### Step 3i — Export an OKF Knowledge Bundle
+
+Project the manifest into a portable, deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact, with authoritative YAML front matter and a concise prose mirror:
+
+```bash
+php artisan necromancer:okf
+```
+
+Writes to `okf/` at the project root by default: `okf/bundle.json` (a small index with the bundle version and artifact count) plus one file per artifact under `okf/artifacts/`, named from a readable slug and a short hash of the artifact's canonical ID (e.g. `app-jobs-sendinvoice-20237e38.md`) — the filename is for browsability only, never authoritative; the `necromancer.id` field inside each file's front matter is.
+
+```markdown
+---
+title: "SendInvoiceEmail"
+type: "artifact"
+kind: "jobs"
+tags:
+  - "billing"
+necromancer:
+  schema_version: 1
+  bundle_version: "0.2"
+  id: "jobs:App\\Jobs\\SendInvoiceEmail"
+  artifact_type: "jobs"
+  generated_at: "2026-08-07T12:00:00+02:00"
+  facts:
+    queue: "emails"
+    tries: 3
+  annotations:
+    domain: "billing"
+    risk: "high"
+---
+
+# SendInvoiceEmail
+
+_jobs artifact_
+
+## Architectural Context
+
+domain: billing · risk: high
+
+## Discovered Facts
+
+- **queue**: `emails`
+- **tries**: `3`
+```
+
+Every field is deterministic: `generated_at` always comes from the manifest's own `meta.generated_at`, never the export clock, so re-exporting an unchanged manifest produces byte-identical files. The bundle never becomes a competing source of truth — it's a read-only projection of the manifest, safe to regenerate at any time and never consulted by Necromancer itself.
+
+By default the command refuses to export a manifest that looks stale (source files changed since the last scan) or whose scan was partial (`--only=` was used, or it's an old unversioned manifest) — both are exit-1 failures with an actionable message, not silent best-effort output:
+
+```bash
+php artisan necromancer:okf --allow-stale      # export anyway, e.g. in a throwaway CI check
+php artisan necromancer:okf --allow-partial    # export a deliberately narrow bundle
+php artisan necromancer:okf --output=dist/okf  # write elsewhere
+```
+
+Output replacement is safe to interrupt: the whole bundle is built in a temporary directory first, and the real output directory is only ever replaced once every file has been written successfully — a failed export never leaves a previously-generated bundle damaged.
+
+#### Relationships, Domain/Flow concepts, and ADRs
+
+When an artifact's already-collected fields name another artifact by class — a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model` — the Artifact Concept's body gains a `## Relationships` section rendering each as a Markdown link to that artifact's own concept file when it's resolvable in the bundle, or as plain text when it isn't (a vendor class, or one Necromancer didn't collect):
+
+```markdown
+## Relationships
+
+- **controller**: [App\Http\Controllers\OrderController](/artifacts/order-controller-9f21ab34.md)
+```
+
+Every artifact tagged with the same `domain` or `flow` annotation value is also made navigable through a synthesized **Domain Concept** or **Flow Concept** — one file per distinct value, linking every member artifact:
+
+```markdown
+---
+title: "billing"
+type: "domain"
+necromancer:
+  schema_version: 1
+  bundle_version: "0.2"
+  id: "domain:billing"
+  concept_type: "domain"
+  members:
+    - "jobs:App\\Jobs\\SendInvoiceEmail"
+    - "routes:POST:billing/cancel"
+---
+
+# billing
+
+_domain concept_
+
+## Artifacts
+
+- [App\Jobs\SendInvoiceEmail](/artifacts/app-jobs-sendinvoiceemail-20237e38.md)
+- [POST billing/cancel](/artifacts/post-billing-cancel-9f21ab34.md)
+```
+
+A locally declared `adrs` reference (anything that isn't an absolute URI) is resolved against the application's base path, copied into the bundle as its own **ADR Concept** with provenance, and linked from every artifact that declared it — an absolute URI stays an external Markdown link instead of being copied:
+
+```markdown
+adrs: [docs/adr/0004-subscription-cancellation.md](/artifacts/0004-subscription-cancellation-1a2b3c4d.md)
+```
+
+A declared local ADR that doesn't exist on disk fails the whole export before anything is written, naming the missing path — the same controlled-failure behavior as a stale or partial manifest.
+
+---
+
+### Step 3j — Generate an AI-Enriched Knowledge Bundle
+
+Layer AI-generated prose onto the deterministic bundle, written to a separate sibling directory — the deterministic bundle from `necromancer:okf` is never modified:
+
+```bash
+php artisan necromancer:okf-enrich
+```
+
+Every concept in the bundle (artifact, domain, flow, and ADR) is eligible for enrichment, and enrichment can only ever *add* content — it cannot change a concept's facts, annotations, Artifact ID, or links, because the AI's output is never given access to those fields to begin with. The enriched front matter gains a `description` field and a `necromancer.enrichment` block; the body gains an `## AI-Enriched Summary` section:
+
+```markdown
+---
+title: "SendInvoiceEmail"
+type: "artifact"
+kind: "jobs"
+description: "Sends invoice emails asynchronously outside the request cycle."
+necromancer:
+  schema_version: 1
+  bundle_version: "0.2"
+  id: "jobs:App\\Jobs\\SendInvoiceEmail"
+  facts:
+    queue: "emails"
+  annotations:
+    domain: "billing"
+  enrichment:
+    provider: "anthropic"
+    model: "claude-sonnet-4-6"
+    prompt_version: "1"
+    privacy_policy: "excludes-source-framework-config-adr-bodies"
+    cache_key: "8f1c2e...:anthropic:claude-sonnet-4-6:default:1"
+    cached: false
+---
+
+# SendInvoiceEmail
+
+...
+
+## AI-Enriched Summary
+
+This job decouples invoice email delivery from the request cycle, running on the
+emails queue so a slow mail provider never blocks the HTTP response.
+```
+
+**What the AI never sees.** The prompt built for each concept excludes raw framework metadata (`route_metadata`), source file paths and hashes, application configuration, and — for ADR concepts — the ADR's own copied file content. A domain/flow concept's prompt carries only its value and member ids; an ADR concept's prompt carries only its path and the ids of artifacts that reference it. None of this is a filter applied after the fact — the code that builds each prompt has no parameter through which that content could pass.
+
+**Caching.** Each concept is cached independently, keyed by a hash of its own prompt plus the provider, model, temperature, and prompt version — so changing one artifact's annotations only invalidates that one concept's cached enrichment, not the whole bundle. Re-running the command reuses cached results and reports how many concepts were generated fresh versus reused:
+
+```bash
+php artisan necromancer:okf-enrich
+# Enriched 12 concept(s) (2 generated, 10 cached) to /path/to/okf-enriched.
+```
+
+```bash
+php artisan necromancer:okf-enrich --refresh              # bypass the cache, re-enrich every concept
+php artisan necromancer:okf-enrich --provider=anthropic --model=claude-sonnet-4-6
+php artisan necromancer:okf-enrich --output=dist/okf-enriched
+php artisan necromancer:okf-enrich --allow-stale --allow-partial
+```
+
+The same stale-manifest and partial-scope refusals as `necromancer:okf` apply, and `--allow-stale`/`--allow-partial` override them the same way. A declared local ADR that doesn't exist on disk fails the command before anything is written, exactly like `necromancer:okf`.
+
+> **Requires** `laravel/ai` installed and an AI provider configured in `config/ai.php`.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -632,6 +800,8 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
 | `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
+| `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
+| `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
 
 ## Configuration
 
@@ -660,6 +830,21 @@ return [
     'output' => [
         'manifest' => base_path('necromancer.json'),
         'context'  => base_path('NECROMANCER.md'),
+    ],
+
+    // OKF Knowledge Bundle output directory (necromancer:okf)
+    'okf' => [
+        'output' => base_path('okf'),
+
+        // AI enrichment (necromancer:okf-enrich)
+        'enrichment' => [
+            'output' => base_path('okf-enriched'),
+            'cache' => storage_path('app/necromancer/okf-enrichment-cache'),
+            'provider' => null,
+            'model' => null,
+            'prompt_version' => '1',
+            'privacy_policy' => 'excludes-source-framework-config-adr-bodies',
+        ],
     ],
 
     // Laravel Boost integration

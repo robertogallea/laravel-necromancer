@@ -16,6 +16,8 @@ use LaravelNecromancer\Commands\GenerateCommand;
 use LaravelNecromancer\Commands\InferCommand;
 use LaravelNecromancer\Commands\InspectPayloadCommand;
 use LaravelNecromancer\Commands\MapCommand;
+use LaravelNecromancer\Commands\OkfCommand;
+use LaravelNecromancer\Commands\OkfEnrichCommand;
 use LaravelNecromancer\Commands\PromptCommand;
 use LaravelNecromancer\Commands\ScanCommand;
 use LaravelNecromancer\Inference\AdrCriticAgent;
@@ -29,6 +31,8 @@ use LaravelNecromancer\Integrations\BoostDetector;
 use LaravelNecromancer\Integrations\McpInstaller;
 use LaravelNecromancer\Mcp\NecromancerServer;
 use LaravelNecromancer\Metadata\RouteMetadataFactory;
+use LaravelNecromancer\Okf\Enrichment\Contracts\ConceptEnricher;
+use LaravelNecromancer\Okf\Enrichment\EnrichmentAgent;
 use LaravelNecromancer\Routing\RouteMetadataMacros;
 
 final class NecromancerServiceProvider extends ServiceProvider
@@ -42,6 +46,7 @@ final class NecromancerServiceProvider extends ServiceProvider
         $this->app->bind(AdrInferrer::class, AdrInferenceAgent::class);
         $this->app->bind(AdrTranslator::class, AdrTranslationAgent::class);
         $this->app->bind(AdrCritic::class, AdrCriticAgent::class);
+        $this->app->bind(ConceptEnricher::class, EnrichmentAgent::class);
         $this->app->singleton(RouteMetadataFactory::class);
     }
 
@@ -66,6 +71,8 @@ final class NecromancerServiceProvider extends ServiceProvider
                 PromptCommand::class,
                 InspectPayloadCommand::class,
                 BenchmarkCommand::class,
+                OkfCommand::class,
+                OkfEnrichCommand::class,
             ]);
         }
 
