@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Process;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
 use LaravelNecromancer\Diff\DiffReviewAgent;
 use LaravelNecromancer\Diff\DiffReviewResult;
-use LaravelNecromancer\Diff\FlaggedRoutes;
+use LaravelNecromancer\Diff\FlaggedArtifacts;
 use LaravelNecromancer\Diff\ManifestDiff;
 use LaravelNecromancer\Diff\ManifestDiffer;
 use LaravelNecromancer\Inference\ManifestSummarizer;
@@ -197,14 +197,15 @@ final class DiffCommand extends Command
             return implode(PHP_EOL, $lines);
         }
 
-        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+        $flagged = FlaggedArtifacts::fromDiff($diff);
 
-        if (! empty($flaggedRoutes)) {
+        if (! empty($flagged)) {
             $lines[] = '';
-            $lines[] = '  FLAGGED ROUTES';
+            $lines[] = '  FLAGGED ARTIFACTS';
 
-            foreach ($flaggedRoutes as $route) {
-                $lines[] = "  <fg=red>⚠</>  {$this->labelArtifact('routes', $route)}  ".FlaggedRoutes::reason($route);
+            foreach ($flagged as ['type' => $type, 'artifact' => $artifact]) {
+                $id = (string) ($artifact['id'] ?? '');
+                $lines[] = "  <fg=red>⚠</>  {$type}  {$this->labelArtifact($type, $artifact)} ({$id})  ".FlaggedArtifacts::reason($artifact);
             }
         }
 
@@ -282,14 +283,15 @@ final class DiffCommand extends Command
             return implode(PHP_EOL, $lines);
         }
 
-        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+        $flagged = FlaggedArtifacts::fromDiff($diff);
 
-        if (! empty($flaggedRoutes)) {
+        if (! empty($flagged)) {
             $lines[] = '';
-            $lines[] = '### Flagged Routes';
+            $lines[] = '### Flagged Artifacts';
 
-            foreach ($flaggedRoutes as $route) {
-                $lines[] = "- `{$this->labelArtifact('routes', $route)}` — ".FlaggedRoutes::reason($route);
+            foreach ($flagged as ['type' => $type, 'artifact' => $artifact]) {
+                $id = (string) ($artifact['id'] ?? '');
+                $lines[] = "- `[{$type}]` `{$this->labelArtifact($type, $artifact)}` (`{$id}`) — ".FlaggedArtifacts::reason($artifact);
             }
         }
 
@@ -472,6 +474,14 @@ final class DiffCommand extends Command
 
         if ($type === 'tests') {
             return basename((string) ($artifact['file'] ?? ''));
+        }
+
+        if ($type === 'gates') {
+            return (string) ($artifact['ability'] ?? '');
+        }
+
+        if ($type === 'scheduled_tasks') {
+            return (string) ($artifact['command'] ?? '');
         }
 
         $class = (string) ($artifact['class'] ?? $artifact['signature'] ?? '');

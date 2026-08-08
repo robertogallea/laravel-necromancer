@@ -128,6 +128,22 @@ test('uses file as canonical key for tests artifacts', function () {
         ->and($diff->removed)->toBeEmpty();
 });
 
+test('detects an annotation-only change, keyed by the artifact canonical id', function () {
+    $differ = new ManifestDiffer;
+    $base = ['jobs' => [['class' => 'App\\Jobs\\SendInvoice', 'queue' => 'emails']]];
+    $head = ['jobs' => [['class' => 'App\\Jobs\\SendInvoice', 'queue' => 'emails', 'annotations' => ['domain' => 'billing', 'risk' => 'high']]]];
+
+    $diff = $differ->diff($base, $head);
+
+    expect($diff->changed)->toHaveKey('jobs')
+        ->and($diff->changed['jobs'])->toHaveCount(1)
+        ->and($diff->changed['jobs'][0]['from']['id'])->toBe('jobs:App\\Jobs\\SendInvoice')
+        ->and($diff->changed['jobs'][0]['to']['id'])->toBe('jobs:App\\Jobs\\SendInvoice')
+        ->and($diff->changed['jobs'][0]['to']['annotations'])->toBe(['domain' => 'billing', 'risk' => 'high'])
+        ->and($diff->added)->toBeEmpty()
+        ->and($diff->removed)->toBeEmpty();
+});
+
 test('uses stored IDs without regenerating them', function () {
     $differ = new ManifestDiffer;
     $base = ['models' => [['id' => 'models:App\\Models\\LegacyOrder', 'class' => 'App\\Models\\Order']]];

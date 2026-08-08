@@ -82,12 +82,13 @@ final class DiffReviewAgent
     {
         $lines = [];
 
-        $flaggedRoutes = FlaggedRoutes::fromDiff($diff);
+        $flagged = FlaggedArtifacts::fromDiff($diff);
 
-        if (! empty($flaggedRoutes)) {
-            $lines[] = 'FLAGGED ROUTES';
-            foreach ($flaggedRoutes as $route) {
-                $lines[] = '- '.$this->labelArtifact('routes', $route).'  '.FlaggedRoutes::reason($route);
+        if (! empty($flagged)) {
+            $lines[] = 'FLAGGED ARTIFACTS';
+            foreach ($flagged as ['type' => $type, 'artifact' => $artifact]) {
+                $id = (string) ($artifact['id'] ?? '');
+                $lines[] = '- ['.$type.'] '.$this->labelArtifact($type, $artifact)." ({$id})  ".FlaggedArtifacts::reason($artifact);
             }
             $lines[] = '';
         }
@@ -143,6 +144,14 @@ final class DiffReviewAgent
             return $name
                 ? "{$method} {$uri} ({$name})"
                 : "{$method} {$uri}";
+        }
+
+        if ($type === 'gates') {
+            return (string) ($artifact['ability'] ?? '');
+        }
+
+        if ($type === 'scheduled_tasks') {
+            return (string) ($artifact['command'] ?? '');
         }
 
         $class = (string) ($artifact['class'] ?? $artifact['signature'] ?? '');

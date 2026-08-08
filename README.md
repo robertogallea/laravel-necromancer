@@ -119,7 +119,7 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
     ]);
 ```
 
-All fields are optional and the feature is entirely opt-in — apps that don't declare route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and is used by `necromancer:doctor` (coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (routes table columns), and `necromancer:diff` (flagged high-risk/external-service routes) — see each command's section below.
+All fields are optional and the feature is entirely opt-in — apps that don't declare route metadata, or that run Laravel < 13.17, are unaffected; the `route_metadata` key is simply omitted from the manifest. Keep values compact (labels, identifiers, ADR references) rather than long narrative descriptions — ADRs, domain docs, and the generated context file remain the right place for extended architectural explanations. This declared metadata takes priority over any naming/namespace-based inference Necromancer performs, and — resolved alongside annotations declared on every other artifact family — is used by `necromancer:doctor` (Artifact Annotation Coverage scoring), `necromancer:audit` (quality checks), `necromancer:generate` (route table columns and the Architectural Context column on every other section), and `necromancer:diff` (flagged high-risk/external-service artifacts) — see each command's section below.
 
 #### Annotating class-backed artifacts, controllers, and middleware
 
@@ -274,6 +274,17 @@ Produces `NECROMANCER.md` at the project root. The generated file includes a `##
 | tests/Feature/OrderCheckoutTest.php | feature | | test_it_completes_checkout |
 ```
 
+Routes render their Domain/Risk/External Services/ADR columns from resolved Artifact Annotations (declared via route metadata, a `#[Necromancer]` attribute, or an exact-ID configuration mapping). Every other artifact section — models, jobs, events, and the rest — renders a single compact `Architectural Context` column whenever at least one of its artifacts declares annotations, so developer intent stays visible without a dedicated column per field:
+
+```markdown
+## Jobs (1)
+| Name | Queue | Connection | Tries | Architectural Context |
+|---|---|---|---|---|
+| SyncStripeInvoices | billing | redis | 3 | domain: billing · risk: high · external services: stripe |
+```
+
+The column is omitted entirely for a section where no artifact declares annotations.
+
 Generate only specific sections:
 
 ```bash
@@ -324,7 +335,7 @@ php artisan necromancer:ask "What routes require authentication?"
 
 If you omit the question, the command prompts you interactively. The manifest is injected verbatim into the AI's context, so answers are grounded in your actual application — not a model's prior knowledge. A warning is shown if the manifest may be stale.
 
-The full manifest is always included — nothing is discarded — but a "Most Relevant Evidence" section is prepended ahead of it, ranking the artifacts most related to your question so the AI's attention is prioritized rather than left to search the whole payload unguided. Ranking uses the same keyword scoring as `necromancer:prompt`, boosted for declared route metadata: a route's `domain`/`flow`/`capability` count as strongly as its name or class, since that's an intentional signal from the developer rather than something inferred from naming.
+The full manifest is always included — nothing is discarded — but a "Most Relevant Evidence" section is prepended ahead of it, ranking the artifacts most related to your question so the AI's attention is prioritized rather than left to search the whole payload unguided. Ranking uses the same keyword scoring as `necromancer:prompt`, boosted for declared Artifact Annotations on any artifact family: a `domain`/`flow`/`capability` counts as strongly as its name or class, since that's an intentional signal from the developer rather than something inferred from naming.
 
 ```bash
 php artisan necromancer:ask                                        # interactive prompt
@@ -506,11 +517,11 @@ php artisan necromancer:diff main
 
 Compares the current manifest against the manifest on the `main` branch. The output shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts.
 
-When an added or changed route declares `risk: high`/`critical` or a non-empty `external_services` via route metadata, it's called out in a dedicated "Flagged Routes" section before the rest of the diff — this is a deterministic check, so it shows up even without `--review`/`laravel/ai`. Each flagged route also shows its `domain`, `flow`, and `capability` when declared, so reviewers see business context alongside the trigger:
+When an added or changed artifact of any family — not just routes — declares `risk: high`/`critical` or a non-empty `external_services` via its resolved Artifact Annotations, it's called out in a dedicated "Flagged Artifacts" section before the rest of the diff — this is a deterministic check, so it shows up even without `--review`/`laravel/ai`. Each flagged artifact also shows its `domain`, `flow`, and `capability` when declared, so reviewers see business context alongside the trigger:
 
 ```text
-FLAGGED ROUTES
-⚠  POST /billing/cancel (billing.cancel)  domain: billing · flow: subscription-cancellation · capability: subscription.cancel · risk: high
+FLAGGED ARTIFACTS
+⚠  routes  POST /billing/cancel (billing.cancel)  domain: billing · flow: subscription-cancellation · capability: subscription.cancel · risk: high
 ```
 
 #### Options
@@ -580,7 +591,7 @@ This PR introduces a subscription model with activation workflow.
 
 > **Note:** The `--review` option requires `laravel/ai` to be installed and configured. Without it, only the basic diff is shown. Both branches must have a committed `necromancer.json` manifest.
 
-The AI reviewer's prompt includes the same "Flagged Routes" signal shown in the deterministic diff (high/critical-risk and external-service routes, with `domain`/`flow`/`capability` when declared) — so its risk assessment is grounded in what you actually declared via route metadata, not left to infer risk purely from the raw diff.
+The AI reviewer's prompt includes the same "Flagged Artifacts" signal shown in the deterministic diff (high/critical-risk and external-service artifacts of any family, with `domain`/`flow`/`capability` when declared) — so its risk assessment is grounded in what you actually declared via Artifact Annotations, not left to infer risk purely from the raw diff.
 
 ---
 

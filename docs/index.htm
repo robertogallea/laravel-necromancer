@@ -400,7 +400,7 @@ php artisan necromancer:infer --fresh               <span class="text-gray-600">
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Compares the current manifest against a branch or snapshot. Shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts. Added or changed routes tagged high/critical risk or declaring external services surface in a dedicated "Flagged Routes" section — no AI required. With <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--review</code>, an AI agent summarises the architectural impact and surfaces risks, grounded in the same flagged-routes signal.</p>
+        <p class="text-gray-400 text-sm mb-3">Compares the current manifest against a branch or snapshot. Shows added, removed, and modified routes, models, jobs, events, listeners, policies, and other artifacts. Added or changed artifacts of any family tagged high/critical risk or declaring external services surface in a dedicated "Flagged Artifacts" section — no AI required. With <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--review</code>, an AI agent summarises the architectural impact and surfaces risks, grounded in the same flagged-artifacts signal.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:diff main
 php artisan necromancer:diff main --review --format=markdown
@@ -719,11 +719,11 @@ Route::singleton('profile', ProfileController::class)->withNecromancer(domain: '
         </div>
         <div class="border border-gray-800 rounded-lg p-4">
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">necromancer:generate &amp; :ask</div>
-          <div class="text-gray-500 text-sm">Conditional Domain/Risk/External Services/ADR table columns, and a relevance boost for declared metadata when ranking evidence for a question.</div>
+          <div class="text-gray-500 text-sm">Conditional Domain/Risk/External Services/ADR table columns for routes, a compact Architectural Context column for every other artifact family, and a relevance boost for declared annotations when ranking evidence for a question.</div>
         </div>
         <div class="border border-gray-800 rounded-lg p-4">
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">necromancer:diff</div>
-          <div class="text-gray-500 text-sm">A deterministic "Flagged Routes" section for any added/changed route tagged high/critical risk or declaring external services — no AI required.</div>
+          <div class="text-gray-500 text-sm">A deterministic "Flagged Artifacts" section for any added/changed artifact of any family tagged high/critical risk or declaring external services — no AI required.</div>
         </div>
       </div>
     </div>

@@ -74,6 +74,12 @@ final class PromptRelevanceScorer
                 continue;
             }
 
+            if ($field === 'annotations') {
+                $score += $this->scoreAnnotations($value, $keywords);
+
+                continue;
+            }
+
             $weight = match (true) {
                 in_array($field, self::HIGH_WEIGHT_FIELDS, true) => 3,
                 in_array($field, self::MID_WEIGHT_FIELDS, true) => 2,
@@ -89,11 +95,38 @@ final class PromptRelevanceScorer
     }
 
     /**
-     * Declared route metadata is a stronger relevance signal than an inferred/observed
-     * field, since it's the developer explicitly naming the domain/flow/capability a
-     * route belongs to — so `domain`/`flow`/`capability` are weighted like `class`/`name`,
-     * `summary` like `description`, and everything else (including raw metadata from
-     * other packages' namespaces) falls back to the default weight.
+     * Resolved Artifact Annotations are a stronger relevance signal than an
+     * inferred/observed field, since they're the developer explicitly naming
+     * the domain/flow/capability an artifact belongs to (AN-SEARCH-002) —
+     * scored the same way for every artifact type, not just routes.
+     *
+     * @param  list<string>  $keywords
+     */
+    private function scoreAnnotations(mixed $value, array $keywords): int
+    {
+        if (! is_array($value)) {
+            return 0;
+        }
+
+        $score = 0;
+
+        foreach (['domain', 'flow', 'capability'] as $field) {
+            $score += $this->matchWeight((string) ($value[$field] ?? ''), $keywords, 3);
+        }
+
+        $score += $this->matchWeight((string) ($value['summary'] ?? ''), $keywords, 2);
+        $score += $this->matchWeight((string) ($value['risk'] ?? ''), $keywords, 1);
+        $score += $this->matchWeight(implode(',', (array) ($value['external_services'] ?? [])), $keywords, 1);
+        $score += $this->matchWeight(implode(',', (array) ($value['adrs'] ?? [])), $keywords, 1);
+
+        return $score;
+    }
+
+    /**
+     * Raw route metadata stays searchable at the default weight (AN-SEARCH-003),
+     * but its reserved `necromancer` namespace is excluded here — that data is
+     * already scored, at differentiated weights, via the resolved `annotations`
+     * field, and must not be counted a second time.
      *
      * @param  list<string>  $keywords
      */
@@ -103,20 +136,10 @@ final class PromptRelevanceScorer
             return 0;
         }
 
-        $necromancer = is_array($value['necromancer'] ?? null) ? $value['necromancer'] : [];
-        $score = 0;
+        $raw = is_array($value['raw'] ?? null) ? $value['raw'] : [];
+        unset($raw['necromancer']);
 
-        foreach (['domain', 'flow', 'capability'] as $field) {
-            $score += $this->matchWeight((string) ($necromancer[$field] ?? ''), $keywords, 3);
-        }
-
-        $score += $this->matchWeight((string) ($necromancer['summary'] ?? ''), $keywords, 2);
-        $score += $this->matchWeight((string) ($necromancer['risk'] ?? ''), $keywords, 1);
-        $score += $this->matchWeight(implode(',', (array) ($necromancer['external_services'] ?? [])), $keywords, 1);
-        $score += $this->matchWeight((string) ($necromancer['adr'] ?? ''), $keywords, 1);
-        $score += $this->matchWeight(json_encode($value['raw'] ?? []) ?: '', $keywords, 1);
-
-        return $score;
+        return $this->matchWeight(json_encode($raw) ?: '', $keywords, 1);
     }
 
     /**
