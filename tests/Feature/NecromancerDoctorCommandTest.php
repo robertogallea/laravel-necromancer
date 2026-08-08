@@ -286,6 +286,17 @@ test('--only with json only includes the specified dimensions in dimensions arra
     expect($keys)->toContain('route-clarity')->toContain('async-clarity');
 });
 
+test('--only accepts artifact-annotation-coverage as an alias for the route-metadata-coverage dimension key', function () {
+    File::put(base_path('necromancer.json'), json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--json' => true, '--only' => 'artifact-annotation-coverage']);
+    $decoded = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['dimensions'])->toHaveCount(1)
+        ->and($decoded['dimensions'][0]['key'])->toBe('route-metadata-coverage')
+        ->and($decoded['dimensions'][0]['label'])->toBe('Artifact Annotation Coverage');
+});
+
 test('the doctor command warns when manifest is stale', function () {
     File::ensureDirectoryExists(base_path('app'));
     File::put(base_path('app/Placeholder.php'), '<?php');

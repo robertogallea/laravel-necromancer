@@ -209,7 +209,7 @@ Check how well your application can be understood by an AI coding agent:
 php artisan necromancer:audit
 ```
 
-Each finding is grouped by severity (error / warning / suggestion). The score is a weighted pass-rate across all checks — normalized by the number of applicable artifacts — so an app with 1 unnamed route out of 50 scores far better than one with 1 out of 1. Errors weigh 3×, warnings 2×, and suggestions 1× in the calculation. Routes using `Route::metadata()` are checked for quality too: a `risk: high`/`critical` route with no `adr` reference, an `external_services` route with no matching test subject, a `summary` over 200 characters (narrative content that belongs in an ADR instead), and routes sharing the same `flow` that disagree on `domain` or `risk` (a single business process should agree on both) all produce findings — but only for routes that have actually declared metadata, so adopting the feature is never required to keep a clean audit. Output a shareable or machine-readable report, or enforce a CI gate:
+Each finding is grouped by severity (error / warning / suggestion). The score is a weighted pass-rate across all checks — normalized by the number of applicable artifacts — so an app with 1 unnamed route out of 50 scores far better than one with 1 out of 1. Errors weigh 3×, warnings 2×, and suggestions 1× in the calculation. Any artifact carrying declared Artifact Annotations — not just routes — is checked for quality: a `risk: high`/`critical` artifact with no `adrs` reference, an `external_services` artifact with no matching test subject, a `summary` over 200 characters (narrative content that belongs in an ADR instead), artifacts sharing the same `flow` that disagree on `domain` or `risk` (a single business process should agree on both), non-canonical or near-duplicate `domain`/`flow`/`capability`/`external_services` spelling, and `adrs` entries pointing at a local file that doesn't exist all produce findings — but only for artifacts that have actually declared annotations, so adopting the feature is never required to keep a clean audit. Output a shareable or machine-readable report, or enforce a CI gate:
 
 ```bash
 php artisan necromancer:audit --format=markdown              # paste into a GitHub issue or PR
@@ -241,12 +241,12 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
   Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
-  Route Metadata Coverage████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service routes tested · 4/4 flow-consistent)
+  Artifact Annotation Cov.████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.
 ```
 
-Route Metadata Coverage scores N/A (and doesn't affect the overall score) until at least one route declares `necromancer` route metadata — adopting the feature is entirely optional.
+Artifact Annotation Coverage scores N/A (and doesn't affect the overall score) until at least one artifact of any family declares Artifact Annotations — adopting the feature is entirely optional. Its emitted dimension key stays `route-metadata-coverage` throughout 1.x for CI/automation compatibility; `--only=artifact-annotation-coverage` is accepted as a forward-compatible alias for the same key.
 
 Output a machine-readable score or enforce a CI gate:
 

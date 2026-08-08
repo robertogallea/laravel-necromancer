@@ -69,7 +69,10 @@ final class DoctorCommand extends Command
             return $dimensions;
         }
 
-        $keys = array_map('trim', explode(',', $only));
+        $keys = array_map(
+            fn (string $key): string => $key === 'artifact-annotation-coverage' ? 'route-metadata-coverage' : $key,
+            array_map('trim', explode(',', $only)),
+        );
 
         return array_values(array_filter($dimensions, fn (DimensionResult $d): bool => in_array($d->key, $keys, true)));
     }
