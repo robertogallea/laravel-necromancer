@@ -46,6 +46,8 @@ final class GraphHtmlTemplate
     --text: #e5e5ea;
     --muted: #8a8a99;
     --accent: #f87171;
+    --edge-grouping: #38bdf8;
+    --edge-reference: #f59e0b;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; overflow: hidden; }
@@ -55,7 +57,10 @@ final class GraphHtmlTemplate
   header .stats { font-size: 12px; color: var(--muted); }
   svg { display: block; width: 100%; height: 100%; cursor: grab; }
   svg:active { cursor: grabbing; }
-  .edge { stroke: var(--border); stroke-width: 1; }
+  .edge { stroke-width: 1; fill: none; }
+  .edge-structural { stroke: var(--border); }
+  .edge-grouping { stroke: var(--edge-grouping); stroke-dasharray: 5 3; }
+  .edge-reference { stroke: var(--edge-reference); stroke-dasharray: 1 3; stroke-linecap: round; }
   .node circle { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; }
   .node text { fill: var(--text); font-size: 9px; pointer-events: none; }
   #message { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 8px; padding: 24px; text-align: center; }
@@ -112,7 +117,7 @@ final class GraphHtmlTemplate
     });
 
     var links = edges
-      .map(function (e) { return { source: byId[e.from], target: byId[e.to] }; })
+      .map(function (e) { return { source: byId[e.from], target: byId[e.to], kind: e.kind }; })
       .filter(function (l) { return l.source && l.target; });
 
     var centerX = width / 2, centerY = height / 2;
@@ -178,9 +183,9 @@ final class GraphHtmlTemplate
     var sim = layout(nodes, edges, width, height);
 
     var edgeGroup = document.createElementNS(NS, 'g');
-    var edgeLines = sim.links.map(function () {
+    var edgeLines = sim.links.map(function (l) {
       var line = document.createElementNS(NS, 'line');
-      line.setAttribute('class', 'edge');
+      line.setAttribute('class', 'edge edge-' + (l.kind || 'structural'));
       edgeGroup.appendChild(line);
       return line;
     });

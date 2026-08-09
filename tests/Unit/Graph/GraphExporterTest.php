@@ -82,6 +82,27 @@ test('export() embeds the graph data directly in graph.html so it works over fil
         ->and($html)->not->toContain('fetch(');
 });
 
+test('export() writes derived edges to graph.json for an annotated manifest', function () {
+    $output = graphTempDir().'/graph';
+
+    $manifest = completeGraphManifest([
+        'jobs' => [[
+            'id' => 'jobs:App\\Jobs\\SendInvoice',
+            'class' => 'App\\Jobs\\SendInvoice',
+            'annotations' => ['domain' => 'billing'],
+            'source' => null,
+        ]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $decoded = json_decode(file_get_contents($output.'/graph.json'), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded['edges'])->toBe([
+        ['from' => 'jobs:App\\Jobs\\SendInvoice', 'to' => 'domain:billing', 'kind' => 'grouping'],
+    ]);
+});
+
 test('export() refuses a stale manifest by default', function () {
     $output = graphTempDir().'/graph';
 

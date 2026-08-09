@@ -9,16 +9,13 @@ use JsonSerializable;
 /**
  * The deterministic node/edge projection of a manifest: canonically-sorted
  * nodes, one per collected artifact, plus their structural, grouping
- * (domain/flow), and reference (ADR) relationships as edges. Edge kinds
- * land in a later iteration (issue #21) — this value object already
- * carries the `edges` field so graph.json's shape doesn't change shape out
- * from under `necromancer:graph`'s HTML viewer once they do.
+ * (domain/flow), and reference (ADR) relationships as edges.
  */
 final readonly class ArtifactGraph implements JsonSerializable
 {
     /**
      * @param  list<ArtifactGraphNode>  $nodes
-     * @param  list<array<string, mixed>>  $edges
+     * @param  list<ArtifactGraphEdge>  $edges
      */
     public function __construct(
         public array $nodes,
@@ -26,7 +23,7 @@ final readonly class ArtifactGraph implements JsonSerializable
     ) {}
 
     /**
-     * @return array{nodes: list<ArtifactGraphNode>, edges: list<array<string, mixed>>}
+     * @return array{nodes: list<ArtifactGraphNode>, edges: list<ArtifactGraphEdge>}
      */
     public function jsonSerialize(): array
     {

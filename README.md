@@ -793,7 +793,13 @@ Project the manifest into a deterministic **Artifact Graph** — a node/edge vis
 php artisan necromancer:graph
 ```
 
-Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. This first iteration produces nodes only — every collected artifact appears, colored by kind — with an empty `edges` array; structural, domain/flow grouping, and ADR-reference edges land in a later release.
+Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact plus their relationships, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. Every collected artifact appears as a node, colored by kind; three kinds of edges connect them:
+
+- **structural** — the same relationship taxonomy the OKF Knowledge Bundle renders: a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model`.
+- **grouping** — an artifact declaring `domain` or `flow` connects to that group (e.g. every artifact tagged `domain: billing` links to `domain:billing`).
+- **reference** — an artifact declaring a local `adrs` entry connects to it (e.g. `adr:docs/adr/0004-x.md`); absolute-URI ADRs are skipped, the same way the OKF bundle leaves them as external links rather than copied concepts.
+
+An edge's target resolves to another node's canonical id when the target is itself a collected artifact (most structural edges, always for grouping/reference); otherwise it carries the raw declared value — a route's `controller`, for instance, almost never resolves, since controllers aren't a collected artifact type. `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an edge with an unresolved endpoint still exists in `graph.json`, just isn't drawn.
 
 `graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
 
