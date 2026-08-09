@@ -4,6 +4,36 @@
 
 Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, jobs, events, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers, and more.
 
+## Contents
+
+- [What Necromancer Collects](#what-necromancer-collects)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Step 1 — Scan](#step-1--scan)
+  - [Step 2 — Explore (optional)](#step-2--explore-optional)
+  - [Step 3a — Audit AI readability](#step-3a--audit-ai-readability)
+  - [Step 3b — Check the AI readability score](#step-3b--check-the-ai-readability-score)
+  - [Step 3c — Generate AI context](#step-3c--generate-ai-context)
+  - [Step 3d — Ask a question about your codebase](#step-3d--ask-a-question-about-your-codebase)
+    - [Inspect the AI payload](#inspect-the-ai-payload)
+  - [Step 3e — Infer Architecture Decision Records](#step-3e--infer-architecture-decision-records)
+  - [Step 3f — Generate a source-grounded prompt](#step-3f--generate-a-source-grounded-prompt)
+  - [Step 3g — Compare manifests across branches](#step-3g--compare-manifests-across-branches)
+  - [Step 3h — Benchmark AI context effectiveness](#step-3h--benchmark-ai-context-effectiveness)
+  - [Step 3i — Export an OKF Knowledge Bundle](#step-3i--export-an-okf-knowledge-bundle)
+  - [Step 3j — Generate an AI-Enriched Knowledge Bundle](#step-3j--generate-an-ai-enriched-knowledge-bundle)
+  - [Step 3k — Visualize the Artifact Graph](#step-3k--visualize-the-artifact-graph)
+- [Commands Reference](#commands-reference)
+- [Configuration](#configuration)
+- [Privacy & Exclusions](#privacy--exclusions)
+- [Laravel Boost Integration](#laravel-boost-integration)
+- [MCP Tools](#mcp-tools)
+- [CI Integration](#ci-integration)
+- [Upgrading to 2.0](#upgrading-to-20)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## What Necromancer Collects
 
 The manifest covers 18 artifact types across the full Laravel application structure:
