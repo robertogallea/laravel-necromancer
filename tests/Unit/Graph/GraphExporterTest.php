@@ -66,6 +66,22 @@ test('export() writes graph.json and graph.html to the output directory', functi
         ->and($decoded['edges'])->toBe([]);
 });
 
+test('export() embeds the graph data directly in graph.html so it works over file:// with no network fetch', function () {
+    $output = graphTempDir().'/graph';
+
+    $manifest = completeGraphManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $html = file_get_contents($output.'/graph.html');
+
+    expect($html)->toContain('id="graph-data"')
+        ->and($html)->toContain('jobs:App\\\\Jobs\\\\SendInvoice')
+        ->and($html)->not->toContain('fetch(');
+});
+
 test('export() refuses a stale manifest by default', function () {
     $output = graphTempDir().'/graph';
 

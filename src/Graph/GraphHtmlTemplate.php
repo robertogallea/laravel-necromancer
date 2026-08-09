@@ -5,16 +5,30 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Graph;
 
 /**
- * The self-contained graph.html shell: inline CSS/JS, no CDN dependencies.
- * Always identical regardless of the manifest — only graph.json varies —
- * so it carries no PHP-side interpolation at all. Fetches graph.json via
- * JS fetch() at view time, which means the output directory must be served
- * over HTTP; opening this file directly via file:// fails to load data in
- * most browsers due to CORS, and the page says so when that happens.
+ * The self-contained graph.html shell: inline CSS/JS, no CDN dependencies,
+ * no network fetch. The graph data is embedded directly into the page as a
+ * `<script type="application/json">` tag at write time, so the file works
+ * standalone when opened via file:// — unlike a fetch()-based loader, it
+ * needs no HTTP server. graph.json is still written alongside it as an
+ * independently useful artifact for other tooling; this page just doesn't
+ * depend on fetching it.
+ *
+ * The embedded JSON is encoded without JSON_UNESCAPED_SLASHES, so any
+ * `</script>` sequence inside a label or annotation value becomes the
+ * inert `<\/script>` and can never terminate the tag early.
  */
 final class GraphHtmlTemplate
 {
-    public static function render(): string
+    private const DATA_PLACEHOLDER = '__NECROMANCER_GRAPH_DATA__';
+
+    public static function render(ArtifactGraph $graph): string
+    {
+        $json = json_encode($graph, JSON_THROW_ON_ERROR);
+
+        return str_replace(self::DATA_PLACEHOLDER, $json, self::shell());
+    }
+
+    private static function shell(): string
     {
         return <<<'HTML'
 <!doctype html>
@@ -61,6 +75,7 @@ final class GraphHtmlTemplate
     <p id="message-text"></p>
   </div>
 </div>
+<script id="graph-data" type="application/json">__NECROMANCER_GRAPH_DATA__</script>
 <script>
 (function () {
   'use strict';
@@ -156,7 +171,7 @@ final class GraphHtmlTemplate
       edges.length + ' edge' + (edges.length === 1 ? '' : 's');
 
     if (nodes.length === 0) {
-      showMessage('No artifacts found in graph.json. Run <code>php artisan necromancer:scan</code>, then <code>php artisan necromancer:graph</code>.');
+      showMessage('No artifacts found in the graph. Run <code>php artisan necromancer:scan</code>, then <code>php artisan necromancer:graph</code>.');
       return;
     }
 
@@ -228,21 +243,12 @@ final class GraphHtmlTemplate
     })();
   }
 
-  fetch('./graph.json')
-    .then(function (response) {
-      if (!response.ok) {
-        throw new Error('HTTP ' + response.status);
-      }
-      return response.json();
-    })
-    .then(render)
-    .catch(function () {
-      showMessage(
-        'Could not load <code>graph.json</code>. This page must be served over HTTP to view it — ' +
-        'opening it directly as a <code>file://</code> URL fails to load data due to CORS. Try ' +
-        '<code>php artisan serve</code> or <code>python3 -m http.server</code> from this directory.'
-      );
-    });
+  try {
+    var data = JSON.parse(document.getElementById('graph-data').textContent);
+    render(data);
+  } catch (e) {
+    showMessage('Could not read the embedded graph data. Regenerate it with <code>php artisan necromancer:graph</code>.');
+  }
 })();
 </script>
 </body>

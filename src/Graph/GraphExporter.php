@@ -84,7 +84,7 @@ final readonly class GraphExporter
             throw new RuntimeException('Unable to write graph.json.');
         }
 
-        if (file_put_contents($tempPath.'/graph.html', GraphHtmlTemplate::render()) === false) {
+        if (file_put_contents($tempPath.'/graph.html', GraphHtmlTemplate::render($graph)) === false) {
             RecursivePathRemover::remove($tempPath);
 
             throw new RuntimeException('Unable to write graph.html.');

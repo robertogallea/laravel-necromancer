@@ -795,12 +795,7 @@ php artisan necromancer:graph
 
 Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. This first iteration produces nodes only — every collected artifact appears, colored by kind — with an empty `edges` array; structural, domain/flow grouping, and ADR-reference edges land in a later release.
 
-`graph.html` fetches `graph.json` via JavaScript at view time, so **the output directory must be served over HTTP** — opening `graph.html` directly as a `file://` URL will fail to load the data due to CORS. Serve it with, for example:
-
-```bash
-php artisan serve --host=127.0.0.1 --port=8080 &   # or any static file server
-python3 -m http.server --directory necromancer-graph 8000
-```
+`graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
 
 Like `necromancer:okf`, the command never rescans the application, refuses a stale or partial-scope manifest by default, and writes atomically — a failed run never damages a previously-generated graph:
 

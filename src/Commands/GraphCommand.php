@@ -48,7 +48,7 @@ final class GraphCommand extends Command
         }
 
         $this->info("Written {$result->nodeCount} node(s) to {$result->outputPath}.");
-        $this->line('Serve the output directory over HTTP to view graph.html (opening it via file:// will fail to load graph.json due to CORS).');
+        $this->line('Open graph.html directly in a browser — the graph data is embedded, no server required.');
 
         return self::SUCCESS;
     }
