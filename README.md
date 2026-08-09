@@ -619,7 +619,7 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 
 ### Step 3i — Export an OKF Knowledge Bundle
 
-Project the manifest into a portable, deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact, with authoritative YAML front matter and a concise prose mirror:
+Project the manifest into a portable, deterministic [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) (OKF) bundle — one Markdown file per artifact, with authoritative YAML front matter and a concise prose mirror:
 
 ```bash
 php artisan necromancer:okf
@@ -785,6 +785,35 @@ The same stale-manifest and partial-scope refusals as `necromancer:okf` apply, a
 
 ---
 
+### Step 3k — Visualize the Artifact Graph
+
+Project the manifest into a deterministic **Artifact Graph** — a node/edge visualization of every collected artifact, viewable as an interactive, force-directed, kind-colored graph in the browser:
+
+```bash
+php artisan necromancer:graph
+```
+
+Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. This first iteration produces nodes only — every collected artifact appears, colored by kind — with an empty `edges` array; structural, domain/flow grouping, and ADR-reference edges land in a later release.
+
+`graph.html` fetches `graph.json` via JavaScript at view time, so **the output directory must be served over HTTP** — opening `graph.html` directly as a `file://` URL will fail to load the data due to CORS. Serve it with, for example:
+
+```bash
+php artisan serve --host=127.0.0.1 --port=8080 &   # or any static file server
+python3 -m http.server --directory necromancer-graph 8000
+```
+
+Like `necromancer:okf`, the command never rescans the application, refuses a stale or partial-scope manifest by default, and writes atomically — a failed run never damages a previously-generated graph:
+
+```bash
+php artisan necromancer:graph --allow-stale      # build anyway, e.g. in a throwaway CI check
+php artisan necromancer:graph --allow-partial    # build a deliberately narrow graph
+php artisan necromancer:graph --output=dist/graph # write elsewhere
+```
+
+`necromancer:graph` is entirely independent of `necromancer:okf` — neither requires the other to have run, and their output directories (`necromancer-graph/` vs. `okf/`) never interfere with each other.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -802,6 +831,7 @@ The same stale-manifest and partial-scope refusals as `necromancer:okf` apply, a
 | `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
+| `necromancer:graph` | Build a deterministic Artifact Graph (nodes only in this release) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 
@@ -830,6 +860,7 @@ return [
     'output' => [
         'manifest' => base_path('necromancer.json'),
         'context'  => base_path('NECROMANCER.md'),
+        'graph'    => base_path('necromancer-graph'),
     ],
 
     // OKF Knowledge Bundle output directory (necromancer:okf)

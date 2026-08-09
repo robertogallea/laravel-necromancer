@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 2.0.0
 
+### Added
+
+- `necromancer:graph` command, projecting the manifest into a deterministic Artifact Graph: `graph.json` (one node per collected artifact — id, kind, display label, resolved annotations — canonically ordered so an unchanged manifest produces byte-identical output) and a self-contained `graph.html` viewer (inline CSS/JS, no CDN dependencies) rendering a force-directed, kind-colored graph in the browser. This first release produces nodes only, with an empty `edges` array reserved for relationship/domain-flow/ADR edges in a later release. `graph.html` fetches `graph.json` via `fetch()` at view time, so the output directory must be served over HTTP — opening it via `file://` won't load the data. Entirely independent of `necromancer:okf` (neither requires the other to have run); refuses a stale or partial-scope manifest by default (`--allow-stale`/`--allow-partial` override); writes atomically. Output defaults to `necromancer-graph/`, configurable via `--output=PATH` or the new `output.graph` config key.
+
 ### Removed
 
 - **BREAKING:** `ManifestReader` no longer adapts pre-1.5 ("v0"/unversioned) manifests in memory. `ManifestReader::read()` — used by every command that reads `necromancer.json` — now rejects any manifest whose `meta.manifest_schema_version` isn't `1`, treating it identically to a missing manifest — every such command shows the same "Necromancer manifest not found. Run necromancer:scan first." error. Run `php artisan necromancer:scan` once after upgrading to regenerate a current-schema manifest.

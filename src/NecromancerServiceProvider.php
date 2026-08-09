@@ -13,6 +13,7 @@ use LaravelNecromancer\Commands\BenchmarkCommand;
 use LaravelNecromancer\Commands\DiffCommand;
 use LaravelNecromancer\Commands\DoctorCommand;
 use LaravelNecromancer\Commands\GenerateCommand;
+use LaravelNecromancer\Commands\GraphCommand;
 use LaravelNecromancer\Commands\InferCommand;
 use LaravelNecromancer\Commands\InspectPayloadCommand;
 use LaravelNecromancer\Commands\MapCommand;
@@ -73,6 +74,7 @@ final class NecromancerServiceProvider extends ServiceProvider
                 BenchmarkCommand::class,
                 OkfCommand::class,
                 OkfEnrichCommand::class,
+                GraphCommand::class,
             ]);
         }
 

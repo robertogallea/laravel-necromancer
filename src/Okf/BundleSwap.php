@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
-use FilesystemIterator;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
+use LaravelNecromancer\Support\RecursivePathRemover;
 use RuntimeException;
 
 /**
@@ -28,7 +26,7 @@ final readonly class BundleSwap
         $hadExisting = file_exists($outputPath);
 
         if ($hadExisting) {
-            $this->removePath($backupPath);
+            RecursivePathRemover::remove($backupPath);
 
             if (! $this->tryRename($outputPath, $backupPath)) {
                 throw new RuntimeException("Unable to move the existing bundle aside before replacing it at {$outputPath}.");
@@ -44,7 +42,7 @@ final readonly class BundleSwap
         }
 
         if ($hadExisting) {
-            $this->removePath($backupPath);
+            RecursivePathRemover::remove($backupPath);
         }
     }
 
@@ -62,29 +60,5 @@ final readonly class BundleSwap
         } finally {
             restore_error_handler();
         }
-    }
-
-    private function removePath(string $path): void
-    {
-        if (is_file($path) || is_link($path)) {
-            unlink($path);
-
-            return;
-        }
-
-        if (! is_dir($path)) {
-            return;
-        }
-
-        $items = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-        }
-
-        rmdir($path);
     }
 }
