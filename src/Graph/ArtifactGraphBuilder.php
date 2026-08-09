@@ -69,6 +69,12 @@ final readonly class ArtifactGraphBuilder
     }
 
     /**
+     * `facts` reuses ArtifactConceptBuilder::EXCLUDED_FACT_KEYS itself —
+     * the exact same constant LaravelNecromancer\Okf\Enrichment\
+     * EnrichmentPromptBuilder already reuses for the same reason — so the
+     * graph's Discovered Facts can never drift from what an Artifact
+     * Concept's own body excludes.
+     *
      * @param  array<string, mixed>  $artifact
      */
     private function node(string $type, array $artifact): ?ArtifactGraphNode
@@ -80,8 +86,9 @@ final readonly class ArtifactGraphBuilder
         }
 
         $annotations = is_array($artifact['annotations'] ?? null) ? $artifact['annotations'] : [];
+        $facts = array_diff_key($artifact, array_flip(ArtifactConceptBuilder::EXCLUDED_FACT_KEYS));
 
-        return new ArtifactGraphNode($identity['id'], $type, $identity['title'], $annotations);
+        return new ArtifactGraphNode($identity['id'], $type, $identity['title'], $annotations, $facts);
     }
 
     /**

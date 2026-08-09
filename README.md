@@ -803,6 +803,15 @@ An edge's target resolves to another node's canonical id when the target is itse
 
 `graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
 
+Each node also carries its Discovered Facts — every field the artifact carries besides `id`/`annotations`/`source`/`route_metadata`, the same exclusion `necromancer:okf`'s Artifact Concepts already apply — so the viewer is fully self-contained for inspection, with nothing further to fetch.
+
+The viewer is interactive:
+
+- **Sidebar** — one row per artifact kind present in the graph, doubling as both a color legend and a filter: unchecking a kind hides its nodes and every edge touching them.
+- **Edge key** — a small always-visible card showing the solid/dashed/dotted line style for structural/grouping/reference edges, each independently toggleable.
+- **Click-to-inspect** — click a node to open a panel with its canonical Artifact ID, kind, Architectural Context (resolved annotations), and Discovered Facts. Clicking a synthesized domain/flow/ADR node shows its member artifacts (or referencing artifacts, for an ADR) instead. Hiding a selected node's kind via the sidebar closes its panel automatically.
+- **Zoom & pan** — scroll to zoom toward the cursor, drag empty canvas to pan, drag a node to reposition it. A **Reset view** button in the header refits the camera to the currently visible nodes.
+
 Like `necromancer:okf`, the command never rescans the application, refuses a stale or partial-scope manifest by default, and writes atomically — a failed run never damages a previously-generated graph:
 
 ```bash

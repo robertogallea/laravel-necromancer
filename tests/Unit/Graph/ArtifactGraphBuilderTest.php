@@ -39,9 +39,9 @@ test('build() resolves id, kind, and a per-type display label', function () {
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
     expect($graph->nodes)->toEqual([
-        new ArtifactGraphNode('routes:GET:orders', 'routes', 'GET orders'),
-        new ArtifactGraphNode('jobs:App\\Jobs\\SendInvoice', 'jobs', 'App\\Jobs\\SendInvoice'),
-        new ArtifactGraphNode('gates:ability:edit-post', 'gates', 'edit-post'),
+        new ArtifactGraphNode('routes:GET:orders', 'routes', 'GET orders', facts: ['method' => 'GET', 'uri' => 'orders']),
+        new ArtifactGraphNode('jobs:App\\Jobs\\SendInvoice', 'jobs', 'App\\Jobs\\SendInvoice', facts: ['class' => 'App\\Jobs\\SendInvoice']),
+        new ArtifactGraphNode('gates:ability:edit-post', 'gates', 'edit-post', facts: ['ability' => 'edit-post', 'kind' => 'closure', 'parameters' => []]),
     ]);
 });
 
@@ -154,7 +154,7 @@ test('build() serializes a node without annotations without an annotations key',
 
     expect($decoded)->toBe([
         'nodes' => [
-            ['id' => 'jobs:App\\Jobs\\SendInvoice', 'kind' => 'jobs', 'label' => 'App\\Jobs\\SendInvoice'],
+            ['id' => 'jobs:App\\Jobs\\SendInvoice', 'kind' => 'jobs', 'label' => 'App\\Jobs\\SendInvoice', 'facts' => ['class' => 'App\\Jobs\\SendInvoice']],
         ],
         'edges' => [],
     ]);
@@ -175,6 +175,7 @@ test('build() serializes a node with annotations including the annotations key',
         'kind' => 'jobs',
         'label' => 'App\\Jobs\\SendInvoice',
         'annotations' => ['domain' => 'billing'],
+        'facts' => ['class' => 'App\\Jobs\\SendInvoice'],
     ]);
 });
 
@@ -361,7 +362,7 @@ test('build() adds a domain and a flow node so grouping edges resolve to a visib
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
     expect($graph->nodes)->toEqual([
-        new ArtifactGraphNode('jobs:App\\Jobs\\SendInvoice', 'jobs', 'App\\Jobs\\SendInvoice', ['domain' => 'billing', 'flow' => 'invoicing']),
+        new ArtifactGraphNode('jobs:App\\Jobs\\SendInvoice', 'jobs', 'App\\Jobs\\SendInvoice', ['domain' => 'billing', 'flow' => 'invoicing'], ['class' => 'App\\Jobs\\SendInvoice']),
         new ArtifactGraphNode('domain:billing', 'domain', 'billing'),
         new ArtifactGraphNode('flow:invoicing', 'flow', 'invoicing'),
     ]);
@@ -412,4 +413,46 @@ test('build() adds no group or adr nodes for an unannotated manifest', function 
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
     expect($graph->nodes)->toHaveCount(1);
+});
+
+test('build() carries discovered facts, reusing ArtifactConceptBuilder::EXCLUDED_FACT_KEYS to exclude id, annotations, source, and route_metadata', function () {
+    $manifest = ['artifacts' => [
+        'routes' => [
+            [
+                'id' => 'routes:GET:orders',
+                'method' => 'GET',
+                'uri' => 'orders',
+                'annotations' => ['domain' => 'billing'],
+                'route_metadata' => ['raw' => ['head' => ['title' => 'x']]],
+                'source' => ['file' => 'routes/web.php', 'line' => 1],
+            ],
+        ],
+    ]];
+
+    $graph = (new ArtifactGraphBuilder)->build($manifest);
+
+    expect($graph->nodes[0]->facts)->toBe(['method' => 'GET', 'uri' => 'orders']);
+});
+
+test('build() gives a synthetic domain, flow, or adr node no facts', function () {
+    $manifest = ['artifacts' => [
+        'jobs' => [
+            [
+                'id' => 'jobs:App\\Jobs\\SendInvoice',
+                'class' => 'App\\Jobs\\SendInvoice',
+                'annotations' => ['domain' => 'billing', 'flow' => 'invoicing', 'adrs' => ['docs/adr/0004-x.md']],
+                'source' => null,
+            ],
+        ],
+    ]];
+
+    $graph = (new ArtifactGraphBuilder)->build($manifest);
+
+    $syntheticNodes = array_values(array_filter(
+        $graph->nodes,
+        fn (ArtifactGraphNode $n): bool => in_array($n->kind, ['domain', 'flow', 'adr'], true),
+    ));
+
+    expect($syntheticNodes)->toHaveCount(3)
+        ->and(array_map(fn (ArtifactGraphNode $n): array => $n->facts, $syntheticNodes))->toBe([[], [], []]);
 });
