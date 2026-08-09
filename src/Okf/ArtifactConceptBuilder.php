@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
+use LaravelNecromancer\Relationships\RelationshipEdge;
+use LaravelNecromancer\Relationships\RelationshipResolver;
+
 /**
  * Projects one serialized manifest artifact into a portable OKF 0.2 Artifact
  * Concept: YAML front matter (authoritative) plus a concise Markdown body
@@ -14,6 +17,10 @@ namespace LaravelNecromancer\Okf;
  */
 final readonly class ArtifactConceptBuilder
 {
+    public function __construct(
+        private RelationshipResolver $relationships = new RelationshipResolver,
+    ) {}
+
     /**
      * The Discovered Facts exclusion list — also the privacy boundary
      * LaravelNecromancer\Okf\Enrichment\EnrichmentPromptBuilder reuses
@@ -251,9 +258,9 @@ final readonly class ArtifactConceptBuilder
     /**
      * Relationship fields already present in $facts, rendered as a
      * dedicated section so declared structural links are as navigable as
-     * the synthesized Domain/Flow concepts. Only the fields listed below
-     * carry another artifact's identity — everything else stays plain
-     * Discovered Facts.
+     * the synthesized Domain/Flow concepts. The taxonomy of which fields
+     * carry another artifact's identity lives in the shared
+     * RelationshipResolver — everything else stays plain Discovered Facts.
      *
      * @param  array<string, mixed>  $facts
      * @param  array<string, ConceptLink>  $classIndex
@@ -261,94 +268,25 @@ final readonly class ArtifactConceptBuilder
      */
     private function relationshipLines(string $type, array $facts, array $classIndex): array
     {
-        return match ($type) {
-            'routes' => $this->scalarRelationshipLines(['controller' => $facts['controller'] ?? null], $classIndex),
-            'models' => [
-                ...$this->modelRelationshipLines($facts['relationships'] ?? [], $classIndex),
-                ...$this->scalarRelationshipLines(['policy' => $facts['policy'] ?? null], $classIndex),
-                ...$this->listRelationshipLines(['observers' => $facts['observers'] ?? []], $classIndex),
-            ],
-            'events' => $this->listRelationshipLines(['listeners' => $facts['listeners'] ?? []], $classIndex),
-            'listeners' => $this->listRelationshipLines(['handles' => $facts['handles'] ?? []], $classIndex),
-            'policies' => $this->scalarRelationshipLines(['model' => $facts['model'] ?? null], $classIndex),
-            'observers' => $this->scalarRelationshipLines(['model' => $facts['model'] ?? null], $classIndex),
-            default => [],
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $fields
-     * @param  array<string, ConceptLink>  $classIndex
-     * @return list<string>
-     */
-    private function scalarRelationshipLines(array $fields, array $classIndex): array
-    {
-        $lines = [];
-
-        foreach ($fields as $label => $value) {
-            if (! is_string($value) || $value === '') {
-                continue;
-            }
-
-            $lines[] = "- **{$label}**: ".$this->linkOrText($value, $classIndex);
-        }
-
-        return $lines;
-    }
-
-    /**
-     * @param  array<string, mixed>  $fields
-     * @param  array<string, ConceptLink>  $classIndex
-     * @return list<string>
-     */
-    private function listRelationshipLines(array $fields, array $classIndex): array
-    {
-        $lines = [];
-
-        foreach ($fields as $label => $values) {
-            $values = array_values(array_filter(
-                (array) $values,
-                fn (mixed $v): bool => is_string($v) && $v !== '',
-            ));
-
-            if ($values === []) {
-                continue;
-            }
-
-            $lines[] = "- **{$label}**: ".implode(', ', array_map(
-                fn (string $v): string => $this->linkOrText($v, $classIndex),
-                $values,
-            ));
-        }
-
-        return $lines;
+        return array_map(
+            fn (RelationshipEdge $edge): string => $this->relationshipLine($edge, $classIndex),
+            $this->relationships->resolve($type, $facts),
+        );
     }
 
     /**
      * @param  array<string, ConceptLink>  $classIndex
-     * @return list<string>
      */
-    private function modelRelationshipLines(mixed $relationships, array $classIndex): array
+    private function relationshipLine(RelationshipEdge $edge, array $classIndex): string
     {
-        $lines = [];
+        $targets = implode(', ', array_map(
+            fn (string $target): string => $this->linkOrText($target, $classIndex),
+            $edge->targets,
+        ));
 
-        foreach ((array) $relationships as $relationship) {
-            if (! is_array($relationship)) {
-                continue;
-            }
+        $value = $edge->relatedType !== null ? "{$edge->relatedType} → {$targets}" : $targets;
 
-            $method = (string) ($relationship['method'] ?? '');
-            $relatedType = (string) ($relationship['type'] ?? '');
-            $related = $relationship['related'] ?? null;
-
-            if ($method === '' || ! is_string($related) || $related === '') {
-                continue;
-            }
-
-            $lines[] = "- **{$method}**: {$relatedType} → ".$this->linkOrText($related, $classIndex);
-        }
-
-        return $lines;
+        return "- **{$edge->label}**: {$value}";
     }
 
     /**
