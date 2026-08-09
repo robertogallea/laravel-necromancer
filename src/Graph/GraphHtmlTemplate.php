@@ -61,8 +61,8 @@ final class GraphHtmlTemplate
   header .stats { font-size: 12px; color: var(--muted); }
   header button { font: inherit; font-size: 11px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
   header button:hover { border-color: var(--accent); }
-  svg { display: block; width: 100%; height: 100%; cursor: grab; }
-  svg:active { cursor: grabbing; }
+  #graph { display: block; width: 100%; height: 100%; cursor: grab; }
+  #graph:active { cursor: grabbing; }
   .edge { stroke-width: 1; fill: none; pointer-events: none; }
   .edge-structural { stroke: var(--border); }
   .edge-grouping { stroke: var(--edge-grouping); stroke-dasharray: 5 3; }
@@ -87,7 +87,7 @@ final class GraphHtmlTemplate
   #edge-key { position: absolute; left: calc(var(--sidebar-w) + 16px); bottom: 16px; z-index: 11; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
   #edge-key .edge-key-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 6px; }
   .edge-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; cursor: pointer; }
-  .edge-row .edge-sample { flex-shrink: 0; }
+  .edge-row .edge-sample { display: block; flex-shrink: 0; width: 20px; height: 10px; }
 
   #inspect-panel { position: absolute; top: var(--header-h); right: 0; bottom: 0; width: var(--panel-w); overflow-y: auto; background: var(--panel); border-left: 1px solid var(--border); z-index: 9; padding: 16px; transform: translateX(100%); transition: transform 0.15s ease; }
   #inspect-panel.open { transform: translateX(0); }
