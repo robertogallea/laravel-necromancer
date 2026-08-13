@@ -1,6 +1,6 @@
 # necromancer:benchmark — AI Context Benchmark
 
-`necromancer:benchmark` measures how much Necromancer's generated context file improves AI coding-assistant effectiveness on your codebase. It runs a bundled task suite in three conditions, scores each response automatically and optionally with an AI judge, and reports accuracy, hallucination rate, quality, and token cost side by side.
+`necromancer:benchmark` measures how much Necromancer's generated context file improves AI coding-assistant effectiveness on your codebase. It runs a bundled task suite in three conditions, scores each response automatically and optionally with an AI judge, and reports accuracy, hallucination rate, quality, latency, and token cost side by side.
 
 ---
 
@@ -20,6 +20,8 @@ Each response is scored by:
 
 1. **Automated fact-checker** — checks whether required strings appear and hallucination markers are absent, using assertions from the task suite.
 2. **AI-as-judge** (optional) — a second AI call using a *different* model scores correctness, completeness, Laravel conventions, and conciseness on a 0–10 scale.
+
+Wall-clock latency is measured independently around each AI call — the generation call, and separately the judge call when it runs — so a slow judge model is never mistaken for a slow generation model. Each condition's report shows the average latency (with standard deviation, when at least two results are available) for both.
 
 The primary comparison is **Necromancer vs. manual** — proving the generated context outperforms a hand-written one, not just an empty context.
 
@@ -106,13 +108,33 @@ php artisan necromancer:benchmark --format=markdown --output=benchmark.md
   Tasks: 12  ·  Conditions: 3  ·  Model: claude-sonnet-4-6  ·  Judge: gpt-4o
 
   ─── Results ─────────────────────────────────────────────────────────
-  Condition              Accuracy   Halluc.    Quality    Tokens
-  No context               41%        23%        5.1       1 200
-  Manual AGENTS.md         67%         9%        6.8       2 100
-  Necromancer              89%         2%        8.4       1 950
+  Condition              Accuracy   Halluc.    Quality    Tokens        Latency  Judge Latency
+  No context               41%        23%        5.1       1 200   0.9s ± 0.2s    1.4s ± 0.3s
+  Manual AGENTS.md         67%         9%        6.8       2 100   1.3s ± 0.3s    1.5s ± 0.2s
+  Necromancer              89%         2%        8.4       1 950   2.1s ± 0.5s    1.6s ± 0.4s
   ──────────────────────────────────────────────────────────────────────
 
   Necromancer vs manual:  +22pp accuracy · +7pp fewer hallucinations
+```
+
+The `Judge Latency` column only appears when at least one result in the run actually has judge data — it's omitted entirely (not shown blank) on a `--no-judge` run. The `± Y.Ys` suffix is the sample standard deviation and is likewise omitted when fewer than two results are available for that condition.
+
+`--format=markdown` renders the same data as a table, with the same Latency/Judge Latency columns and omission rule:
+
+```bash
+php artisan necromancer:benchmark --format=markdown --output=benchmark.md
+```
+
+```markdown
+# Necromancer Benchmark Results
+
+| Condition | Accuracy | Hallucination Rate | Quality Score | Avg Tokens | Latency | Judge Latency |
+|---|---|---|---|---|---|---|
+| No context | 41% | 23% | 5.1 / 10 | 1200 | 0.9s ± 0.2s | 1.4s ± 0.3s |
+| Manual CLAUDE.md | 67% | 9% | 6.8 / 10 | 2100 | 1.3s ± 0.3s | 1.5s ± 0.2s |
+| Necromancer | 89% | 2% | 8.4 / 10 | 1950 | 2.1s ± 0.5s | 1.6s ± 0.4s |
+
+**Necromancer vs manual:** +22pp accuracy · +7pp hallucination reduction
 ```
 
 ---
@@ -151,13 +173,15 @@ Run-level metadata and aggregated statistics:
         "necromancer": { "path": "NECROMANCER.md", "exists": true, "bytes": 4210, "sha256": "..." }
     },
     "summary": {
-        "none":        { "accuracy": 0.41, "hallucination_rate": 0.23, "quality_score": 5.1, "avg_prompt_tokens": 55,   "avg_completion_tokens": 110 },
-        "manual":      { "accuracy": 0.67, "hallucination_rate": 0.09, "quality_score": 6.8, "avg_prompt_tokens": 840,  "avg_completion_tokens": 130 },
-        "necromancer": { "accuracy": 0.89, "hallucination_rate": 0.02, "quality_score": 8.4, "avg_prompt_tokens": 3450, "avg_completion_tokens": 150 }
+        "none":        { "accuracy": 0.41, "hallucinationRate": 0.23, "qualityScore": 5.1, "avgPromptTokens": 55,   "avgCompletionTokens": 110, "totalJudgeTokens": 4200, "avgLatencyMs": 900,  "latencyStdDevMs": 200, "avgJudgeLatencyMs": 1400, "judgeLatencyStdDevMs": 300 },
+        "manual":      { "accuracy": 0.67, "hallucinationRate": 0.09, "qualityScore": 6.8, "avgPromptTokens": 840,  "avgCompletionTokens": 130, "totalJudgeTokens": 4900, "avgLatencyMs": 1300, "latencyStdDevMs": 300, "avgJudgeLatencyMs": 1500, "judgeLatencyStdDevMs": 200 },
+        "necromancer": { "accuracy": 0.89, "hallucinationRate": 0.02, "qualityScore": 8.4, "avgPromptTokens": 3450, "avgCompletionTokens": 150, "totalJudgeTokens": 5100, "avgLatencyMs": 2100, "latencyStdDevMs": 500, "avgJudgeLatencyMs": 1600, "judgeLatencyStdDevMs": 400 }
     },
     "warnings": []
 }
 ```
+
+`summary` mirrors `BenchmarkReport::byCondition()`'s in-memory shape verbatim, so its keys are camelCase — unlike the per-task fields below, which use snake_case. `avgJudgeLatencyMs`/`judgeLatencyStdDevMs` are computed only over results that actually carry judge data, same as `qualityScore`.
 
 ### `results.json`
 
@@ -180,7 +204,9 @@ Full per-task breakdown, useful for deeper analysis or feeding a charting tool:
             "judge_score":            5,
             "prompt_tokens":          44,
             "completion_tokens":      119,
+            "latency_ms":             823,
             "judge_tokens":           711,
+            "judge_latency_ms":       1412,
             "golden_answers_trusted": true
         }
     ]
@@ -198,7 +224,8 @@ One Markdown file per task × condition — human-readable, ready to paste into 
 
 type: qa · skipped: false
 accuracy: 0.00 · hallucination_rate: 0.00 · judge_score: 5
-prompt_tokens: 44 · completion_tokens: 119 · judge_tokens: 711
+prompt_tokens: 44 · completion_tokens: 119 · latency_ms: 823
+judge_tokens: 711 · judge_latency_ms: 1412
 golden_answers_trusted: true
 
 ## Prompt
@@ -353,6 +380,7 @@ Each task must follow this shape:
 | Manifest-derived golden answers favour Necromancer | Each `fact_key` is cross-checked against the framework runtime (`Route::getRoutes()`, `class_exists()`) before use; mismatches are flagged in the report |
 | AI judge favours its own output style | Generation and judge use **different models** (e.g. Claude generates, GPT-4o judges) |
 | No-context is an unfair baseline | The **manual vs. necromancer** comparison is the primary claim; no-context is a lower bound only |
+| Latency differences look like a speed verdict on the model | The `none`/`manual`/`necromancer` context files differ in size, so a slower `necromancer` condition likely reflects a longer prompt, not a slower model — latency is reported for diagnostics, not as an accuracy/quality-style comparison claim |
 
 ---
 

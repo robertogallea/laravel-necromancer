@@ -627,13 +627,13 @@ The AI reviewer's prompt includes the same "Flagged Artifacts" signal shown in t
 
 ### Step 3h — Benchmark AI context effectiveness
 
-Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, and token cost compared to a hand-written `AGENTS.md` or no context at all:
+Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, latency, and token cost compared to a hand-written `AGENTS.md` or no context at all:
 
 ```bash
 php artisan necromancer:benchmark
 ```
 
-The command runs a bundled task suite in three conditions — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run.
+The command runs a bundled task suite in three conditions — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run. Each condition also reports average latency (with standard deviation) for the generation call and, separately, the judge call — shown as `Latency`/`Judge Latency` columns in the terminal and markdown reports, and as raw per-task fields in `--format=json` and the automatic dump; the judge column is omitted entirely when no result carries judge data (e.g. `--no-judge`).
 
 Q&A tasks (which measure context *coverage*) only run under the `none` and `manual` conditions — Necromancer would trivially score 100% since the answers are in the context file it generated. Code generation and mini tasks run across all three conditions and measure actual effectiveness.
 
@@ -868,7 +868,7 @@ php artisan necromancer:graph --output=dist/graph # write elsewhere
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
-| `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
+| `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, latency, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
 | `necromancer:graph` | Build a deterministic Artifact Graph (nodes only in this release) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
