@@ -12,22 +12,42 @@ final class MarkdownRenderer
     {
         $by = $report->byCondition();
 
+        $hasJudgeLatency = $this->hasJudgeLatency($by);
+
+        $header = '| Condition | Accuracy | Hallucination Rate | Quality Score | Avg Tokens | Latency |';
+        $separator = '|---|---|---|---|---|---|';
+
+        if ($hasJudgeLatency) {
+            $header .= ' Judge Latency |';
+            $separator .= '---|';
+        }
+
         $lines = [
             '# Necromancer Benchmark Results',
             '',
-            '| Condition | Accuracy | Hallucination Rate | Quality Score | Avg Tokens |',
-            '|---|---|---|---|---|',
+            $header,
+            $separator,
         ];
 
         foreach ($by as $condition => $stats) {
-            $lines[] = sprintf(
-                '| %s | %.0f%% | %.0f%% | %.1f / 10 | %d |',
+            $row = sprintf(
+                '| %s | %.0f%% | %.0f%% | %.1f / 10 | %d | %s |',
                 $this->labelFor($condition),
                 $stats['accuracy'] * 100,
                 $stats['hallucinationRate'] * 100,
                 $stats['qualityScore'],
                 $stats['avgPromptTokens'] + $stats['avgCompletionTokens'],
+                $this->formatLatency($stats['avgLatencyMs'], $stats['latencyStdDevMs']),
             );
+
+            if ($hasJudgeLatency) {
+                $judgeLatency = $stats['avgJudgeLatencyMs'] !== null
+                    ? $this->formatLatency($stats['avgJudgeLatencyMs'], $stats['judgeLatencyStdDevMs'])
+                    : '—';
+                $row .= " {$judgeLatency} |";
+            }
+
+            $lines[] = $row;
         }
 
         if (isset($by['necromancer'], $by['manual'])) {
@@ -52,5 +72,30 @@ final class MarkdownRenderer
             'necromancer' => 'Necromancer',
             default => $condition,
         };
+    }
+
+    /** @param array<string, array{avgJudgeLatencyMs: ?int}> $by */
+    private function hasJudgeLatency(array $by): bool
+    {
+        foreach ($by as $stats) {
+            if ($stats['avgJudgeLatencyMs'] !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function formatLatency(int $avgMs, ?int $stdDevMs): string
+    {
+        $avg = number_format($avgMs / 1000, 1);
+
+        if ($stdDevMs === null) {
+            return "{$avg}s";
+        }
+
+        $stdDev = number_format($stdDevMs / 1000, 1);
+
+        return "{$avg}s ± {$stdDev}s";
     }
 }

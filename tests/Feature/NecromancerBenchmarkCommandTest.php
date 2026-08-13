@@ -4,7 +4,19 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\AiServiceProvider;
 use LaravelNecromancer\Benchmark\GenerationAgent;
+use LaravelNecromancer\Inference\TemperatureAwareStructuredAgent;
 use LaravelNecromancer\Integrations\AiDetector;
+
+function fakeJudgeResponses(int $count = 20): array
+{
+    return array_fill(0, $count, [
+        'correctness' => 3,
+        'completeness' => 3,
+        'conventions' => 2,
+        'conciseness' => 2,
+        'total' => 10,
+    ]);
+}
 
 function benchmarkManifest(): string
 {
@@ -118,7 +130,63 @@ test('outputs results table in terminal format by default', function () {
         ->expectsOutputToContain('Report')
         ->expectsOutputToContain('Dump')
         ->doesntExpectOutputToContain('Output')
+        ->doesntExpectOutputToContain('Judge Latency')
         ->assertSuccessful();
+});
+
+test('shows latency and judge latency columns in terminal output when the judge runs', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+    TemperatureAwareStructuredAgent::fake(fakeJudgeResponses());
+
+    // "Judge Latency" contains "Latency" as a substring, so this single assertion covers both
+    // columns without tripping Laravel's expectsOutputToContain quirk, where multiple
+    // substrings landing in the same underlying console write only credit the first match.
+    $this->artisan('necromancer:benchmark', [
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+    ])
+        ->expectsOutputToContain('Judge Latency')
+        ->assertSuccessful();
+});
+
+test('includes latency and judge latency columns in markdown output when the judge runs', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+    TemperatureAwareStructuredAgent::fake(fakeJudgeResponses());
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $markdown = File::get($outputPath);
+
+    expect($markdown)->toContain('Latency')
+        ->and($markdown)->toContain('Judge Latency');
+});
+
+test('omits the judge latency column from markdown output when no judge data exists', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $markdown = File::get($outputPath);
+
+    expect($markdown)->toContain('Latency')
+        ->and($markdown)->not->toContain('Judge Latency');
 });
 
 test('writes markdown report when --format=markdown --output is given', function () {
