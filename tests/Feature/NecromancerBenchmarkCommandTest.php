@@ -683,6 +683,96 @@ test('necromancer-mcp condition produces a report entry with latency and token m
     File::delete($outputPath);
 });
 
+test('terminal output shows the Necromancer (MCP) vs Necromancer (static) comparison line when both conditions are present', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+    ])
+        ->expectsOutputToContain('Necromancer (MCP) vs Necromancer (static):')
+        ->assertSuccessful();
+});
+
+test('terminal output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer-mcp is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'manual', 'necromancer'],
+        '--type' => ['codegen'],
+    ])
+        ->doesntExpectOutputToContain('Necromancer (MCP) vs Necromancer (static)')
+        ->assertSuccessful();
+});
+
+test('terminal output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+    ])
+        ->doesntExpectOutputToContain('Necromancer (MCP) vs Necromancer (static)')
+        ->assertSuccessful();
+});
+
+test('markdown output includes the Necromancer (MCP) vs Necromancer (static) comparison line when both conditions are present', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    expect(File::get($outputPath))->toContain('**Necromancer (MCP) vs Necromancer (static):**');
+});
+
+test('markdown output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer-mcp is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'manual', 'necromancer'],
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    expect(File::get($outputPath))->not->toContain('Necromancer (MCP) vs Necromancer (static)');
+});
+
+test('markdown output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    expect(File::get($outputPath))->not->toContain('Necromancer (MCP) vs Necromancer (static)');
+});
+
 test('--generate-suite writes a PHP task file and exits without benchmarking', function () {
     File::put(base_path('necromancer.json'), benchmarkManifest());
 

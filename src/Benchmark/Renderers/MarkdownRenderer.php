@@ -61,6 +61,17 @@ final class MarkdownRenderer
             );
         }
 
+        if (isset($by['necromancer-mcp'], $by['necromancer'])) {
+            $mcpAccDiff = ($by['necromancer-mcp']['accuracy'] - $by['necromancer']['accuracy']) * 100;
+            $mcpHallDiff = ($by['necromancer']['hallucinationRate'] - $by['necromancer-mcp']['hallucinationRate']) * 100;
+            $lines[] = '';
+            $lines[] = sprintf(
+                '**Necromancer (MCP) vs Necromancer (static):** %+.0fpp accuracy · %+.0fpp hallucination reduction',
+                $mcpAccDiff,
+                $mcpHallDiff,
+            );
+        }
+
         return implode("\n", $lines)."\n";
     }
 
@@ -70,6 +81,7 @@ final class MarkdownRenderer
             'none' => 'No context',
             'manual' => 'Manual CLAUDE.md',
             'necromancer' => 'Necromancer',
+            'necromancer-mcp' => 'Necromancer (MCP)',
             default => $condition,
         };
     }
