@@ -11,7 +11,6 @@ use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
-use Stringable;
 
 final class SearchArtifactsTool implements CanActAsTool, Tool
 {
@@ -27,7 +26,7 @@ final class SearchArtifactsTool implements CanActAsTool, Tool
         return 'search_artifacts';
     }
 
-    public function description(): Stringable|string
+    public function description(): string
     {
         return 'Full-text search across all artifact types in the Necromancer manifest. Returns matching artifacts tagged with their type.';
     }
@@ -45,7 +44,7 @@ final class SearchArtifactsTool implements CanActAsTool, Tool
         ];
     }
 
-    public function handle(Request $request): Stringable|string
+    public function handle(Request $request): string
     {
         $artifacts = $this->loadArtifactsByType($this->manifestReader);
 

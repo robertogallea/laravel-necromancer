@@ -11,7 +11,6 @@ use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
-use Stringable;
 
 final class QueryModelsTool implements CanActAsTool, Tool
 {
@@ -27,7 +26,7 @@ final class QueryModelsTool implements CanActAsTool, Tool
         return 'query_models';
     }
 
-    public function description(): Stringable|string
+    public function description(): string
     {
         return 'List Eloquent models from the Necromancer manifest with their tables, fillable fields, casts, and relationships.';
     }
@@ -42,7 +41,7 @@ final class QueryModelsTool implements CanActAsTool, Tool
         ];
     }
 
-    public function handle(Request $request): Stringable|string
+    public function handle(Request $request): string
     {
         $artifacts = $this->loadArtifactsByType($this->manifestReader);
 

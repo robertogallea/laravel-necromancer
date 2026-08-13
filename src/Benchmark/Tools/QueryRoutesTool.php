@@ -11,7 +11,6 @@ use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
-use Stringable;
 
 final class QueryRoutesTool implements CanActAsTool, Tool
 {
@@ -27,7 +26,7 @@ final class QueryRoutesTool implements CanActAsTool, Tool
         return 'query_routes';
     }
 
-    public function description(): Stringable|string
+    public function description(): string
     {
         return 'List routes from the Necromancer manifest. Optionally filter by HTTP method or a name/URI pattern.';
     }
@@ -43,7 +42,7 @@ final class QueryRoutesTool implements CanActAsTool, Tool
         ];
     }
 
-    public function handle(Request $request): Stringable|string
+    public function handle(Request $request): string
     {
         $artifacts = $this->loadArtifactsByType($this->manifestReader);
 
