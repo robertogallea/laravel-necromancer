@@ -633,14 +633,15 @@ Measure how much Necromancer's generated context file improves AI coding-assista
 php artisan necromancer:benchmark
 ```
 
-The command runs a bundled task suite in three conditions — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run. Each condition also reports average latency (with standard deviation) for the generation call and, separately, the judge call — shown as `Latency`/`Judge Latency` columns in the terminal and markdown reports, and as raw per-task fields in `--format=json` and the automatic dump; the judge column is omitted entirely when no result carries judge data (e.g. `--no-judge`).
+The command runs a bundled task suite in three conditions by default — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An opt-in fourth condition, `necromancer-mcp`, runs the model with bare instructions plus live, tool-based access to the same route/model/artifact/search queries the MCP server exposes, rather than a pre-assembled document — request it explicitly via `--condition=`. An optional cross-model AI judge scores quality; automated fact-checks always run. Each condition also reports average latency (with standard deviation) for the generation call and, separately, the judge call — shown as `Latency`/`Judge Latency` columns in the terminal and markdown reports, and as raw per-task fields in `--format=json` and the automatic dump; the judge column is omitted entirely when no result carries judge data (e.g. `--no-judge`). When both `necromancer` and `necromancer-mcp` are present in a run, an additional "Necromancer (MCP) vs Necromancer (static)" comparison line shows whether live tool-querying discovers the same facts as effectively as reading the generated document.
 
-Q&A tasks (which measure context *coverage*) only run under the `none` and `manual` conditions — Necromancer would trivially score 100% since the answers are in the context file it generated. Code generation and mini tasks run across all three conditions and measure actual effectiveness.
+Q&A tasks (which measure context *coverage*) run under every condition except the static `necromancer` one — Necromancer would trivially score 100% there since the answers are in the context file it generated; `necromancer-mcp` doesn't have this problem, since the model must still choose the right tool and interpret its output. Code generation and mini tasks run across all active conditions and measure actual effectiveness.
 
 ```bash
 php artisan necromancer:benchmark --no-judge              # automated checks only (single provider)
 php artisan necromancer:benchmark --format=markdown --output=benchmark.md
 php artisan necromancer:benchmark --generate-suite        # generate a suite grounded to your app's manifest
+php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   # static context vs. live tool-querying (opt-in)
 ```
 
 > See **[BENCHMARK.md](BENCHMARK.md)** for full setup instructions, config reference, and bias mitigations.

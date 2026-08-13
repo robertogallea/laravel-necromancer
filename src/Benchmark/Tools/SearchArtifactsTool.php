@@ -2,28 +2,32 @@
 
 declare(strict_types=1);
 
-namespace LaravelNecromancer\Mcp\Tools;
+namespace LaravelNecromancer\Benchmark\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Mcp\Request;
-use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Tool;
+use Laravel\Ai\Contracts\CanActAsTool;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
+use Stringable;
 
-final class SearchArtifactsTool extends Tool
+final class SearchArtifactsTool implements CanActAsTool, Tool
 {
     use LoadsManifestArtifacts;
 
-    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
+    public function __construct(
+        private readonly ManifestReader $manifestReader = new ManifestReader,
+        private readonly ArtifactQueryService $queryService = new ArtifactQueryService,
+    ) {}
 
     public function name(): string
     {
         return 'search_artifacts';
     }
 
-    public function description(): string
+    public function description(): Stringable|string
     {
         return 'Full-text search across all artifact types in the Necromancer manifest. Returns matching artifacts tagged with their type.';
     }
@@ -41,16 +45,16 @@ final class SearchArtifactsTool extends Tool
         ];
     }
 
-    public function handle(ManifestReader $reader, Request $request): mixed
+    public function handle(Request $request): Stringable|string
     {
-        $artifacts = $this->loadArtifactsByType($reader);
+        $artifacts = $this->loadArtifactsByType($this->manifestReader);
 
         $results = $this->queryService->search(
             $artifacts,
-            (string) ($request->get('query') ?? ''),
-            typeFilter: $request->has('type') ? (string) $request->get('type') : null,
+            $request->string('query')->toString(),
+            typeFilter: $request->has('type') ? $request->string('type')->toString() : null,
         );
 
-        return Response::json($results);
+        return json_encode($results, JSON_THROW_ON_ERROR);
     }
 }

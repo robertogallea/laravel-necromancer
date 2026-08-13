@@ -3,7 +3,12 @@
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\AiServiceProvider;
+use Laravel\Ai\Prompts\AgentPrompt;
 use LaravelNecromancer\Benchmark\GenerationAgent;
+use LaravelNecromancer\Benchmark\Tools\QueryArtifactsTool as BenchmarkQueryArtifactsTool;
+use LaravelNecromancer\Benchmark\Tools\QueryModelsTool as BenchmarkQueryModelsTool;
+use LaravelNecromancer\Benchmark\Tools\QueryRoutesTool as BenchmarkQueryRoutesTool;
+use LaravelNecromancer\Benchmark\Tools\SearchArtifactsTool as BenchmarkSearchArtifactsTool;
 use LaravelNecromancer\Inference\TemperatureAwareStructuredAgent;
 use LaravelNecromancer\Integrations\AiDetector;
 
@@ -555,6 +560,218 @@ test('codegen tasks run for all three conditions', function () {
     expect($conditions)->toContain('none', 'necromancer');
 
     File::delete($outputPath);
+});
+
+test('accepts --condition=necromancer-mcp and runs successfully', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp'],
+        '--type' => ['codegen'],
+    ])->assertSuccessful();
+});
+
+test('necromancer-mcp is NOT included by default when --condition is omitted entirely', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-default-conditions-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--type' => ['codegen'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+    $conditions = array_unique(array_column($json['results'], 'condition'));
+
+    expect($conditions)->toContain('none', 'manual', 'necromancer')
+        ->not->toContain('necromancer-mcp');
+
+    File::delete($outputPath);
+});
+
+test('necromancer-mcp condition builds the generation agent with bare instructions and the four benchmark tools attached', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(['auth authorize Route::get']);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp'],
+        '--type' => ['codegen'],
+    ])->assertSuccessful();
+
+    GenerationAgent::assertPrompted(function (AgentPrompt $prompt): bool {
+        $tools = iterator_to_array($prompt->agent->tools());
+        $toolClasses = array_map(get_class(...), $tools);
+
+        return $prompt->agent->instructions() === 'You are a Laravel expert. Answer questions about this codebase accurately and concisely.'
+            && count($tools) === 4
+            && in_array(BenchmarkQueryRoutesTool::class, $toolClasses, true)
+            && in_array(BenchmarkQueryModelsTool::class, $toolClasses, true)
+            && in_array(BenchmarkQueryArtifactsTool::class, $toolClasses, true)
+            && in_array(BenchmarkSearchArtifactsTool::class, $toolClasses, true);
+    });
+});
+
+test('the none condition still builds the generation agent with no tools attached', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(['auth authorize Route::get']);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['codegen'],
+    ])->assertSuccessful();
+
+    GenerationAgent::assertPrompted(fn (AgentPrompt $prompt): bool => iterator_to_array($prompt->agent->tools()) === []);
+});
+
+test('Q&A tasks run (are not skipped) under the necromancer-mcp condition', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $outputPath = base_path('benchmark-qa-mcp-conditions-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp'],
+        '--type' => ['qa'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+    $notSkipped = array_filter($json['results'], fn ($r) => $r['skipped'] === false);
+
+    expect($notSkipped)->not->toBeEmpty();
+
+    File::delete($outputPath);
+});
+
+test('necromancer-mcp condition produces a report entry with latency and token metrics', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 5, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-mcp-metrics-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp'],
+        '--type' => ['codegen'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+
+    expect($json['summary'])->toHaveKey('necromancer-mcp')
+        ->and($json['summary']['necromancer-mcp'])->toHaveKeys(['avgLatencyMs', 'avgPromptTokens', 'avgCompletionTokens']);
+
+    $mcpResult = collect($json['results'])->first(fn ($r) => $r['condition'] === 'necromancer-mcp' && $r['skipped'] === false);
+    expect($mcpResult)->not->toBeNull()
+        ->and($mcpResult['latency_ms'])->toBeInt()
+        ->and($mcpResult['latency_ms'])->toBeGreaterThanOrEqual(0);
+
+    File::delete($outputPath);
+});
+
+test('terminal output shows the Necromancer (MCP) vs Necromancer (static) comparison line when both conditions are present', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+    ])
+        ->expectsOutputToContain('Necromancer (MCP) vs Necromancer (static):')
+        ->assertSuccessful();
+});
+
+test('terminal output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer-mcp is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'manual', 'necromancer'],
+        '--type' => ['codegen'],
+    ])
+        ->doesntExpectOutputToContain('Necromancer (MCP) vs Necromancer (static)')
+        ->assertSuccessful();
+});
+
+test('terminal output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+    ])
+        ->doesntExpectOutputToContain('Necromancer (MCP) vs Necromancer (static)')
+        ->assertSuccessful();
+});
+
+test('markdown output includes the Necromancer (MCP) vs Necromancer (static) comparison line when both conditions are present', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    expect(File::get($outputPath))->toContain('**Necromancer (MCP) vs Necromancer (static):**');
+});
+
+test('markdown output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer-mcp is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'manual', 'necromancer'],
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    expect(File::get($outputPath))->not->toContain('Necromancer (MCP) vs Necromancer (static)');
+});
+
+test('markdown output omits the Necromancer (MCP) vs Necromancer (static) line when necromancer is absent', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none', 'necromancer-mcp'],
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    expect(File::get($outputPath))->not->toContain('Necromancer (MCP) vs Necromancer (static)');
 });
 
 test('--generate-suite writes a PHP task file and exits without benchmarking', function () {

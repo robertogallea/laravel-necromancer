@@ -2,28 +2,32 @@
 
 declare(strict_types=1);
 
-namespace LaravelNecromancer\Mcp\Tools;
+namespace LaravelNecromancer\Benchmark\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Mcp\Request;
-use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Tool;
+use Laravel\Ai\Contracts\CanActAsTool;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
+use Stringable;
 
-final class QueryArtifactsTool extends Tool
+final class QueryArtifactsTool implements CanActAsTool, Tool
 {
     use LoadsManifestArtifacts;
 
-    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
+    public function __construct(
+        private readonly ManifestReader $manifestReader = new ManifestReader,
+        private readonly ArtifactQueryService $queryService = new ArtifactQueryService,
+    ) {}
 
     public function name(): string
     {
         return 'query_artifacts';
     }
 
-    public function description(): string
+    public function description(): Stringable|string
     {
         return 'List artifacts of any current type from the Necromancer manifest. Optionally filter by a JSON substring.';
     }
@@ -43,23 +47,23 @@ final class QueryArtifactsTool extends Tool
         ];
     }
 
-    public function handle(ManifestReader $reader, Request $request): mixed
+    public function handle(Request $request): Stringable|string
     {
-        $type = (string) ($request->get('type') ?? '');
+        $type = $request->string('type')->toString();
 
         if (! $this->queryService->isSupportedType($type)) {
-            return Response::json([]);
+            return json_encode([], JSON_THROW_ON_ERROR);
         }
 
-        $artifacts = $this->loadArtifactsByType($reader);
+        $artifacts = $this->loadArtifactsByType($this->manifestReader);
 
         $results = $this->queryService->artifactsOfType(
             $artifacts,
             $type,
-            query: $request->has('query') ? (string) $request->get('query') : null,
-            limit: $request->has('limit') ? (int) $request->get('limit') : null,
+            query: $request->has('query') ? $request->string('query')->toString() : null,
+            limit: $request->has('limit') ? $request->integer('limit') : null,
         );
 
-        return Response::json($results);
+        return json_encode($results, JSON_THROW_ON_ERROR);
     }
 }

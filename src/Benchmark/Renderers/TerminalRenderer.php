@@ -68,6 +68,19 @@ final class TerminalRenderer
             );
         }
 
+        if (isset($by['necromancer-mcp'], $by['necromancer'])) {
+            $mcpAccDiff = ($by['necromancer-mcp']['accuracy'] - $by['necromancer']['accuracy']) * 100;
+            $mcpHallDiff = ($by['necromancer']['hallucinationRate'] - $by['necromancer-mcp']['hallucinationRate']) * 100;
+            $mcpSign = $mcpAccDiff >= 0 ? '+' : '';
+            $lines[] = '';
+            $lines[] = sprintf(
+                '  Necromancer (MCP) vs Necromancer (static):  %s%.0fpp accuracy · %+.0fpp fewer hallucinations',
+                $mcpSign,
+                $mcpAccDiff,
+                $mcpHallDiff,
+            );
+        }
+
         $lines[] = '';
 
         return implode("\n", $lines);
@@ -79,6 +92,7 @@ final class TerminalRenderer
             'none' => 'No context',
             'manual' => 'Manual AGENTS.md',
             'necromancer' => 'Necromancer',
+            'necromancer-mcp' => 'Necromancer (MCP)',
             default => $condition,
         };
     }

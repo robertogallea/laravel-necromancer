@@ -90,12 +90,12 @@ it('falls back to generic codegen-004 when no events exist', function () {
     expect($codegen004['assertions'])->toHaveKey('must_recall_from');
 });
 
-it('sets conditions to [none, manual] on all Q&A tasks', function () use ($manifest) {
+it('sets conditions to [none, manual, necromancer-mcp] on all Q&A tasks', function () use ($manifest) {
     $tasks = (new TaskSuiteGenerator($manifest()))->generate();
     $qaTasks = array_filter($tasks, fn ($t) => $t['type'] === 'qa');
 
     foreach ($qaTasks as $task) {
-        expect($task['conditions'])->toBe(['none', 'manual']);
+        expect($task['conditions'])->toBe(['none', 'manual', 'necromancer-mcp']);
     }
 });
 

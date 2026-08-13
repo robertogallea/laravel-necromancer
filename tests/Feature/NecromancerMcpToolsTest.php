@@ -5,6 +5,8 @@ use Laravel\Mcp\Request;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Mcp\NecromancerServer;
 use LaravelNecromancer\Mcp\Tools\QueryArtifactsTool;
+use LaravelNecromancer\Mcp\Tools\QueryModelsTool;
+use LaravelNecromancer\Mcp\Tools\QueryRoutesTool;
 use LaravelNecromancer\Mcp\Tools\SearchArtifactsTool;
 
 beforeEach(function () {
@@ -85,6 +87,20 @@ test('query_artifacts returns an empty list when the manifest is missing', funct
     expect(json_decode($results->content()->__toString(), true))->toBe([]);
 });
 
+test('query_artifacts short-circuits on an unsupported type without reading the manifest', function () {
+    // An unreadable (invalid JSON) manifest would make ManifestReader::read() throw
+    // JsonException — proving the unsupported-type check happens before any manifest
+    // read is attempted, exactly as it did before the ArtifactQueryService extraction.
+    File::ensureDirectoryExists(dirname(necromancerMcpManifestPath()));
+    File::put(necromancerMcpManifestPath(), 'not valid json');
+
+    $results = (new QueryArtifactsTool)->handle(app(ManifestReader::class), new Request([
+        'type' => 'requests',
+    ]));
+
+    expect(json_decode($results->content()->__toString(), true))->toBe([]);
+});
+
 test('search_artifacts supports current type filters and ignores legacy requests', function () {
     writeNecromancerMcpManifest([
         'form_requests' => [
@@ -112,6 +128,79 @@ test('search_artifacts supports current type filters and ignores legacy requests
     expect($found)->toBe([
         ['type' => 'form_requests', 'artifact' => ['id' => 'form_requests:App\\Http\\Requests\\StoreIssueRequest', 'class' => 'App\\Http\\Requests\\StoreIssueRequest']],
     ])->and($notFound)->toBe([]);
+});
+
+test('query_routes returns all routes when no filter is given', function () {
+    writeNecromancerMcpManifest([
+        'routes' => [
+            ['name' => 'projects.index', 'method' => 'GET', 'uri' => '/projects'],
+            ['name' => 'projects.store', 'method' => 'POST', 'uri' => '/projects'],
+        ],
+    ]);
+
+    $results = json_decode((new QueryRoutesTool)->handle(app(ManifestReader::class), new Request([]))->content()->__toString(), true);
+
+    expect($results)->toHaveCount(2);
+});
+
+test('query_routes filters by method and by name/uri pattern', function () {
+    writeNecromancerMcpManifest([
+        'routes' => [
+            ['name' => 'projects.index', 'method' => 'GET', 'uri' => '/projects'],
+            ['name' => 'projects.store', 'method' => 'POST', 'uri' => '/projects'],
+            ['name' => 'issues.index', 'method' => 'GET', 'uri' => '/issues'],
+        ],
+    ]);
+
+    $tool = new QueryRoutesTool;
+
+    $byMethod = json_decode($tool->handle(app(ManifestReader::class), new Request(['method' => 'post']))->content()->__toString(), true);
+    $byPattern = json_decode($tool->handle(app(ManifestReader::class), new Request(['pattern' => 'issues']))->content()->__toString(), true);
+
+    expect($byMethod)->toBe([['name' => 'projects.store', 'method' => 'POST', 'uri' => '/projects']])
+        ->and($byPattern)->toBe([['name' => 'issues.index', 'method' => 'GET', 'uri' => '/issues']]);
+});
+
+test('query_routes returns an empty list when the manifest is missing', function () {
+    File::delete(necromancerMcpManifestPath());
+
+    $results = (new QueryRoutesTool)->handle(app(ManifestReader::class), new Request([]));
+
+    expect(json_decode($results->content()->__toString(), true))->toBe([]);
+});
+
+test('query_models returns all models when no filter is given', function () {
+    writeNecromancerMcpManifest([
+        'models' => [
+            ['class' => 'App\\Models\\Order'],
+            ['class' => 'App\\Models\\Customer'],
+        ],
+    ]);
+
+    $results = json_decode((new QueryModelsTool)->handle(app(ManifestReader::class), new Request([]))->content()->__toString(), true);
+
+    expect($results)->toHaveCount(2);
+});
+
+test('query_models filters by a case-insensitive substring against the class name', function () {
+    writeNecromancerMcpManifest([
+        'models' => [
+            ['class' => 'App\\Models\\Order'],
+            ['class' => 'App\\Models\\Customer'],
+        ],
+    ]);
+
+    $results = json_decode((new QueryModelsTool)->handle(app(ManifestReader::class), new Request(['name' => 'order']))->content()->__toString(), true);
+
+    expect($results)->toBe([['class' => 'App\\Models\\Order']]);
+});
+
+test('query_models returns an empty list when the manifest is missing', function () {
+    File::delete(necromancerMcpManifestPath());
+
+    $results = (new QueryModelsTool)->handle(app(ManifestReader::class), new Request([]));
+
+    expect(json_decode($results->content()->__toString(), true))->toBe([]);
 });
 
 test('necromancer server registers query_artifacts', function () {

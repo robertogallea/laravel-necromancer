@@ -7,6 +7,10 @@ namespace LaravelNecromancer\Benchmark;
 use Illuminate\Http\Client\ConnectionException;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\TextDelta;
+use LaravelNecromancer\Benchmark\Tools\QueryArtifactsTool;
+use LaravelNecromancer\Benchmark\Tools\QueryModelsTool;
+use LaravelNecromancer\Benchmark\Tools\QueryRoutesTool;
+use LaravelNecromancer\Benchmark\Tools\SearchArtifactsTool;
 
 final class BenchmarkRunner
 {
@@ -118,8 +122,9 @@ final class BenchmarkRunner
 
         $context = $this->loadContext($condition, $options['contextPaths']);
         $instructions = $this->buildInstructions($context);
+        $tools = $condition === 'necromancer-mcp' ? $this->mcpTools() : [];
 
-        $agent = new GenerationAgent($instructions, [], []);
+        $agent = new GenerationAgent($instructions, [], $tools);
 
         $text = '';
         $promptTokens = 0;
@@ -207,6 +212,17 @@ final class BenchmarkRunner
         }
 
         return (string) file_get_contents($path);
+    }
+
+    /** @return list<QueryRoutesTool|QueryModelsTool|QueryArtifactsTool|SearchArtifactsTool> */
+    private function mcpTools(): array
+    {
+        return [
+            new QueryRoutesTool,
+            new QueryModelsTool,
+            new QueryArtifactsTool,
+            new SearchArtifactsTool,
+        ];
     }
 
     private function buildInstructions(string $context): string

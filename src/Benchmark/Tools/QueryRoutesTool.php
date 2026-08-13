@@ -2,28 +2,32 @@
 
 declare(strict_types=1);
 
-namespace LaravelNecromancer\Mcp\Tools;
+namespace LaravelNecromancer\Benchmark\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Mcp\Request;
-use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Tool;
+use Laravel\Ai\Contracts\CanActAsTool;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
+use Stringable;
 
-final class QueryRoutesTool extends Tool
+final class QueryRoutesTool implements CanActAsTool, Tool
 {
     use LoadsManifestArtifacts;
 
-    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
+    public function __construct(
+        private readonly ManifestReader $manifestReader = new ManifestReader,
+        private readonly ArtifactQueryService $queryService = new ArtifactQueryService,
+    ) {}
 
     public function name(): string
     {
         return 'query_routes';
     }
 
-    public function description(): string
+    public function description(): Stringable|string
     {
         return 'List routes from the Necromancer manifest. Optionally filter by HTTP method or a name/URI pattern.';
     }
@@ -39,16 +43,16 @@ final class QueryRoutesTool extends Tool
         ];
     }
 
-    public function handle(ManifestReader $reader, Request $request): mixed
+    public function handle(Request $request): Stringable|string
     {
-        $artifacts = $this->loadArtifactsByType($reader);
+        $artifacts = $this->loadArtifactsByType($this->manifestReader);
 
         $routes = $this->queryService->routes(
             $artifacts,
-            method: $request->has('method') ? (string) $request->get('method') : null,
-            pattern: $request->has('pattern') ? (string) $request->get('pattern') : null,
+            method: $request->has('method') ? $request->string('method')->toString() : null,
+            pattern: $request->has('pattern') ? $request->string('pattern')->toString() : null,
         );
 
-        return Response::json($routes);
+        return json_encode($routes, JSON_THROW_ON_ERROR);
     }
 }
