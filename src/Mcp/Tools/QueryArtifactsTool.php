@@ -8,33 +8,15 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
-use LaravelNecromancer\Manifest\ManifestNotFoundException;
+use LaravelNecromancer\Manifest\ArtifactQueryService;
+use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
 
 final class QueryArtifactsTool extends Tool
 {
-    private const DEFAULT_LIMIT = 50;
+    use LoadsManifestArtifacts;
 
-    private const SUPPORTED_TYPES = [
-        'routes',
-        'models',
-        'form_requests',
-        'jobs',
-        'events',
-        'listeners',
-        'commands',
-        'observers',
-        'policies',
-        'enums',
-        'tests',
-        'scheduled_tasks',
-        'middleware',
-        'livewire_components',
-        'gates',
-        'mailables',
-        'validation_rules',
-        'service_providers',
-    ];
+    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
 
     public function name(): string
     {
@@ -65,38 +47,19 @@ final class QueryArtifactsTool extends Tool
     {
         $type = (string) ($request->get('type') ?? '');
 
-        if (! in_array($type, self::SUPPORTED_TYPES, strict: true)) {
+        if (! $this->queryService->isSupportedType($type)) {
             return Response::json([]);
         }
 
-        $artifacts = $this->loadArtifacts($reader, $type);
+        $artifacts = $this->loadArtifactsByType($reader);
 
-        if ($request->has('query')) {
-            $needle = strtolower((string) $request->get('query'));
-            $artifacts = array_values(array_filter(
-                $artifacts,
-                fn (array $artifact): bool => str_contains(strtolower(json_encode($artifact) ?: ''), $needle),
-            ));
-        }
+        $results = $this->queryService->artifactsOfType(
+            $artifacts,
+            $type,
+            query: $request->has('query') ? (string) $request->get('query') : null,
+            limit: $request->has('limit') ? (int) $request->get('limit') : null,
+        );
 
-        $limit = $request->has('limit')
-            ? max(0, (int) $request->get('limit'))
-            : self::DEFAULT_LIMIT;
-
-        return Response::json(array_slice($artifacts, 0, $limit));
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function loadArtifacts(ManifestReader $reader, string $type): array
-    {
-        try {
-            $path = (string) config('necromancer.output.manifest', base_path('necromancer.json'));
-
-            return (array) ($reader->read($path)['artifacts'][$type] ?? []);
-        } catch (ManifestNotFoundException) {
-            return [];
-        }
+        return Response::json($results);
     }
 }

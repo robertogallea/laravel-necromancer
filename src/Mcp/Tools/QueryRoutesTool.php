@@ -8,11 +8,16 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
-use LaravelNecromancer\Manifest\ManifestNotFoundException;
+use LaravelNecromancer\Manifest\ArtifactQueryService;
+use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
 
 final class QueryRoutesTool extends Tool
 {
+    use LoadsManifestArtifacts;
+
+    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
+
     public function name(): string
     {
         return 'query_routes';
@@ -36,35 +41,14 @@ final class QueryRoutesTool extends Tool
 
     public function handle(ManifestReader $reader, Request $request): mixed
     {
-        $routes = $this->loadArtifacts($reader, 'routes');
+        $artifacts = $this->loadArtifactsByType($reader);
 
-        if ($request->has('method')) {
-            $method = strtoupper((string) $request->get('method'));
-            $routes = array_values(array_filter($routes, fn (array $r): bool => strtoupper((string) ($r['method'] ?? '')) === $method
-            ));
-        }
-
-        if ($request->has('pattern')) {
-            $needle = strtolower((string) $request->get('pattern'));
-            $routes = array_values(array_filter($routes, fn (array $r): bool => str_contains(strtolower((string) ($r['name'] ?? '')), $needle) ||
-                str_contains(strtolower((string) ($r['uri'] ?? '')), $needle)
-            ));
-        }
+        $routes = $this->queryService->routes(
+            $artifacts,
+            method: $request->has('method') ? (string) $request->get('method') : null,
+            pattern: $request->has('pattern') ? (string) $request->get('pattern') : null,
+        );
 
         return Response::json($routes);
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function loadArtifacts(ManifestReader $reader, string $type): array
-    {
-        try {
-            $path = (string) config('necromancer.output.manifest', base_path('necromancer.json'));
-
-            return (array) ($reader->read($path)['artifacts'][$type] ?? []);
-        } catch (ManifestNotFoundException) {
-            return [];
-        }
     }
 }
