@@ -28,7 +28,7 @@ final class BenchmarkCommand extends Command
     use ReadsManifest;
 
     protected $signature = 'necromancer:benchmark
-        {--condition=*    : Conditions to run: none,manual,necromancer,necromancer-mcp. Default: all four.}
+        {--condition=*    : Conditions to run: none,manual,necromancer,necromancer-mcp. Default: none,manual,necromancer.}
         {--type=*         : Task types to run: qa,codegen,mini. Default: all.}
         {--no-judge       : Skip the AI-as-judge pass (automated checks only)}
         {--no-dump        : Skip writing the per-run benchmark dump}
@@ -343,7 +343,7 @@ final class BenchmarkCommand extends Command
     private function resolveConditions(): array
     {
         $option = $this->option('condition');
-        $conditions = is_array($option) && ! empty($option) ? $option : ['none', 'manual', 'necromancer', 'necromancer-mcp'];
+        $conditions = is_array($option) && ! empty($option) ? $option : ['none', 'manual', 'necromancer'];
 
         return array_values(array_filter($conditions, fn (string $c): bool => in_array($c, ['none', 'manual', 'necromancer', 'necromancer-mcp'], true)));
     }

@@ -1,6 +1,6 @@
 # necromancer:benchmark — AI Context Benchmark
 
-`necromancer:benchmark` measures how much Necromancer's generated context file improves AI coding-assistant effectiveness on your codebase. It runs a bundled task suite in four conditions, scores each response automatically and optionally with an AI judge, and reports accuracy, hallucination rate, quality, latency, and token cost side by side.
+`necromancer:benchmark` measures how much Necromancer's generated context file improves AI coding-assistant effectiveness on your codebase. It runs a bundled task suite in three conditions by default — plus an optional fourth, `necromancer-mcp` — scores each response automatically and optionally with an AI judge, and reports accuracy, hallucination rate, quality, latency, and token cost side by side.
 
 ---
 
@@ -78,7 +78,7 @@ php artisan necromancer:generate
 ## Running the benchmark
 
 ```bash
-# Full benchmark — all 12 tasks × 4 conditions × AI judge
+# Full benchmark — all 12 tasks × 3 conditions × AI judge
 php artisan necromancer:benchmark
 
 # Automated checks only (single provider, no judge cost)
@@ -115,22 +115,19 @@ php artisan necromancer:benchmark --format=markdown --output=benchmark.md
 ```
   Laravel Necromancer — Benchmark
   ────────────────────────────────
-  Tasks: 12  ·  Conditions: 4  ·  Model: claude-sonnet-4-6  ·  Judge: gpt-4o
+  Tasks: 12  ·  Conditions: 3  ·  Model: claude-sonnet-4-6  ·  Judge: gpt-4o
 
   ─── Results ─────────────────────────────────────────────────────────
   Condition              Accuracy   Halluc.    Quality    Tokens        Latency  Judge Latency
   No context               41%        23%        5.1       1 200   0.9s ± 0.2s    1.4s ± 0.3s
   Manual AGENTS.md         67%         9%        6.8       2 100   1.3s ± 0.3s    1.5s ± 0.2s
   Necromancer              89%         2%        8.4       1 950   2.1s ± 0.5s    1.6s ± 0.4s
-  Necromancer (MCP)        85%         1%        7.9       1 480   3.4s ± 0.8s    1.6s ± 0.3s
   ──────────────────────────────────────────────────────────────────────
 
   Necromancer vs manual:  +22pp accuracy · +7pp fewer hallucinations
-
-  Necromancer (MCP) vs Necromancer (static):  -4pp accuracy · +1pp fewer hallucinations
 ```
 
-The `Judge Latency` column only appears when at least one result in the run actually has judge data — it's omitted entirely (not shown blank) on a `--no-judge` run. The `± Y.Ys` suffix is the sample standard deviation and is likewise omitted when fewer than two results are available for that condition. The `Necromancer (MCP) vs Necromancer (static)` line only appears when both conditions are present in the run.
+The `Judge Latency` column only appears when at least one result in the run actually has judge data — it's omitted entirely (not shown blank) on a `--no-judge` run. The `± Y.Ys` suffix is the sample standard deviation and is likewise omitted when fewer than two results are available for that condition.
 
 `--format=markdown` renders the same data as a table, with the same Latency/Judge Latency columns and omission rule:
 
@@ -146,12 +143,29 @@ php artisan necromancer:benchmark --format=markdown --output=benchmark.md
 | No context | 41% | 23% | 5.1 / 10 | 1200 | 0.9s ± 0.2s | 1.4s ± 0.3s |
 | Manual CLAUDE.md | 67% | 9% | 6.8 / 10 | 2100 | 1.3s ± 0.3s | 1.5s ± 0.2s |
 | Necromancer | 89% | 2% | 8.4 / 10 | 1950 | 2.1s ± 0.5s | 1.6s ± 0.4s |
-| Necromancer (MCP) | 85% | 1% | 7.9 / 10 | 1480 | 3.4s ± 0.8s | 1.6s ± 0.3s |
 
 **Necromancer vs manual:** +22pp accuracy · +7pp hallucination reduction
-
-**Necromancer (MCP) vs Necromancer (static):** -4pp accuracy · +1pp hallucination reduction
 ```
+
+### Comparing against `necromancer-mcp`
+
+`necromancer-mcp` is opt-in, not part of the default three conditions — request it explicitly to see the live-query-vs-static comparison:
+
+```bash
+php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp --no-judge
+```
+
+```
+  ─── Results ─────────────────────────────────────────────────────────
+  Condition              Accuracy   Halluc.    Quality    Tokens        Latency
+  Necromancer              89%         2%        8.4       1 950   2.1s ± 0.5s
+  Necromancer (MCP)        85%         1%        7.9       1 480   3.4s ± 0.8s
+  ──────────────────────────────────────────────────────────────────────
+
+  Necromancer (MCP) vs Necromancer (static):  -4pp accuracy · +1pp fewer hallucinations
+```
+
+The `Necromancer (MCP) vs Necromancer (static)` line only appears when both `necromancer` and `necromancer-mcp` are present in the run — omitted, not shown blank, otherwise. `--format=markdown` renders the same comparison line the same way.
 
 ---
 
@@ -168,7 +182,6 @@ storage/app/necromancer/benchmarks/
         ├── qa-001__none.md
         ├── qa-001__manual.md
         ├── qa-001__necromancer.md
-        ├── qa-001__necromancer-mcp.md
         └── ...           # one file per task × condition
 ```
 
@@ -180,7 +193,7 @@ Run-level metadata and aggregated statistics:
 {
     "started_at": "2026-06-06T11:51:53Z",
     "manifest": { "path": "necromancer.json", "bytes": 12480, "sha256": "e3b0c..." },
-    "conditions": ["none", "manual", "necromancer", "necromancer-mcp"],
+    "conditions": ["none", "manual", "necromancer"],
     "types": null,
     "generation": { "model": "claude-sonnet-4-6", "provider": "anthropic" },
     "judge": { "enabled": true, "model": "gpt-4o", "provider": "openai" },
@@ -190,10 +203,9 @@ Run-level metadata and aggregated statistics:
         "necromancer": { "path": "NECROMANCER.md", "exists": true, "bytes": 4210, "sha256": "..." }
     },
     "summary": {
-        "none":            { "accuracy": 0.41, "hallucinationRate": 0.23, "qualityScore": 5.1, "avgPromptTokens": 55,   "avgCompletionTokens": 110, "totalJudgeTokens": 4200, "avgLatencyMs": 900,  "latencyStdDevMs": 200, "avgJudgeLatencyMs": 1400, "judgeLatencyStdDevMs": 300 },
-        "manual":          { "accuracy": 0.67, "hallucinationRate": 0.09, "qualityScore": 6.8, "avgPromptTokens": 840,  "avgCompletionTokens": 130, "totalJudgeTokens": 4900, "avgLatencyMs": 1300, "latencyStdDevMs": 300, "avgJudgeLatencyMs": 1500, "judgeLatencyStdDevMs": 200 },
-        "necromancer":     { "accuracy": 0.89, "hallucinationRate": 0.02, "qualityScore": 8.4, "avgPromptTokens": 3450, "avgCompletionTokens": 150, "totalJudgeTokens": 5100, "avgLatencyMs": 2100, "latencyStdDevMs": 500, "avgJudgeLatencyMs": 1600, "judgeLatencyStdDevMs": 400 },
-        "necromancer-mcp": { "accuracy": 0.85, "hallucinationRate": 0.01, "qualityScore": 7.9, "avgPromptTokens": 1330, "avgCompletionTokens": 150, "totalJudgeTokens": 4800, "avgLatencyMs": 3400, "latencyStdDevMs": 800, "avgJudgeLatencyMs": 1600, "judgeLatencyStdDevMs": 300 }
+        "none":        { "accuracy": 0.41, "hallucinationRate": 0.23, "qualityScore": 5.1, "avgPromptTokens": 55,   "avgCompletionTokens": 110, "totalJudgeTokens": 4200, "avgLatencyMs": 900,  "latencyStdDevMs": 200, "avgJudgeLatencyMs": 1400, "judgeLatencyStdDevMs": 300 },
+        "manual":      { "accuracy": 0.67, "hallucinationRate": 0.09, "qualityScore": 6.8, "avgPromptTokens": 840,  "avgCompletionTokens": 130, "totalJudgeTokens": 4900, "avgLatencyMs": 1300, "latencyStdDevMs": 300, "avgJudgeLatencyMs": 1500, "judgeLatencyStdDevMs": 200 },
+        "necromancer": { "accuracy": 0.89, "hallucinationRate": 0.02, "qualityScore": 8.4, "avgPromptTokens": 3450, "avgCompletionTokens": 150, "totalJudgeTokens": 5100, "avgLatencyMs": 2100, "latencyStdDevMs": 500, "avgJudgeLatencyMs": 1600, "judgeLatencyStdDevMs": 400 }
     },
     "warnings": []
 }
@@ -276,7 +288,7 @@ php artisan necromancer:benchmark --no-dump
 
 | Option | Description |
 |---|---|
-| `--condition=*` | Conditions to run: `none`, `manual`, `necromancer`, `necromancer-mcp`. Default: all four. |
+| `--condition=*` | Conditions to run: `none`, `manual`, `necromancer`, `necromancer-mcp`. Default: `none`, `manual`, `necromancer`. |
 | `--type=*` | Task types: `qa`, `codegen`, `mini`. Default: all. |
 | `--no-judge` | Skip the AI-as-judge pass (automated checks only). |
 | `--no-dump` | Skip writing the per-run dump to `storage/`. |

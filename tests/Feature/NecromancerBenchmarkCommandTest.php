@@ -572,7 +572,7 @@ test('accepts --condition=necromancer-mcp and runs successfully', function () {
     ])->assertSuccessful();
 });
 
-test('necromancer-mcp is included by default when --condition is omitted entirely', function () {
+test('necromancer-mcp is NOT included by default when --condition is omitted entirely', function () {
     File::put(base_path('necromancer.json'), benchmarkManifest());
     GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
 
@@ -590,7 +590,8 @@ test('necromancer-mcp is included by default when --condition is omitted entirel
     $json = json_decode(File::get($outputPath), true);
     $conditions = array_unique(array_column($json['results'], 'condition'));
 
-    expect($conditions)->toContain('none', 'manual', 'necromancer', 'necromancer-mcp');
+    expect($conditions)->toContain('none', 'manual', 'necromancer')
+        ->not->toContain('necromancer-mcp');
 
     File::delete($outputPath);
 });
