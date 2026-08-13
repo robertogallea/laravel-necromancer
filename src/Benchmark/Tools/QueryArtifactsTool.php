@@ -11,7 +11,6 @@ use Laravel\Ai\Tools\Request;
 use LaravelNecromancer\Manifest\ArtifactQueryService;
 use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
-use Stringable;
 
 final class QueryArtifactsTool implements CanActAsTool, Tool
 {
@@ -27,7 +26,7 @@ final class QueryArtifactsTool implements CanActAsTool, Tool
         return 'query_artifacts';
     }
 
-    public function description(): Stringable|string
+    public function description(): string
     {
         return 'List artifacts of any current type from the Necromancer manifest. Optionally filter by a JSON substring.';
     }
@@ -47,7 +46,7 @@ final class QueryArtifactsTool implements CanActAsTool, Tool
         ];
     }
 
-    public function handle(Request $request): Stringable|string
+    public function handle(Request $request): string
     {
         $type = $request->string('type')->toString();
 
