@@ -56,7 +56,9 @@ return [
 
     'boost' => [
         'context_path' => base_path('.ai/guidelines/necromancer.md'),
-        'skill_path' => base_path('.ai/skills/necromancer.md'),
+        // A directory containing a SKILL.md file — the shape Laravel Boost's
+        // SkillComposer discovers. Not a flat file.
+        'skill_path' => base_path('.ai/skills/necromancer'),
     ],
 
     'inference' => [
