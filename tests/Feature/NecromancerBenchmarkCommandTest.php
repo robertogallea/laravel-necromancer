@@ -225,6 +225,52 @@ test('writes json report when --format=json --output is given', function () {
         ->and($json['results'])->not->toBeEmpty();
 });
 
+test('json report results include raw latency fields, null judge latency when the judge did not run', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+    $firstResult = $json['results'][0];
+
+    expect($firstResult)->toHaveKeys(['latency_ms', 'judge_latency_ms'])
+        ->and($firstResult['latency_ms'])->toBeInt()
+        ->and($firstResult['latency_ms'])->toBeGreaterThanOrEqual(0)
+        ->and($firstResult['judge_latency_ms'])->toBeNull();
+});
+
+test('json report includes latency fields in results and summary when the judge runs', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+    TemperatureAwareStructuredAgent::fake(fakeJudgeResponses());
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $json = json_decode(File::get($outputPath), true);
+    $firstResult = $json['results'][0];
+
+    expect($firstResult['judge_latency_ms'])->toBeInt()
+        ->and($firstResult['judge_latency_ms'])->toBeGreaterThanOrEqual(0)
+        ->and($json['summary']['none'])->toHaveKeys([
+            'avgLatencyMs', 'latencyStdDevMs', 'avgJudgeLatencyMs', 'judgeLatencyStdDevMs',
+        ]);
+});
+
 test('accepts --timeout option without failing', function () {
     File::put(base_path('necromancer.json'), benchmarkManifest());
 
@@ -275,6 +321,27 @@ test('benchmark dump results include prompts and generated responses', function 
         ->and($firstResult['response'])->toContain('projects.index')
         ->and(File::get(File::files($dumpDirectory.'/responses')[0]->getPathname()))->toContain('## Prompt')
         ->and(File::get(File::files($dumpDirectory.'/responses')[0]->getPathname()))->toContain('## Response');
+});
+
+test('benchmark dump results include raw per-task latency fields', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'The route projects.index requires auth middleware.'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['none'],
+        '--type' => ['qa'],
+    ])->assertSuccessful();
+
+    $dumpDirectory = benchmarkDumpDirectory($this->benchmarkDumpPath);
+    $results = json_decode(File::get($dumpDirectory.'/results.json'), true, 512, JSON_THROW_ON_ERROR);
+    $firstResult = $results['results'][0];
+
+    expect($firstResult)->toHaveKeys(['latency_ms', 'judge_latency_ms'])
+        ->and($firstResult['latency_ms'])->toBeInt()
+        ->and($firstResult['latency_ms'])->toBeGreaterThanOrEqual(0)
+        ->and($firstResult['judge_latency_ms'])->toBeNull()
+        ->and(File::get(File::files($dumpDirectory.'/responses')[0]->getPathname()))->toContain('Latency:');
 });
 
 test('benchmark dump records context metadata without copying full context text', function () {
