@@ -18,6 +18,7 @@ use LaravelNecromancer\Benchmark\TaskSuite;
 use LaravelNecromancer\Benchmark\TaskSuiteGenerator;
 use LaravelNecromancer\Benchmark\TaskSuiteWriter;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
+use LaravelNecromancer\Commands\Concerns\ResolvesSkillPath;
 use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Integrations\BoostDetector;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
@@ -26,6 +27,7 @@ use LaravelNecromancer\Manifest\ManifestReader;
 final class BenchmarkCommand extends Command
 {
     use ReadsManifest;
+    use ResolvesSkillPath;
 
     protected $signature = 'necromancer:benchmark
         {--condition=*    : Conditions to run: none,manual,necromancer. Default: all three.}
@@ -316,10 +318,13 @@ final class BenchmarkCommand extends Command
     private function resolveNecromancerContextPath(BoostDetector $boostDetector): string
     {
         if ($boostDetector->isAvailable()) {
-            $path = (string) config('necromancer.boost.skill_path', base_path('.ai/skills/necromancer.md'));
-        } else {
-            $path = (string) config('necromancer.output.context', base_path('NECROMANCER.md'));
+            $skillDir = (string) config('necromancer.boost.skill_path', base_path('.ai/skills/necromancer'));
+            $skillDir = $this->isAbsolutePath($skillDir) ? $skillDir : base_path($skillDir);
+
+            return $this->skillFilePath($skillDir);
         }
+
+        $path = (string) config('necromancer.output.context', base_path('NECROMANCER.md'));
 
         return $this->isAbsolutePath($path) ? $path : base_path($path);
     }

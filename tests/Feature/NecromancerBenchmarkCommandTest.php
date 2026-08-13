@@ -325,12 +325,13 @@ test('task is skipped when required_key resolves to an empty list', function () 
 });
 
 test('resolves necromancer context to skill_path config when Boost is available', function () {
-    // Point skill_path to a known file, guidelines to a different file.
-    // The benchmark should load from skill_path, not context_path/guidelines.
-    $skillPath = base_path('_bench_skill_test.md');
+    // Point skill_path to a known directory, guidelines to a different file.
+    // The benchmark should load from {skill_path}/SKILL.md, not context_path/guidelines.
+    $skillPath = base_path('_bench_skill_test');
     $guidelinesPath = base_path('_bench_guidelines_test.md');
 
-    File::put($skillPath, 'SKILL_SENTINEL');
+    File::ensureDirectoryExists($skillPath);
+    File::put($skillPath.'/SKILL.md', 'SKILL_SENTINEL');
     File::put($guidelinesPath, 'GUIDELINES_SENTINEL');
 
     config([
@@ -358,7 +359,8 @@ test('resolves necromancer context to skill_path config when Boost is available'
     // At least one non-skipped codegen task means the skill file was found and loaded.
     expect(count($ran))->toBeGreaterThan(0);
 
-    File::delete([$skillPath, $guidelinesPath, $outputPath]);
+    File::deleteDirectory($skillPath);
+    File::delete([$guidelinesPath, $outputPath]);
 });
 
 test('only runs tasks matching --type filter', function () {
