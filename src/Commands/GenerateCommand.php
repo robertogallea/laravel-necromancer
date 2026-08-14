@@ -11,6 +11,7 @@ use LaravelNecromancer\Integrations\BoostDetector;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Okf\FrontMatter;
+use LaravelNecromancer\Okf\ManifestContentHash;
 
 final class GenerateCommand extends Command
 {
@@ -101,7 +102,7 @@ final class GenerateCommand extends Command
             }
         }
 
-        $knowledgeBundle = $this->buildKnowledgeBundle();
+        $knowledgeBundle = $this->buildKnowledgeBundle($manifest);
 
         // --- Tier 2: full content with --only/--except filtering ---
         $sectionMap = [
@@ -571,17 +572,22 @@ final class GenerateCommand extends Command
      * known, accepted limitation. Not gated by --only/--except/--paths,
      * same as buildOverview(). Returns '' when okf.announce_in_context is
      * false, or when neither bundle is present.
+     *
+     * @param  array<string, mixed>  $manifest
      */
-    private function buildKnowledgeBundle(): string
+    private function buildKnowledgeBundle(array $manifest): string
     {
         if (! (bool) config('necromancer.okf.announce_in_context', true)) {
             return '';
         }
 
+        $currentContentHash = ManifestContentHash::resolve($manifest);
+
         $lines = array_filter([
             $this->knowledgeBundleLine(
                 (string) config('necromancer.okf.output', base_path('okf')),
                 'php artisan necromancer:okf',
+                $currentContentHash,
                 function (array $index): string {
                     $count = (int) ($index['artifact_count'] ?? 0);
 
@@ -591,6 +597,7 @@ final class GenerateCommand extends Command
             $this->knowledgeBundleLine(
                 (string) config('necromancer.okf.enrichment.output', base_path('okf-enriched')),
                 'php artisan necromancer:okf-enrich',
+                $currentContentHash,
                 function (array $index): string {
                     $count = (int) ($index['concept_count'] ?? 0);
                     $concepts = $count === 1 ? '1 concept' : "{$count} concepts";
@@ -612,7 +619,7 @@ final class GenerateCommand extends Command
     /**
      * @param  callable(array<string, mixed>): string  $describeCounts
      */
-    private function knowledgeBundleLine(string $configuredPath, string $regenerateCommand, callable $describeCounts): ?string
+    private function knowledgeBundleLine(string $configuredPath, string $regenerateCommand, ?string $currentContentHash, callable $describeCounts): ?string
     {
         $path = $this->isAbsolutePath($configuredPath) ? $configuredPath : base_path($configuredPath);
         $bundleJsonPath = rtrim($path, '/').'/bundle.json';
@@ -629,7 +636,17 @@ final class GenerateCommand extends Command
             ? ", generated {$index['generated_at']}"
             : '';
 
-        return "- **{$this->relativeToBasePath($path)}/** — {$detail}{$generatedAt}. Regenerate with `{$regenerateCommand}`.";
+        // A bundle.json with no content_hash key at all (a pre-upgrade
+        // export) renders with no staleness claim either way — only a
+        // present, non-matching hash on both sides earns the caveat.
+        $bundleContentHash = isset($index['content_hash']) && is_string($index['content_hash']) && $index['content_hash'] !== ''
+            ? $index['content_hash']
+            : null;
+        $staleCaveat = $bundleContentHash !== null && $currentContentHash !== null && $bundleContentHash !== $currentContentHash
+            ? ' ⚠ May be stale relative to the current manifest.'
+            : '';
+
+        return "- **{$this->relativeToBasePath($path)}/** — {$detail}{$generatedAt}. Regenerate with `{$regenerateCommand}`.{$staleCaveat}";
     }
 
     private function relativeToBasePath(string $path): string

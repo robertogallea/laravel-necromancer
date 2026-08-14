@@ -2959,13 +2959,59 @@ test('--paths uses boundary-aware matching and does not match sibling prefixes',
 
 // Knowledge Bundle Announcement
 
-function generateManifestWithApp(): array
+function generateManifestWithApp(?string $contentHash = null): array
 {
     return [
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['app_name' => 'TestApp', 'content_hash' => $contentHash],
         'artifacts' => (object) [],
     ];
 }
+
+test('when a bundle content_hash matches the manifest content_hash no staleness caveat appears', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1, 'content_hash' => 'abc123']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(contentHash: 'abc123'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('stale');
+});
+
+test('when a bundle content_hash differs from the manifest content_hash its line gets a staleness caveat', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1, 'content_hash' => 'old-hash']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(contentHash: 'new-hash'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)
+        ->toContain('stale')
+        ->toContain('php artisan necromancer:okf');
+});
+
+test('a bundle.json with no content_hash key at all renders with no staleness claim', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(contentHash: 'new-hash'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('stale');
+});
+
+test('the staleness caveat applies independently to the deterministic and enriched bundle lines', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1, 'content_hash' => 'stale-det']);
+    putKnowledgeBundle('okf-enriched', ['concept_count' => 1, 'cached_count' => 0, 'fresh_count' => 1, 'content_hash' => 'fresh-enriched']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(contentHash: 'fresh-enriched'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    $lines = explode("\n", $content);
+    $deterministicLine = collect($lines)->first(fn ($line) => str_contains($line, '**okf/**'));
+    $enrichedLine = collect($lines)->first(fn ($line) => str_contains($line, '**okf-enriched/**'));
+
+    expect($deterministicLine)->toContain('stale');
+    expect($enrichedLine)->not->toContain('stale');
+});
 
 test('with no Knowledge Bundle present the output contains no Knowledge Bundle section', function () {
     File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
