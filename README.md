@@ -285,6 +285,16 @@ Routes render their Domain/Risk/External Services/ADR columns from resolved Arti
 
 The column is omitted entirely for a section where no artifact declares annotations.
 
+If a Knowledge Bundle exists at its configured default path (`okf/`, `okf-enriched/`, or wherever `okf.output`/`okf.enrichment.output` point), a `## Knowledge Bundle` section names it, its regenerate command, and its live stats — in `NECROMANCER.md` and in the compact `CLAUDE.md`/`AGENTS.md` output alike:
+
+```markdown
+## Knowledge Bundle
+
+- **okf/** — 12 artifact concepts, generated 2026-08-07T12:00:00+02:00. Regenerate with `php artisan necromancer:okf`.
+```
+
+The section is exempt from `--only`/`--except`/`--paths` (the same way the Application header always is) and is omitted entirely when no bundle exists at either configured path. A bundle exported to a custom `--output` path is not detected — only the configured defaults are checked. Set `okf.announce_in_context` to `false` in `config/necromancer.php` to suppress the section outright.
+
 Generate only specific sections:
 
 ```bash
@@ -839,6 +849,10 @@ return [
     // OKF Knowledge Bundle output directory (necromancer:okf)
     'okf' => [
         'output' => base_path('okf'),
+
+        // Whether necromancer:generate announces a Knowledge Bundle's
+        // presence when one exists at the paths below.
+        'announce_in_context' => true,
 
         // AI enrichment (necromancer:okf-enrich)
         'enrichment' => [

@@ -10,6 +10,8 @@ beforeEach(function () {
     File::delete(base_path('necromancer.json'));
     File::delete(base_path('NECROMANCER.md'));
     File::delete(base_path('.ai/skills/necromancer.md'));
+    File::deleteDirectory(base_path('okf'));
+    File::deleteDirectory(base_path('okf-enriched'));
 });
 
 afterEach(function () {
@@ -24,7 +26,15 @@ afterEach(function () {
     File::deleteDirectory((string) config('necromancer.boost.skill_path'));
     @rmdir(dirname((string) config('necromancer.boost.skill_path')));
     @rmdir(dirname(dirname((string) config('necromancer.boost.skill_path'))));
+    File::deleteDirectory(base_path('okf'));
+    File::deleteDirectory(base_path('okf-enriched'));
 });
+
+function putKnowledgeBundle(string $relativeDir, array $index): void
+{
+    File::ensureDirectoryExists(base_path($relativeDir));
+    File::put(base_path($relativeDir.'/bundle.json'), json_encode($index, JSON_THROW_ON_ERROR));
+}
 
 test('the generate command is registered in artisan', function () {
     $this->artisan('list')
@@ -2945,4 +2955,166 @@ test('--paths uses boundary-aware matching and does not match sibling prefixes',
     $content = File::get(base_path('NECROMANCER.md'));
     expect($content)->toContain('app/Models/Invoice.php');
     expect($content)->not->toContain('app/ModelsArchive/Old.php');
+});
+
+// Knowledge Bundle Announcement
+
+function generateManifestWithApp(): array
+{
+    return [
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => (object) [],
+    ];
+}
+
+test('with no Knowledge Bundle present the output contains no Knowledge Bundle section', function () {
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)->not->toContain('## Knowledge Bundle');
+});
+
+test('with the deterministic bundle present a line names its path, regenerate command, and counts', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 12, 'generated_at' => '2026-08-07T12:00:00+02:00']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)
+        ->toContain('## Knowledge Bundle')
+        ->toContain('okf/')
+        ->toContain('php artisan necromancer:okf')
+        ->toContain('12 artifact concepts')
+        ->toContain('2026-08-07T12:00:00+02:00')
+        ->not->toContain('okf-enriched/');
+});
+
+test('with the enriched bundle present its own line appears', function () {
+    putKnowledgeBundle('okf-enriched', ['concept_count' => 5, 'cached_count' => 3, 'fresh_count' => 2, 'generated_at' => '2026-08-07T12:00:00+02:00']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect($content)
+        ->toContain('## Knowledge Bundle')
+        ->toContain('okf-enriched/')
+        ->toContain('php artisan necromancer:okf-enrich')
+        ->toContain('5 concepts')
+        ->toContain('2 fresh')
+        ->toContain('3 cached');
+});
+
+test('with both bundles present both lines appear under one Knowledge Bundle heading', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 12, 'generated_at' => '2026-08-07T12:00:00+02:00']);
+    putKnowledgeBundle('okf-enriched', ['concept_count' => 5, 'cached_count' => 3, 'fresh_count' => 2, 'generated_at' => '2026-08-07T12:00:00+02:00']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+    expect(substr_count($content, '## Knowledge Bundle'))->toBe(1)
+        ->and($content)->toContain('okf/')
+        ->and($content)->toContain('okf-enriched/');
+});
+
+test('--only never removes the Knowledge Bundle section', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'routes' => [
+                ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--only' => 'routes'])->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('## Knowledge Bundle');
+});
+
+test('--except never removes the Knowledge Bundle section', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'routes' => [
+                ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--except' => 'routes'])->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('## Knowledge Bundle');
+});
+
+test('--paths never removes the Knowledge Bundle section', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['app_name' => 'TestApp'],
+        'artifacts' => [
+            'models' => [
+                ['class' => 'App\\Models\\Invoice', 'table' => 'invoices', 'fillable' => [], 'casts' => [], 'relationships' => [], 'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1]],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Other'])->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('## Knowledge Bundle');
+});
+
+test('okf.announce_in_context set to false suppresses the section even when a bundle exists', function () {
+    config(['necromancer.okf.announce_in_context' => false]);
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Knowledge Bundle');
+});
+
+test('a bundle exported to a custom output path is not detected', function () {
+    $customPath = storage_path('framework/testing/knowledge-bundle-custom');
+    File::deleteDirectory($customPath);
+    File::ensureDirectoryExists($customPath);
+    File::put($customPath.'/bundle.json', json_encode(['artifact_count' => 1], JSON_THROW_ON_ERROR));
+
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Knowledge Bundle');
+
+    File::deleteDirectory($customPath);
+});
+
+test('the Knowledge Bundle section appears in Tier 1 (CLAUDE.md and AGENTS.md) as well as Tier 2', function () {
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('CLAUDE.md')))->toContain('## Knowledge Bundle');
+    expect(File::get(base_path('AGENTS.md')))->toContain('## Knowledge Bundle');
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('## Knowledge Bundle');
+});
+
+test('the Knowledge Bundle section appears in the Boost context path and SKILL.md when Boost is detected', function () {
+    $this->instance(BoostDetector::class, new BoostDetector(ServiceProvider::class));
+
+    putKnowledgeBundle('okf', ['artifact_count' => 1]);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $skillFile = ((string) config('necromancer.boost.skill_path')).'/SKILL.md';
+
+    expect(File::get(config('necromancer.boost.context_path')))->toContain('## Knowledge Bundle');
+    expect(File::get($skillFile))->toContain('## Knowledge Bundle');
 });

@@ -101,6 +101,8 @@ final class GenerateCommand extends Command
             }
         }
 
+        $knowledgeBundle = $this->buildKnowledgeBundle();
+
         // --- Tier 2: full content with --only/--except filtering ---
         $sectionMap = [
             'overview' => $this->buildOverview($manifest['meta'] ?? []),
@@ -122,12 +124,15 @@ final class GenerateCommand extends Command
             'mailables' => $this->buildMailables($artifacts['mailables'] ?? []),
             'validation_rules' => $this->buildValidationRules($artifacts['validation_rules'] ?? []),
             'service_providers' => $this->buildServiceProviders($artifacts['service_providers'] ?? []),
+            'knowledge_bundle' => $knowledgeBundle,
         ];
+
+        $alwaysIncluded = $this->alwaysIncludedSections();
 
         if ($onlyTypes !== null) {
             $sectionMap = array_filter(
                 $sectionMap,
-                fn (string $key) => $key === 'overview' || in_array($key, $onlyTypes, true),
+                fn (string $key) => in_array($key, $alwaysIncluded, true) || in_array($key, $onlyTypes, true),
                 ARRAY_FILTER_USE_KEY,
             );
         }
@@ -135,16 +140,20 @@ final class GenerateCommand extends Command
         if ($exceptTypes !== null) {
             $sectionMap = array_filter(
                 $sectionMap,
-                fn (string $key) => $key === 'overview' || ! in_array($key, $exceptTypes, true),
+                fn (string $key) => in_array($key, $alwaysIncluded, true) || ! in_array($key, $exceptTypes, true),
                 ARRAY_FILTER_USE_KEY,
             );
         }
 
-        $writtenNames = array_keys(array_filter($sectionMap));
+        $writtenNames = array_keys(array_filter(array_diff_key($sectionMap, ['knowledge_bundle' => true])));
         $tier2Content = implode("\n\n", array_filter($sectionMap));
 
         // --- Tier 1: compact content (fixed set, not affected by --only/--except) ---
         $tier1Content = $this->buildTier1($manifest)."\n\n".$this->buildTier1Footer($usingBoost);
+
+        if ($knowledgeBundle !== '') {
+            $tier1Content .= "\n\n{$knowledgeBundle}";
+        }
 
         // --- Resolve Tier 2 path ---
         $override = $this->option('output');
@@ -211,6 +220,18 @@ final class GenerateCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * `$sectionMap` keys that are not artifact-type sections and are
+     * therefore exempt from `--only`/`--except` filtering, mirroring how
+     * the Application header is never affected by artifact-type filtering.
+     *
+     * @return list<string>
+     */
+    private function alwaysIncludedSections(): array
+    {
+        return ['overview', 'knowledge_bundle'];
     }
 
     /**
@@ -541,6 +562,81 @@ final class GenerateCommand extends Command
         }
 
         return '> For complete application context (all route details, model fields, casts, jobs, events, listeners, commands, policies, form requests, enums, tests, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers), read `NECROMANCER.md`.';
+    }
+
+    /**
+     * Announces a Knowledge Bundle's presence (deterministic and/or
+     * enriched) when one exists at its *configured default* output path —
+     * a bundle exported via a one-off `--output=PATH` is not detected, a
+     * known, accepted limitation. Not gated by --only/--except/--paths,
+     * same as buildOverview(). Returns '' when okf.announce_in_context is
+     * false, or when neither bundle is present.
+     */
+    private function buildKnowledgeBundle(): string
+    {
+        if (! (bool) config('necromancer.okf.announce_in_context', true)) {
+            return '';
+        }
+
+        $lines = array_filter([
+            $this->knowledgeBundleLine(
+                (string) config('necromancer.okf.output', base_path('okf')),
+                'php artisan necromancer:okf',
+                function (array $index): string {
+                    $count = (int) ($index['artifact_count'] ?? 0);
+
+                    return $count === 1 ? '1 artifact concept' : "{$count} artifact concepts";
+                },
+            ),
+            $this->knowledgeBundleLine(
+                (string) config('necromancer.okf.enrichment.output', base_path('okf-enriched')),
+                'php artisan necromancer:okf-enrich',
+                function (array $index): string {
+                    $count = (int) ($index['concept_count'] ?? 0);
+                    $concepts = $count === 1 ? '1 concept' : "{$count} concepts";
+                    $fresh = (int) ($index['fresh_count'] ?? 0);
+                    $cached = (int) ($index['cached_count'] ?? 0);
+
+                    return "{$concepts} ({$fresh} fresh, {$cached} cached)";
+                },
+            ),
+        ]);
+
+        if (empty($lines)) {
+            return '';
+        }
+
+        return implode("\n", ['## Knowledge Bundle', '', ...$lines]);
+    }
+
+    /**
+     * @param  callable(array<string, mixed>): string  $describeCounts
+     */
+    private function knowledgeBundleLine(string $configuredPath, string $regenerateCommand, callable $describeCounts): ?string
+    {
+        $path = $this->isAbsolutePath($configuredPath) ? $configuredPath : base_path($configuredPath);
+        $bundleJsonPath = rtrim($path, '/').'/bundle.json';
+
+        if (! is_file($bundleJsonPath)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) file_get_contents($bundleJsonPath), true);
+        $index = is_array($decoded) ? $decoded : [];
+
+        $detail = $describeCounts($index);
+        $generatedAt = isset($index['generated_at']) && is_string($index['generated_at']) && $index['generated_at'] !== ''
+            ? ", generated {$index['generated_at']}"
+            : '';
+
+        return "- **{$this->relativeToBasePath($path)}/** — {$detail}{$generatedAt}. Regenerate with `{$regenerateCommand}`.";
+    }
+
+    private function relativeToBasePath(string $path): string
+    {
+        $base = rtrim(base_path(), '/').'/';
+
+        return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
     }
 
     /**
