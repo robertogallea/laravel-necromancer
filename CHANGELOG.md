@@ -5,6 +5,13 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.8.0
+
+### Added
+
+- `necromancer:okf` writes a `README.md` alongside the bundle (purpose, structure, concept kinds, CLI/config reference, and a static mention of the `necromancer:okf-enrich` sibling — never an existence check), and `necromancer:okf-enrich` writes the analogous `okf-enriched/README.md`. Both bundles' `bundle.json` gain a `content_hash` field (the source manifest's `meta.content_hash`), without an `okf_version` bump.
+- `necromancer:generate` announces a Knowledge Bundle's presence (deterministic and/or enriched) when one exists at its configured default path: a `## Knowledge Bundle` section in both Tier 1 (`CLAUDE.md`/`AGENTS.md`, or the Boost context path) and Tier 2 (`NECROMANCER.md`, or the Boost `SKILL.md`), naming its path, regenerate command, and live stats — exempt from `--only`/`--except`/`--paths`, suppressible via a new `okf.announce_in_context` config key. Each line compares that bundle's `content_hash` against the current manifest's and appends a "may be stale — re-run `<command>`" caveat on mismatch; a bundle with no `content_hash` key at all (produced before this feature existed) renders with no staleness claim either way.
+
 ## 1.7.2
 
 ### Fixed
