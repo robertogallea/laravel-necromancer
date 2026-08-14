@@ -6,12 +6,13 @@ use LaravelNecromancer\Integrations\AiDetector;
 use LaravelNecromancer\Okf\Enrichment\Contracts\ConceptEnricher;
 use LaravelNecromancer\Okf\Enrichment\RawEnrichment;
 
-function okfEnrichManifest(array $artifacts = [], bool $complete = true): array
+function okfEnrichManifest(array $artifacts = [], bool $complete = true, ?string $contentHash = null): array
 {
     return [
         'meta' => [
             'generated_at' => now()->addMinute()->toIso8601String(),
             'scope' => ['complete' => $complete, 'artifact_types' => array_keys($artifacts)],
+            'content_hash' => $contentHash,
         ],
         'artifacts' => $artifacts,
     ];
@@ -100,6 +101,31 @@ test('the okf-enrich command writes an enriched bundle to the default sibling ou
     $content = File::get(File::glob(base_path('okf-enriched/artifacts/*.md'))[0]);
     expect($content)->toContain('A generated narrative.')
         ->and($content)->toContain('cache_key:');
+});
+
+test('the okf-enrich command writes a README.md documenting enrichment and the deterministic sibling', function () {
+    File::put(base_path('necromancer.json'), json_encode(okfEnrichManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ], contentHash: 'abc123'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:okf-enrich')->assertSuccessful();
+
+    expect(File::isFile(base_path('okf-enriched/README.md')))->toBeTrue();
+
+    $readme = File::get(base_path('okf-enriched/README.md'));
+
+    expect($readme)
+        ->toContain('necromancer:okf')
+        ->toContain('1 fresh');
+});
+
+test('the okf-enrich command records the manifest content_hash in the enriched bundle.json', function () {
+    File::put(base_path('necromancer.json'), json_encode(okfEnrichManifest([], contentHash: 'abc123'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:okf-enrich')->assertSuccessful();
+
+    $index = json_decode(File::get(base_path('okf-enriched/bundle.json')), true, 512, JSON_THROW_ON_ERROR);
+    expect($index['content_hash'])->toBe('abc123');
 });
 
 test('--output overrides the default enriched bundle directory', function () {
