@@ -2,12 +2,13 @@
 
 use Illuminate\Support\Facades\File;
 
-function okfManifest(array $artifacts = [], bool $complete = true): array
+function okfManifest(array $artifacts = [], bool $complete = true, ?string $contentHash = null): array
 {
     return [
         'meta' => ['manifest_schema_version' => 1,
             'generated_at' => now()->addMinute()->toIso8601String(),
             'scope' => ['complete' => $complete, 'artifact_types' => array_keys($artifacts)],
+            'content_hash' => $contentHash,
         ],
         'artifacts' => $artifacts,
     ];
@@ -141,6 +142,31 @@ test('the okf command copies a declared local ADR and synthesizes domain/flow co
     expect(count(File::glob(base_path('okf/artifacts/*.md'))))->toBe(4);
 
     File::deleteDirectory(base_path('docs/adr'));
+});
+
+test('the okf command writes a README.md documenting necromancer:okf and necromancer:okf-enrich', function () {
+    File::put(base_path('necromancer.json'), json_encode(okfManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ], contentHash: 'abc123'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:okf')->assertSuccessful();
+
+    expect(File::isFile(base_path('okf/README.md')))->toBeTrue();
+
+    $readme = File::get(base_path('okf/README.md'));
+
+    expect($readme)
+        ->toContain('necromancer:okf-enrich')
+        ->toContain('1 artifact concept');
+});
+
+test('the okf command records the manifest content_hash in bundle.json', function () {
+    File::put(base_path('necromancer.json'), json_encode(okfManifest([], contentHash: 'abc123'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:okf')->assertSuccessful();
+
+    $index = json_decode(File::get(base_path('okf/bundle.json')), true, 512, JSON_THROW_ON_ERROR);
+    expect($index['content_hash'])->toBe('abc123');
 });
 
 test('the okf command resolves the manifest path from config', function () {
