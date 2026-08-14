@@ -625,7 +625,7 @@ Project the manifest into a portable, deterministic Open Knowledge Format (OKF) 
 php artisan necromancer:okf
 ```
 
-Writes to `okf/` at the project root by default: `okf/bundle.json` (a small index with the bundle version and artifact count) plus one file per artifact under `okf/artifacts/`, named from a readable slug and a short hash of the artifact's canonical ID (e.g. `app-jobs-sendinvoice-20237e38.md`) — the filename is for browsability only, never authoritative; the `necromancer.id` field inside each file's front matter is.
+Writes to `okf/` at the project root by default: `okf/bundle.json` (a small index with the bundle version, a `content_hash` copied from the source manifest, and the artifact count), a generated `okf/README.md` explaining the bundle's structure and how to regenerate it, plus one file per artifact under `okf/artifacts/`, named from a readable slug and a short hash of the artifact's canonical ID (e.g. `app-jobs-sendinvoice-20237e38.md`) — the filename is for browsability only, never authoritative; the `necromancer.id` field inside each file's front matter is.
 
 ```markdown
 ---
@@ -673,6 +673,8 @@ php artisan necromancer:okf --output=dist/okf  # write elsewhere
 ```
 
 Output replacement is safe to interrupt: the whole bundle is built in a temporary directory first, and the real output directory is only ever replaced once every file has been written successfully — a failed export never leaves a previously-generated bundle damaged.
+
+`bundle.json`'s `content_hash` is the source manifest's own `meta.content_hash` at export time, not a timestamp — so it stays comparable across rescans that changed nothing, and lets other tooling tell a bundle apart from the manifest it was built from without being thrown off by a routine no-op rescan.
 
 #### Relationships, Domain/Flow concepts, and ADRs
 

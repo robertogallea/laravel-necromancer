@@ -241,7 +241,9 @@ test('export() writes a README.md documenting necromancer:okf and mentioning nec
         ->toContain('Artifact Concept')
         ->toContain('Domain Concept')
         ->toContain('Flow Concept')
-        ->toContain('ADR Concept');
+        ->toContain('ADR Concept')
+        ->toContain('necromancer.okf.output')
+        ->toContain('necromancer.okf.enrichment.output');
 });
 
 test('export() README footer reports generated_at and artifact_count', function () {
