@@ -127,11 +127,7 @@ final class GenerateCommand extends Command
             'knowledge_bundle' => $knowledgeBundle,
         ];
 
-        // 'overview' and 'knowledge_bundle' are not artifact-type sections —
-        // they're exempt from --only/--except the same way, mirroring how
-        // the Application header is never affected by artifact-type
-        // filtering.
-        $alwaysIncluded = ['overview', 'knowledge_bundle'];
+        $alwaysIncluded = $this->alwaysIncludedSections();
 
         if ($onlyTypes !== null) {
             $sectionMap = array_filter(
@@ -224,6 +220,18 @@ final class GenerateCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * `$sectionMap` keys that are not artifact-type sections and are
+     * therefore exempt from `--only`/`--except` filtering, mirroring how
+     * the Application header is never affected by artifact-type filtering.
+     *
+     * @return list<string>
+     */
+    private function alwaysIncludedSections(): array
+    {
+        return ['overview', 'knowledge_bundle'];
     }
 
     /**
