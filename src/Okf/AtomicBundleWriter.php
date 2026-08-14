@@ -29,10 +29,15 @@ final readonly class AtomicBundleWriter
      * supply the rest (e.g. `artifact_count`, or `concept_count`/
      * `cached_count`/`fresh_count` for an enriched bundle).
      *
+     * $readme, when given, is written as a top-level `README.md` alongside
+     * `bundle.json` — part of the same temp-directory-then-atomic-swap
+     * sequence, so it gets the identical write-safety guarantee. Left
+     * `null` for a caller that doesn't (yet) build one.
+     *
      * @param  list<ArtifactConcept>  $concepts
      * @param  array<string, mixed>  $index
      */
-    public function write(string $outputPath, array $concepts, array $index): void
+    public function write(string $outputPath, array $concepts, array $index, ?string $readme = null): void
     {
         $tempPath = rtrim($outputPath, '/').'.tmp';
         RecursivePathRemover::remove($tempPath);
@@ -57,6 +62,12 @@ final readonly class AtomicBundleWriter
             RecursivePathRemover::remove($tempPath);
 
             throw new RuntimeException('Unable to write bundle.json.');
+        }
+
+        if ($readme !== null && file_put_contents($tempPath.'/README.md', $readme."\n") === false) {
+            $this->removePath($tempPath);
+
+            throw new RuntimeException('Unable to write README.md.');
         }
 
         try {

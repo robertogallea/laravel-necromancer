@@ -315,6 +315,24 @@ Routes render their Domain/Risk/External Services/ADR columns from resolved Arti
 
 The column is omitted entirely for a section where no artifact declares annotations.
 
+If a Knowledge Bundle exists at its configured default path (`okf/`, `okf-enriched/`, or wherever `okf.output`/`okf.enrichment.output` point), a `## Knowledge Bundle` section names it, its regenerate command, and its live stats — in `NECROMANCER.md` and in the compact `CLAUDE.md`/`AGENTS.md` output alike:
+
+```markdown
+## Knowledge Bundle
+
+- **okf/** — 12 artifact concepts, generated 2026-08-07T12:00:00+02:00. Regenerate with `php artisan necromancer:okf`.
+```
+
+The section is exempt from `--only`/`--except`/`--paths` (the same way the Application header always is) and is omitted entirely when no bundle exists at either configured path. A bundle exported to a custom `--output` path is not detected — only the configured defaults are checked. Set `okf.announce_in_context` to `false` in `config/necromancer.php` to suppress the section outright.
+
+Each line compares that bundle's own `content_hash` against the current manifest's `content_hash` and appends a caveat when they differ:
+
+```markdown
+- **okf/** — 12 artifact concepts, generated 2026-08-07T12:00:00+02:00. Regenerate with `php artisan necromancer:okf`. ⚠ May be stale relative to the current manifest — re-run `php artisan necromancer:okf`.
+```
+
+A bundle exported before this feature existed (no `content_hash` key at all in its `bundle.json`) renders with no staleness claim either way — never assumed stale or fresh.
+
 Generate only specific sections:
 
 ```bash
@@ -656,7 +674,7 @@ Project the manifest into a portable, deterministic [Open Knowledge Format](http
 php artisan necromancer:okf
 ```
 
-Writes to `okf/` at the project root by default: `okf/bundle.json` (a small index with the bundle version and artifact count) plus one file per artifact under `okf/artifacts/`, named from a readable slug and a short hash of the artifact's canonical ID (e.g. `app-jobs-sendinvoice-20237e38.md`) — the filename is for browsability only, never authoritative; the `necromancer.id` field inside each file's front matter is.
+Writes to `okf/` at the project root by default: `okf/bundle.json` (a small index with the bundle version, a `content_hash` copied from the source manifest, and the artifact count), a generated `okf/README.md` explaining the bundle's structure and how to regenerate it, plus one file per artifact under `okf/artifacts/`, named from a readable slug and a short hash of the artifact's canonical ID (e.g. `app-jobs-sendinvoice-20237e38.md`) — the filename is for browsability only, never authoritative; the `necromancer.id` field inside each file's front matter is.
 
 ```markdown
 ---
@@ -704,6 +722,8 @@ php artisan necromancer:okf --output=dist/okf  # write elsewhere
 ```
 
 Output replacement is safe to interrupt: the whole bundle is built in a temporary directory first, and the real output directory is only ever replaced once every file has been written successfully — a failed export never leaves a previously-generated bundle damaged.
+
+`bundle.json`'s `content_hash` is the source manifest's own `meta.content_hash` at export time, not a timestamp — so it stays comparable across rescans that changed nothing, and lets other tooling tell a bundle apart from the manifest it was built from without being thrown off by a routine no-op rescan.
 
 #### Relationships, Domain/Flow concepts, and ADRs
 
@@ -758,6 +778,8 @@ Layer AI-generated prose onto the deterministic bundle, written to a separate si
 ```bash
 php artisan necromancer:okf-enrich
 ```
+
+Writes `okf-enriched/bundle.json` (carrying its own `content_hash`, copied from the source manifest the same way the deterministic bundle's is) and a generated `okf-enriched/README.md` explaining what enrichment can and cannot change, caching, privacy, and configuration — mentioning the deterministic `okf/` sibling it enriches in the same static, unconditional prose the deterministic bundle's own README uses to mention this one.
 
 Every concept in the bundle (artifact, domain, flow, and ADR) is eligible for enrichment, and enrichment can only ever *add* content — it cannot change a concept's facts, annotations, Artifact ID, or links, because the AI's output is never given access to those fields to begin with. The enriched front matter gains a `description` field and a `necromancer.enrichment` block; the body gains an `## AI-Enriched Summary` section:
 
@@ -907,6 +929,10 @@ return [
     // OKF Knowledge Bundle output directory (necromancer:okf)
     'okf' => [
         'output' => base_path('okf'),
+
+        // Whether necromancer:generate announces a Knowledge Bundle's
+        // presence when one exists at the paths below.
+        'announce_in_context' => true,
 
         // AI enrichment (necromancer:okf-enrich)
         'enrichment' => [

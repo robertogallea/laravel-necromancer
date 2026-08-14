@@ -44,6 +44,13 @@ return [
 
     'okf' => [
         'output' => base_path('okf'),
+
+        // Whether necromancer:generate announces a Knowledge Bundle's
+        // presence in its output when one exists at the configured
+        // default path(s) below. Set to false to suppress the section
+        // entirely, independent of whether a bundle exists.
+        'announce_in_context' => true,
+
         'enrichment' => [
             'output' => base_path('okf-enriched'),
             'cache' => storage_path('app/necromancer/okf-enrichment-cache'),

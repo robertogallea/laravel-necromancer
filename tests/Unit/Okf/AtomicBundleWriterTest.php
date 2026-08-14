@@ -55,3 +55,29 @@ test('write() replaces a pre-existing bundle at the same output path', function 
 
     expect(is_file($output.'/artifacts/stale.md'))->toBeFalse();
 });
+
+test('write() writes a README.md file when given one', function () {
+    $output = atomicWriterTempDir().'/bundle';
+
+    (new AtomicBundleWriter)->write($output, [], ['artifact_count' => 0], 'Hello README');
+
+    expect(file_get_contents($output.'/README.md'))->toBe("Hello README\n");
+});
+
+test('write() writes no README.md file when none is given', function () {
+    $output = atomicWriterTempDir().'/bundle';
+
+    (new AtomicBundleWriter)->write($output, [], ['artifact_count' => 0]);
+
+    expect(is_file($output.'/README.md'))->toBeFalse();
+});
+
+test('write() replaces a pre-existing README.md at the same output path', function () {
+    $output = atomicWriterTempDir().'/bundle';
+    mkdir($output, 0755, true);
+    file_put_contents($output.'/README.md', 'old readme');
+
+    (new AtomicBundleWriter)->write($output, [], ['artifact_count' => 0], 'new readme');
+
+    expect(file_get_contents($output.'/README.md'))->toBe("new readme\n");
+});
