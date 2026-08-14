@@ -30,6 +30,7 @@ final class BundleEnricher
         private readonly BundleExporter $exporter = new BundleExporter,
         private readonly EnrichmentPromptBuilder $promptBuilder = new EnrichmentPromptBuilder,
         private readonly AtomicBundleWriter $writer = new AtomicBundleWriter,
+        private readonly EnrichedBundleReadmeBuilder $readmeBuilder = new EnrichedBundleReadmeBuilder,
     ) {}
 
     /**
@@ -59,6 +60,8 @@ final class BundleEnricher
 
         $policy = new EnrichmentPolicy($enricher, $cache, $provider, $model, $temperature, $promptVersion, $privacyPolicy, $refresh);
         $generatedAt = (string) ($manifest['meta']['generated_at'] ?? '');
+        $contentHash = $manifest['meta']['content_hash'] ?? null;
+        $contentHash = is_string($contentHash) && $contentHash !== '' ? $contentHash : null;
 
         // Two calls to assemble() against the same $manifest/$basePath: the
         // first (no enrichments) only discovers which concepts exist and
@@ -85,12 +88,18 @@ final class BundleEnricher
         $freshCount = count($enrichments) - $cachedCount;
 
         try {
-            $this->writer->write($outputPath, $concepts, [
-                'generated_at' => $generatedAt !== '' ? $generatedAt : null,
-                'concept_count' => count($concepts),
-                'cached_count' => $cachedCount,
-                'fresh_count' => $freshCount,
-            ]);
+            $this->writer->write(
+                $outputPath,
+                $concepts,
+                [
+                    'generated_at' => $generatedAt !== '' ? $generatedAt : null,
+                    'concept_count' => count($concepts),
+                    'cached_count' => $cachedCount,
+                    'fresh_count' => $freshCount,
+                    'content_hash' => $contentHash,
+                ],
+                $this->readmeBuilder->build($generatedAt, count($concepts), $freshCount, $cachedCount),
+            );
         } catch (Throwable $e) {
             return BundleEnrichmentResult::failure("Failed to write the enriched bundle: {$e->getMessage()}");
         }
