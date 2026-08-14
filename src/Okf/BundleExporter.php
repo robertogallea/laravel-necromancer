@@ -27,6 +27,7 @@ final readonly class BundleExporter
         private GroupConceptBuilder $groupBuilder = new GroupConceptBuilder,
         private AdrConceptBuilder $adrBuilder = new AdrConceptBuilder,
         private AtomicBundleWriter $writer = new AtomicBundleWriter,
+        private BundleReadmeBuilder $readmeBuilder = new BundleReadmeBuilder,
     ) {}
 
     /**
@@ -47,6 +48,8 @@ final readonly class BundleExporter
         }
 
         $generatedAt = (string) ($manifest['meta']['generated_at'] ?? '');
+        $contentHash = $manifest['meta']['content_hash'] ?? null;
+        $contentHash = is_string($contentHash) && $contentHash !== '' ? $contentHash : null;
 
         try {
             [$concepts, $artifactCount] = $this->assembleConcepts($manifest, $generatedAt, $basePath);
@@ -55,7 +58,7 @@ final readonly class BundleExporter
         }
 
         try {
-            $this->writeAtomically($outputPath, $concepts, $artifactCount, $generatedAt);
+            $this->writeAtomically($outputPath, $concepts, $artifactCount, $generatedAt, $contentHash);
         } catch (Throwable $e) {
             return BundleExportResult::failure("Failed to write the bundle: {$e->getMessage()}");
         }
@@ -395,11 +398,17 @@ final readonly class BundleExporter
     /**
      * @param  list<ArtifactConcept>  $concepts
      */
-    private function writeAtomically(string $outputPath, array $concepts, int $artifactCount, string $generatedAt): void
+    private function writeAtomically(string $outputPath, array $concepts, int $artifactCount, string $generatedAt, ?string $contentHash): void
     {
-        $this->writer->write($outputPath, $concepts, [
-            'generated_at' => $generatedAt !== '' ? $generatedAt : null,
-            'artifact_count' => $artifactCount,
-        ]);
+        $this->writer->write(
+            $outputPath,
+            $concepts,
+            [
+                'generated_at' => $generatedAt !== '' ? $generatedAt : null,
+                'artifact_count' => $artifactCount,
+                'content_hash' => $contentHash,
+            ],
+            $this->readmeBuilder->build($generatedAt, $artifactCount),
+        );
     }
 }
