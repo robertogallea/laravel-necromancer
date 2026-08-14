@@ -2983,9 +2983,7 @@ test('when a bundle content_hash differs from the manifest content_hash its line
     $this->artisan('necromancer:generate')->assertSuccessful();
 
     $content = File::get(base_path('NECROMANCER.md'));
-    expect($content)
-        ->toContain('stale')
-        ->toContain('php artisan necromancer:okf');
+    expect($content)->toContain('stale relative to the current manifest — re-run `php artisan necromancer:okf`');
 });
 
 test('a bundle.json with no content_hash key at all renders with no staleness claim', function () {
@@ -3009,8 +3007,17 @@ test('the staleness caveat applies independently to the deterministic and enrich
     $deterministicLine = collect($lines)->first(fn ($line) => str_contains($line, '**okf/**'));
     $enrichedLine = collect($lines)->first(fn ($line) => str_contains($line, '**okf-enriched/**'));
 
-    expect($deterministicLine)->toContain('stale');
+    expect($deterministicLine)->toContain('stale relative to the current manifest — re-run `php artisan necromancer:okf`');
     expect($enrichedLine)->not->toContain('stale');
+});
+
+test('a stale enriched bundle line names the necromancer:okf-enrich regenerate command', function () {
+    putKnowledgeBundle('okf-enriched', ['concept_count' => 1, 'cached_count' => 0, 'fresh_count' => 1, 'content_hash' => 'old-hash']);
+    File::put(base_path('necromancer.json'), json_encode(generateManifestWithApp(contentHash: 'new-hash'), JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->toContain('stale relative to the current manifest — re-run `php artisan necromancer:okf-enrich`');
 });
 
 test('with no Knowledge Bundle present the output contains no Knowledge Bundle section', function () {

@@ -295,6 +295,14 @@ If a Knowledge Bundle exists at its configured default path (`okf/`, `okf-enrich
 
 The section is exempt from `--only`/`--except`/`--paths` (the same way the Application header always is) and is omitted entirely when no bundle exists at either configured path. A bundle exported to a custom `--output` path is not detected — only the configured defaults are checked. Set `okf.announce_in_context` to `false` in `config/necromancer.php` to suppress the section outright.
 
+Each line compares that bundle's own `content_hash` against the current manifest's `content_hash` and appends a caveat when they differ:
+
+```markdown
+- **okf/** — 12 artifact concepts, generated 2026-08-07T12:00:00+02:00. Regenerate with `php artisan necromancer:okf`. ⚠ May be stale relative to the current manifest — re-run `php artisan necromancer:okf`.
+```
+
+A bundle exported before this feature existed (no `content_hash` key at all in its `bundle.json`) renders with no staleness claim either way — never assumed stale or fresh.
+
 Generate only specific sections:
 
 ```bash

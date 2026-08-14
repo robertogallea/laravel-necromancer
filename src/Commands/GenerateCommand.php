@@ -632,21 +632,26 @@ final class GenerateCommand extends Command
         $index = is_array($decoded) ? $decoded : [];
 
         $detail = $describeCounts($index);
-        $generatedAt = isset($index['generated_at']) && is_string($index['generated_at']) && $index['generated_at'] !== ''
-            ? ", generated {$index['generated_at']}"
-            : '';
+        $generatedAtValue = $this->nonEmptyStringOrNull($index, 'generated_at');
+        $generatedAt = $generatedAtValue !== null ? ", generated {$generatedAtValue}" : '';
 
         // A bundle.json with no content_hash key at all (a pre-upgrade
         // export) renders with no staleness claim either way — only a
         // present, non-matching hash on both sides earns the caveat.
-        $bundleContentHash = isset($index['content_hash']) && is_string($index['content_hash']) && $index['content_hash'] !== ''
-            ? $index['content_hash']
-            : null;
+        $bundleContentHash = $this->nonEmptyStringOrNull($index, 'content_hash');
         $staleCaveat = $bundleContentHash !== null && $currentContentHash !== null && $bundleContentHash !== $currentContentHash
-            ? ' ⚠ May be stale relative to the current manifest.'
+            ? " ⚠ May be stale relative to the current manifest — re-run `{$regenerateCommand}`."
             : '';
 
         return "- **{$this->relativeToBasePath($path)}/** — {$detail}{$generatedAt}. Regenerate with `{$regenerateCommand}`.{$staleCaveat}";
+    }
+
+    /**
+     * @param  array<string, mixed>  $index
+     */
+    private function nonEmptyStringOrNull(array $index, string $key): ?string
+    {
+        return isset($index[$key]) && is_string($index[$key]) && $index[$key] !== '' ? $index[$key] : null;
     }
 
     private function relativeToBasePath(string $path): string
