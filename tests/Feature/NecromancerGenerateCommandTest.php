@@ -2960,7 +2960,7 @@ test('--paths uses boundary-aware matching and does not match sibling prefixes',
 function generateManifestWithApp(?string $contentHash = null): array
 {
     return [
-        'meta' => ['app_name' => 'TestApp', 'content_hash' => $contentHash],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'content_hash' => $contentHash],
         'artifacts' => (object) [],
     ];
 }
@@ -3075,7 +3075,7 @@ test('with both bundles present both lines appear under one Knowledge Bundle hea
 test('--only never removes the Knowledge Bundle section', function () {
     putKnowledgeBundle('okf', ['artifact_count' => 1]);
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -3091,7 +3091,7 @@ test('--only never removes the Knowledge Bundle section', function () {
 test('--except never removes the Knowledge Bundle section', function () {
     putKnowledgeBundle('okf', ['artifact_count' => 1]);
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -3107,7 +3107,7 @@ test('--except never removes the Knowledge Bundle section', function () {
 test('--paths never removes the Knowledge Bundle section', function () {
     putKnowledgeBundle('okf', ['artifact_count' => 1]);
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Invoice', 'table' => 'invoices', 'fillable' => [], 'casts' => [], 'relationships' => [], 'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1]],

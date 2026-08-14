@@ -65,7 +65,7 @@ final readonly class AtomicBundleWriter
         }
 
         if ($readme !== null && file_put_contents($tempPath.'/README.md', $readme."\n") === false) {
-            $this->removePath($tempPath);
+            RecursivePathRemover::remove($tempPath);
 
             throw new RuntimeException('Unable to write README.md.');
         }
