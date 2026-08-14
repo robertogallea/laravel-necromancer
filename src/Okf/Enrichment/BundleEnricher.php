@@ -9,6 +9,7 @@ use LaravelNecromancer\Okf\AtomicBundleWriter;
 use LaravelNecromancer\Okf\BundleExporter;
 use LaravelNecromancer\Okf\ConceptEnrichment;
 use LaravelNecromancer\Okf\Enrichment\Contracts\ConceptEnricher;
+use LaravelNecromancer\Okf\ManifestContentHash;
 use RuntimeException;
 use Throwable;
 
@@ -60,8 +61,7 @@ final class BundleEnricher
 
         $policy = new EnrichmentPolicy($enricher, $cache, $provider, $model, $temperature, $promptVersion, $privacyPolicy, $refresh);
         $generatedAt = (string) ($manifest['meta']['generated_at'] ?? '');
-        $contentHash = $manifest['meta']['content_hash'] ?? null;
-        $contentHash = is_string($contentHash) && $contentHash !== '' ? $contentHash : null;
+        $contentHash = ManifestContentHash::resolve($manifest);
 
         // Two calls to assemble() against the same $manifest/$basePath: the
         // first (no enrichments) only discovers which concepts exist and

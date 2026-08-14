@@ -730,6 +730,8 @@ Layer AI-generated prose onto the deterministic bundle, written to a separate si
 php artisan necromancer:okf-enrich
 ```
 
+Writes `okf-enriched/bundle.json` (carrying its own `content_hash`, copied from the source manifest the same way the deterministic bundle's is) and a generated `okf-enriched/README.md` explaining what enrichment can and cannot change, caching, privacy, and configuration — mentioning the deterministic `okf/` sibling it enriches in the same static, unconditional prose the deterministic bundle's own README uses to mention this one.
+
 Every concept in the bundle (artifact, domain, flow, and ADR) is eligible for enrichment, and enrichment can only ever *add* content — it cannot change a concept's facts, annotations, Artifact ID, or links, because the AI's output is never given access to those fields to begin with. The enriched front matter gains a `description` field and a `necromancer.enrichment` block; the body gains an `## AI-Enriched Summary` section:
 
 ```markdown

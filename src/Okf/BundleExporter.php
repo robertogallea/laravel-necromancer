@@ -48,8 +48,7 @@ final readonly class BundleExporter
         }
 
         $generatedAt = (string) ($manifest['meta']['generated_at'] ?? '');
-        $contentHash = $manifest['meta']['content_hash'] ?? null;
-        $contentHash = is_string($contentHash) && $contentHash !== '' ? $contentHash : null;
+        $contentHash = ManifestContentHash::resolve($manifest);
 
         try {
             [$concepts, $artifactCount] = $this->assembleConcepts($manifest, $generatedAt, $basePath);
