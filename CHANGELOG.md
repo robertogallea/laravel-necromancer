@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING:** The `necromancer:scan` diagnostic codes `AN_LEGACY_VALUE` and `AN_LEGACY_RISK` are renamed to `AN_SCHEMA_INCOMPATIBLE_VALUE` and `AN_SCHEMA_INCOMPATIBLE_RISK`. The underlying check — a native `Route::metadata()` value that can't fit Annotation Schema v1 — is unchanged; only the code name changed, since the condition was never actually tied to manifest schema age.
 - Internal: the relationship taxonomy behind the OKF bundle's `## Relationships` section (route→controller, model→relationships/policy/observers, event→listeners, listener→handles, policy→model, observer→model) is now exposed as structured data via `LaravelNecromancer\Relationships\RelationshipResolver`, extracted out of `ArtifactConceptBuilder`. No user-visible change — rendered bundle output is byte-identical.
 
+### Fixed
+
+- `necromancer:doctor`'s text output no longer misaligns the "Artifact Annotation Coverage" row. Its label is longer than the fixed 24-char column every other dimension pads into, so its progress bar started several columns late; it's now abbreviated to "Artifact Annotation Cov." for the text dashboard only, which fits the column and lines its bar up with the rest. `--json` output, `DimensionResult::$label`, and `--only=artifact-annotation-coverage` are unaffected — they still use the full "Artifact Annotation Coverage" name.
+- `necromancer:doctor`'s text output no longer shifts a row's detail text when its score is 100% or a single digit. The percentage field is now right-padded to a fixed 3-digit width before the `%` sign, so `100%`, ` 82%`, and `  0%` all occupy the same 4 characters and every row's `(...)` detail starts in the same column.
+
 See the [README's "Upgrading to 2.0" section](README.md#upgrading-to-20) for a full migration guide.
 
 ## 1.8.0

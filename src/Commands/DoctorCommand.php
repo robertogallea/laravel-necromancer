@@ -88,8 +88,9 @@ final class DoctorCommand extends Command
         foreach ($dimensions as $d) {
             $pct = $d->percentage();
             $bar = $this->progressBar($pct);
-            $label = str_pad($d->label, 24);
-            $lines[] = "  {$label}  {$bar}  {$pct}%  ({$d->detail})";
+            $label = str_pad($this->displayLabel($d->label, 24), 24);
+            $pctField = str_pad((string) $pct, 3, ' ', STR_PAD_LEFT).'%';
+            $lines[] = "  {$label}  {$bar}  {$pctField}  ({$d->detail})";
         }
 
         $lines[] = '';
@@ -113,6 +114,15 @@ final class DoctorCommand extends Command
                 'weight' => $d->weight,
             ], $dimensions),
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+    }
+
+    private function displayLabel(string $label, int $width): string
+    {
+        if (mb_strlen($label) > $width) {
+            $label = preg_replace('/ Coverage$/', ' Cov.', $label) ?? $label;
+        }
+
+        return $label;
     }
 
     private function progressBar(int $percentage): string

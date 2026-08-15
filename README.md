@@ -264,14 +264,14 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   ──────────────────────────────────────────
   Score: 74%
 
-  Route Clarity          ████████░░  82%  (12/15 named · 14/15 controller-backed)
-  Model Expressiveness   ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
-  Authorization Coverage ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
-  Validation Coverage    ████████░░  80%  (8/10 write routes with FormRequest)
-  Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
-  Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
-  Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
-  Artifact Annotation Cov.████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
+  Route Clarity             ████████░░  82%  (12/15 named · 14/15 controller-backed)
+  Model Expressiveness      ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
+  Authorization Coverage    ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
+  Validation Coverage       ████████░░  80%  (8/10 write routes with FormRequest)
+  Async Clarity             ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
+  Codebase Vocabulary       ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
+  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs)
+  Artifact Annotation Cov.  ████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.
 ```

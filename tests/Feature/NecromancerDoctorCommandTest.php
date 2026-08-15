@@ -297,6 +297,55 @@ test('--only=artifact-annotation-coverage selects the dimension by its canonical
         ->and($decoded['dimensions'][0]['label'])->toBe('Artifact Annotation Coverage');
 });
 
+test('the artifact annotation coverage row is abbreviated and column-aligned with other rows in text output', function () {
+    File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--only' => 'route-clarity,artifact-annotation-coverage']);
+    $output = Artisan::output();
+
+    expect($output)->toContain('Artifact Annotation Cov.')
+        ->and($output)->not->toContain('Artifact Annotation Coverage');
+
+    $lines = explode(PHP_EOL, $output);
+    $routeLine = collect($lines)->first(fn (string $line): bool => str_contains($line, 'Route Clarity'));
+    $annotationLine = collect($lines)->first(fn (string $line): bool => str_contains($line, 'Artifact Annotation Cov.'));
+
+    expect($routeLine)->not->toBeNull()
+        ->and($annotationLine)->not->toBeNull();
+
+    $barColumn = fn (string $line): int|false => mb_strpos($line, '█') !== false
+        ? mb_strpos($line, '█')
+        : mb_strpos($line, '░');
+
+    expect($barColumn($routeLine))->toBe($barColumn($annotationLine));
+});
+
+test('rows with 100%, a single-digit percentage, and a normal percentage keep their detail text column-aligned', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1],
+        'artifacts' => [
+            'routes' => [
+                ['method' => 'GET', 'uri' => '/x', 'name' => null, 'controller' => null, 'middleware' => []],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    Artisan::call('necromancer:doctor', ['--only' => 'route-clarity,model-expressiveness']);
+    $output = Artisan::output();
+
+    expect($output)->toContain('0%')
+        ->and($output)->toContain('100%');
+
+    $lines = explode(PHP_EOL, $output);
+    $lowLine = collect($lines)->first(fn (string $line): bool => str_contains($line, 'Route Clarity'));
+    $fullLine = collect($lines)->first(fn (string $line): bool => str_contains($line, 'Model Expressiveness'));
+
+    expect($lowLine)->not->toBeNull()
+        ->and($fullLine)->not->toBeNull();
+
+    expect(mb_strpos($lowLine, '('))->toBe(mb_strpos($fullLine, '('));
+});
+
 test('--only=route-metadata-coverage no longer matches anything — the legacy alias was removed in 2.0', function () {
     File::put(base_path('necromancer.json'), json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
