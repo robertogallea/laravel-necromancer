@@ -65,9 +65,9 @@
           Unearth what AI needs to know about your Laravel app.
         </h1>
         <p class="text-lg text-gray-400 mb-8 leading-relaxed">
-          Laravel Necromancer scans your bootstrapped application and produces a structured manifest of
-          <strong class="text-gray-200">18 artifact types</strong> — routes, models, jobs, events, policies, and more —
-          so AI coding agents always have an accurate picture of your application.
+          Scan your app, then generate a Markdown context file with every route, model, and job
+          <strong class="text-gray-200">cited to its file and line</strong> — so Claude Code, Cursor, or Copilot
+          stop guessing and start citing your actual codebase.
         </p>
         <div class="flex flex-wrap gap-3">
           <a href="https://github.com/robertogallea/laravel-necromancer"
@@ -82,22 +82,32 @@
         </div>
       </div>
       <div class="mt-10 code-block relative">
-        <pre class="bg-black text-green-400 font-mono text-sm p-6 rounded-xl overflow-x-auto leading-relaxed border border-gray-800"><span class="text-gray-600">$</span> php artisan necromancer:doctor
+        <pre class="bg-black text-green-400 font-mono text-sm p-6 rounded-xl overflow-x-auto leading-relaxed border border-gray-800"><span class="text-gray-600">$</span> php artisan necromancer:scan
+Necromancer manifest written to necromancer.json
 
-  Laravel Necromancer — AI Readability Score
-  ──────────────────────────────────────────
-  Score: 74%
+<span class="text-gray-600">$</span> php artisan necromancer:generate
+Full context written to NECROMANCER.md
+Compact context written to CLAUDE.md</pre>
+      </div>
+      <div class="mt-4 code-block relative">
+        <div class="text-xs text-gray-600 font-mono px-1 mb-1">NECROMANCER.md</div>
+        <pre class="bg-black text-gray-300 font-mono text-sm p-6 rounded-xl overflow-x-auto leading-relaxed border border-gray-800">## Routes (14)
 
-  Route Clarity          ████████░░  82%  (12/15 named · 14/15 controller-backed)
-  Model Expressiveness   ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
-  Authorization Coverage ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
-  Validation Coverage    ████████░░  80%  (8/10 write routes with FormRequest)
-  Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
-  Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
-  Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
-  Artifact Annotation Cov.████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
+| Name | Method | URI | Controller | Middleware | Source |
+|---|---|---|---|---|---|
+| orders.index | GET | /orders | OrderController@index | auth, verified | app/Http/Controllers/OrderController.php:12 |
 
-  Tip: run necromancer:audit for a detailed findings list.</pre>
+## Models (1)
+
+| Name | Table | Fillable | Casts | Relationships | Source |
+|---|---|---|---|---|---|
+| Order | orders | customer_id, total, status | total → decimal:2 | belongsTo Customer, hasMany OrderLine | app/Models/Order.php:1 |
+
+## Policies (1)
+
+| Class | Model | Methods | Source |
+|---|---|---|---|
+| OrderPolicy | Order | viewAny, view, create, update, delete | app/Policies/OrderPolicy.php:1 |</pre>
       </div>
     </div>
   </section>
@@ -227,8 +237,10 @@
       <h2 class="text-2xl font-bold text-red-400 mb-2">Commands</h2>
       <p class="text-gray-500 mb-8">
         Necromancer follows a <strong class="text-gray-200">scan-first</strong> workflow — every other command reads the manifest produced by
-        <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">necromancer:scan</code>.
+        <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">necromancer:scan</code>. Grouped below by what you're trying to do, not execution order.
       </p>
+
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Understand your app</h3>
 
       <!-- necromancer:scan -->
       <div class="border border-gray-800 rounded-lg p-6 mb-4">
@@ -268,7 +280,7 @@ php artisan necromancer:map --type=models</pre>
       </div>
 
       <!-- necromancer:audit -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+      <div class="border border-red-900/40 rounded-lg p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
           <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:audit</code>
           <div class="flex flex-wrap gap-1.5">
@@ -278,6 +290,16 @@ php artisan necromancer:map --type=models</pre>
           </div>
         </div>
         <p class="text-gray-400 text-sm mb-3">Scored AI-readability report (0–100). Findings grouped by severity: <strong class="text-gray-200">error</strong> (−10), <strong class="text-gray-200">warning</strong> (−5), <strong class="text-gray-200">suggestion</strong> (−1). Checks unnamed routes, missing model casts, dead events, unconfigured jobs, high-risk artifacts without an ADR, external-service artifacts without tests, and more.</p>
+        <div class="code-block relative mb-3">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800"><span class="text-red-400 font-semibold">ERRORS</span>
+<span class="text-red-400">✗</span>  Unnamed routes (3)
+   GET /orders           routes/web.php:12
+
+<span class="text-amber-400 font-semibold">WARNINGS</span>
+<span class="text-amber-400">⚠</span>  Missing return types (7)
+   OrderController::store()   app/Http/Controllers/OrderController.php:45</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:audit
 php artisan necromancer:audit --format=markdown --output=audit.md
@@ -288,7 +310,7 @@ php artisan necromancer:audit --fail-on=warning    <span class="text-gray-600">#
       </div>
 
       <!-- necromancer:doctor -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+      <div class="border border-red-900/40 rounded-lg p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
           <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:doctor</code>
           <div class="flex flex-wrap gap-1.5">
@@ -298,6 +320,23 @@ php artisan necromancer:audit --fail-on=warning    <span class="text-gray-600">#
           </div>
         </div>
         <p class="text-gray-400 text-sm mb-3">Eight-dimension AI readability percentage dashboard with progress bars. Dimensions: Route Clarity, Model Expressiveness, Authorization Coverage, Validation Coverage, Async Clarity, Codebase Vocabulary, Test Presence, Artifact Annotation Coverage.</p>
+        <div class="code-block relative mb-3">
+          <pre class="bg-black text-green-400 font-mono text-sm p-4 rounded-lg overflow-x-auto leading-relaxed border border-gray-800">  Laravel Necromancer — AI Readability Score
+  ──────────────────────────────────────────
+  Score: 74%
+
+  Route Clarity             ████████░░  82%  (12/15 named · 14/15 controller-backed)
+  Model Expressiveness      ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
+  Authorization Coverage    ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
+  Validation Coverage       ████████░░  80%  (8/10 write routes with FormRequest)
+  Async Clarity             ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
+  Codebase Vocabulary       ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
+  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs)
+  Artifact Annotation Cov.  ████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
+
+  Tip: run necromancer:audit for a detailed findings list.</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:doctor
 php artisan necromancer:doctor --json
@@ -307,8 +346,10 @@ php artisan necromancer:doctor --only=route-clarity</pre>
         </div>
       </div>
 
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-10 mb-4">Feed it to AI</h3>
+
       <!-- necromancer:generate -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+      <div class="border border-red-900/40 rounded-lg p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
           <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:generate</code>
           <div class="flex flex-wrap gap-1.5">
@@ -326,24 +367,6 @@ php artisan necromancer:generate --only=routes,models
 php artisan necromancer:generate --except=listeners,validation_rules
 php artisan necromancer:generate --paths=app/Models,app/Http/Controllers/Admin
 php artisan necromancer:generate --output=.ai/context/app.md --force</pre>
-          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
-        </div>
-      </div>
-
-      <!-- necromancer:ask -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
-        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
-          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:ask</code>
-          <div class="flex flex-wrap gap-1.5">
-            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--provider=</span>
-            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--model=</span>
-          </div>
-        </div>
-        <p class="text-gray-400 text-sm mb-3">Natural-language codebase Q&amp;A. The manifest is injected verbatim into the AI's context — answers are grounded in your actual application, not the model's prior knowledge. Requires <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">laravel/ai</code>.</p>
-        <div class="code-block relative">
-          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:ask "What routes require authentication?"
-php artisan necromancer:ask                              <span class="text-gray-600"># interactive prompt</span>
-php artisan necromancer:ask "..." --provider=anthropic --model=claude-sonnet-4-5</pre>
           <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
         </div>
       </div>
@@ -367,28 +390,46 @@ php artisan necromancer:prompt "auth" --no-ai --output=prompt.txt</pre>
         </div>
       </div>
 
-      <!-- necromancer:infer -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
-        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
-          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:infer</code>
-          <div class="flex flex-wrap gap-1.5">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-10 mb-4">Talk to your codebase</h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+        <!-- necromancer:ask -->
+        <div class="border border-gray-800 rounded-lg p-5">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:ask</code>
+              <span class="bg-red-950 text-red-400 font-mono text-[10px] rounded-full px-2 py-0.5 border border-red-900/50 uppercase tracking-wide whitespace-nowrap">requires laravel/ai</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--provider=</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--model=</span>
+          </div>
+          <p class="text-gray-400 text-sm">Natural-language codebase Q&amp;A. The manifest is injected verbatim into the AI's context — answers are grounded in your actual application, not the model's prior knowledge.</p>
+        </div>
+
+        <!-- necromancer:infer -->
+        <div class="border border-gray-800 rounded-lg p-5">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:infer</code>
+              <span class="bg-red-950 text-red-400 font-mono text-[10px] rounded-full px-2 py-0.5 border border-red-900/50 uppercase tracking-wide whitespace-nowrap">requires laravel/ai</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--locale=</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--temperature=</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--max-critic-rounds=N</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--dry-run</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--fresh</span>
           </div>
+          <p class="text-gray-400 text-sm">Generates Architecture Decision Records (ADRs) from the manifest. Evaluates nine architectural dimensions (async-processing, authorization, event-driven, api-design, data-modeling, command-scheduling, form-validation, external-services, architecture-pattern), with a critic agent reviewing and filtering the initial ADRs.</p>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Generates Architecture Decision Records (ADRs) from the manifest using AI. Evaluates nine architectural dimensions (async-processing, authorization, event-driven, api-design, data-modeling, command-scheduling, form-validation, external-services, architecture-pattern). A critic agent reviews and filters the initial ADRs. Requires <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">laravel/ai</code>.</p>
-        <div class="code-block relative">
-          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:infer
-php artisan necromancer:infer --dry-run             <span class="text-gray-600"># print without writing files</span>
-php artisan necromancer:infer --temperature=0 --max-critic-rounds=2
-php artisan necromancer:infer --locale=it           <span class="text-gray-600"># add Italian translation</span>
-php artisan necromancer:infer --fresh               <span class="text-gray-600"># clear cache and re-infer</span></pre>
-          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
-        </div>
+
       </div>
+
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-10 mb-4">Review &amp; measure</h3>
 
       <!-- necromancer:diff -->
       <div class="border border-gray-800 rounded-lg p-6 mb-4">
@@ -434,8 +475,10 @@ php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   <spa
         </div>
       </div>
 
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-10 mb-4">Knowledge Bundle &amp; Graph</h3>
+
       <!-- necromancer:okf -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+      <div class="border border-red-900/40 rounded-lg p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
           <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:okf</code>
           <div class="flex flex-wrap gap-1.5">
@@ -444,7 +487,27 @@ php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   <spa
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-partial</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact under <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/artifacts/</code>, with authoritative YAML front matter and a concise Architectural Context prose mirror. Resolvable cross-artifact relationships (a route's controller, a model's relationships/policy/observers, event/listener pairings) render as Markdown links; every shared <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">domain</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">flow</code> value gets a synthesized, linked concept; and declared local ADRs are copied into the bundle with provenance — a missing one fails the export. A generated <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/README.md</code> explains the bundle's structure and how to regenerate it, and <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">bundle.json</code> carries a <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">content_hash</code> for detecting a stale bundle. Never rescans the application; refuses a stale or partial manifest by default; a failed export never damages a previously-generated bundle.</p>
+        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact under <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/artifacts/</code>, with authoritative YAML front matter and a concise Architectural Context prose mirror. Resolvable cross-artifact relationships (a route's controller, a model's relationships/policy/observers, event/listener pairings) render as Markdown links; every shared <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">domain</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">flow</code> value gets a synthesized, linked concept; and declared local ADRs are copied into the bundle with provenance — a missing one fails the export.</p>
+        <div class="code-block relative mb-3">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">---
+title: "SendInvoiceEmail"
+type: "artifact"
+kind: "jobs"
+necromancer:
+  id: "jobs:App\\Jobs\\SendInvoiceEmail"
+  facts:
+    queue: "emails"
+    tries: 3
+  annotations:
+    domain: "billing"
+    risk: "high"
+---
+
+## Architectural Context
+
+domain: billing · risk: high</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:okf
 php artisan necromancer:okf --allow-stale --allow-partial
@@ -454,9 +517,12 @@ php artisan necromancer:okf --output=dist/okf</pre>
       </div>
 
       <!-- necromancer:okf-enrich -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+      <div class="border border-gray-800 rounded-lg p-5 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
-          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:okf-enrich</code>
+          <div class="flex flex-wrap items-center gap-2">
+            <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:okf-enrich</code>
+            <span class="bg-red-950 text-red-400 font-mono text-[10px] rounded-full px-2 py-0.5 border border-red-900/50 uppercase tracking-wide whitespace-nowrap">requires laravel/ai</span>
+          </div>
           <div class="flex flex-wrap gap-1.5">
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--provider=</span>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--model=</span>
@@ -464,17 +530,11 @@ php artisan necromancer:okf --output=dist/okf</pre>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Writes an AI-enriched <strong class="text-gray-200">sibling</strong> bundle alongside the deterministic one — the <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/</code> bundle from <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code> is never touched. Enrichment can only <em>add</em> a <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">description</code> field and an "AI-Enriched Summary" section — it structurally cannot change facts, annotations, Artifact IDs, or links, because the AI is never given access to those fields. Prompts exclude raw framework metadata, source paths/hashes, configuration, and ADR body content. Each concept caches independently and every enriched concept records provider, model, prompt version, privacy policy, and cache key. A generated <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf-enriched/README.md</code> documents all of this, and <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">bundle.json</code> carries its own <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">content_hash</code>. Requires <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">laravel/ai</code>.</p>
-        <div class="code-block relative">
-          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:okf-enrich
-php artisan necromancer:okf-enrich --refresh
-php artisan necromancer:okf-enrich --provider=anthropic --model=claude-sonnet-4-6</pre>
-          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
-        </div>
+        <p class="text-gray-400 text-sm">Writes an AI-enriched <strong class="text-gray-200">sibling</strong> bundle alongside the deterministic one — the <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/</code> bundle from <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code> is never touched. Enrichment can only <em>add</em> a <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">description</code> field and an "AI-Enriched Summary" section — it structurally cannot change facts, annotations, Artifact IDs, or links, because the AI is never given access to those fields. Prompts exclude raw framework metadata, source paths/hashes, configuration, and ADR body content. Each concept caches independently, and a generated <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf-enriched/README.md</code> documents all of this, with <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">bundle.json</code> carrying its own <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">content_hash</code>.</p>
       </div>
 
       <!-- necromancer:graph -->
-      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+      <div class="border border-red-900/40 rounded-lg p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
           <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:graph</code>
           <div class="flex flex-wrap gap-1.5">
@@ -483,7 +543,8 @@ php artisan necromancer:okf-enrich --provider=anthropic --model=claude-sonnet-4-
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-partial</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic <strong class="text-gray-200">Artifact Graph</strong> — <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.json</code> (one node per collected artifact — id, kind, label, annotations, Discovered Facts — canonically ordered) plus a self-contained, no-CDN <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> viewer: a force-directed, kind-colored graph with edges styled distinctly per kind. <strong class="text-gray-200">Structural</strong> edges mirror the OKF bundle's relationship taxonomy (route→controller, model→relationships/policy/observers, event→listeners, listener→handles, policy→model, observer→model); <strong class="text-gray-200">grouping</strong> edges connect an artifact to its declared domain/flow; <strong class="text-gray-200">reference</strong> edges connect an artifact to a declared local ADR. A sidebar doubles as a color-coded legend and kind filter, with Select all / Select none buttons to toggle every kind at once; a small edge key toggles structural/grouping/reference lines independently; clicking a node opens an inspect panel with its Architectural Context and Discovered Facts (or member/referencing artifacts, for a synthesized domain/flow/ADR node); scroll to zoom, drag to pan, Zoom in / Zoom out header buttons step the same zoom, and a Reset view button refits the camera. The graph data is embedded directly into <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> at write time, so it opens straight from disk — no local server needed. Entirely independent of <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code> — neither requires the other. Never rescans the application; refuses a stale or partial manifest by default; writes atomically.</p>
+        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic <strong class="text-gray-200">Artifact Graph</strong> — the actual viewer is pictured below. <strong class="text-gray-200">Structural</strong> edges mirror the OKF bundle's relationship taxonomy (route→controller, model→relationships/policy/observers, event→listeners); <strong class="text-gray-200">grouping</strong> edges connect an artifact to its declared domain/flow; <strong class="text-gray-200">reference</strong> edges connect it to a declared local ADR. The sidebar doubles as a color-coded legend and kind filter. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> is self-contained (no CDN dependencies) and opens straight from disk — no server needed. Entirely independent of <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code>; refuses a stale or partial manifest by default; writes atomically.</p>
+        <img src="graph.png" alt="Necromancer Artifact Graph viewer: a force-directed, kind-colored graph of an application's routes, models, jobs, policies, and their relationships, with a sidebar legend/filter and edge-type key" class="w-full rounded-lg border border-gray-800 mb-3">
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:graph
 php artisan necromancer:graph --allow-stale --allow-partial
