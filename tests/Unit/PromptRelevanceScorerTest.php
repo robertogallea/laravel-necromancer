@@ -120,7 +120,7 @@ test('the route metadata necromancer namespace is not scored a second time once 
     $withRawNecromancerToo = $scorer->score(['routes' => [
         [
             'uri' => '/a',
-            'route_metadata' => ['raw' => ['necromancer' => ['domain' => 'billing']], 'necromancer' => ['domain' => 'billing']],
+            'route_metadata' => ['raw' => ['necromancer' => ['domain' => 'billing']]],
             'annotations' => ['domain' => 'billing'],
         ],
     ]], 'billing', 10);

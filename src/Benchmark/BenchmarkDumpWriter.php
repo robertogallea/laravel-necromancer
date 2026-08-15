@@ -168,7 +168,9 @@ final class BenchmarkDumpWriter
             'judge_score' => $result->judgeScore,
             'prompt_tokens' => $result->promptTokens,
             'completion_tokens' => $result->completionTokens,
+            'latency_ms' => $result->latencyMs,
             'judge_tokens' => $result->judgeTokens,
+            'judge_latency_ms' => $result->judgeLatencyMs,
             'golden_answers_trusted' => $result->goldenAnswersTrusted,
         ], $report->results);
     }
@@ -187,6 +189,7 @@ final class BenchmarkDumpWriter
         $skipReason = $result->skipReason ?? '';
         $judgeScore = $result->judgeScore === null ? 'not run' : (string) $result->judgeScore;
         $judgeTokens = $result->judgeTokens === null ? 'not run' : (string) $result->judgeTokens;
+        $judgeLatency = $result->judgeLatencyMs === null ? 'not run' : "{$result->judgeLatencyMs}ms";
 
         return <<<MARKDOWN
             # {$result->taskId} / {$result->condition}
@@ -199,7 +202,9 @@ final class BenchmarkDumpWriter
             - Judge score: {$judgeScore}
             - Prompt tokens: {$result->promptTokens}
             - Completion tokens: {$result->completionTokens}
+            - Latency: {$result->latencyMs}ms
             - Judge tokens: {$judgeTokens}
+            - Judge latency: {$judgeLatency}
             - Golden answers trusted: {$this->boolLabel($result->goldenAnswersTrusted)}
 
             ## Prompt

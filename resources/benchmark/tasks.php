@@ -15,7 +15,7 @@ return [
         'type' => 'qa',
         'prompt' => 'What routes in this application require authentication? List their names and HTTP methods.',
         'required_key' => 'routes.auth_required',
-        'conditions' => ['none', 'manual'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp'],
         'assertions' => [
             'must_recall_from' => 'routes.auth_required',
             'fact_keys' => ['routes.auth_required'],
@@ -27,7 +27,7 @@ return [
         'type' => 'qa',
         'prompt' => 'Which Eloquent models in this application have observers attached? List the observer class names.',
         'required_key' => 'models.with_observers',
-        'conditions' => ['none', 'manual'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp'],
         'assertions' => [
             'must_recall_from' => 'models.with_observers',
             'must_not_contain' => ['no observer', 'does not have', 'observer does not exist'],
@@ -40,7 +40,7 @@ return [
         'type' => 'qa',
         'prompt' => 'What jobs exist in this application, and what are their queue names and retry settings?',
         'required_key' => 'jobs.named',
-        'conditions' => ['none', 'manual'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp'],
         'assertions' => [
             'must_recall_from' => 'jobs.named',
             'must_not_contain' => ['no jobs', 'no queue'],
@@ -53,7 +53,7 @@ return [
         'type' => 'qa',
         'prompt' => 'Which Eloquent models in this application declare casts? List the model names.',
         'required_key' => 'models.with_casts',
-        'conditions' => ['none', 'manual'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp'],
         'assertions' => [
             'must_recall_from' => 'models.with_casts',
             'must_not_contain' => ['no casts', 'no models'],
@@ -66,7 +66,7 @@ return [
         'type' => 'qa',
         'prompt' => 'Which Eloquent models have a corresponding policy registered in this application?',
         'required_key' => 'policies.models',
-        'conditions' => ['none', 'manual'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp'],
         'assertions' => [
             'must_recall_from' => 'policies.models',
             'must_not_contain' => ['no policies'],

@@ -16,21 +16,41 @@ final class TerminalRenderer
             return '  No results.';
         }
 
+        $hasJudgeLatency = $this->hasJudgeLatency($by);
+
+        $headerFormat = '  %-20s %8s  %8s  %8s  %8s  %13s';
+        $rowFormat = '  %-20s %7.0f%%  %7.0f%%  %8.1f  %8d  %13s';
+        $headerArgs = ['Condition', 'Accuracy', 'Halluc.', 'Quality', 'Tokens', 'Latency'];
+
+        if ($hasJudgeLatency) {
+            $headerFormat .= '  %13s';
+            $rowFormat .= '  %13s';
+            $headerArgs[] = 'Judge Latency';
+        }
+
         $lines = [
             '',
             '  ─── Results ─────────────────────────────────────────────────────────',
-            sprintf('  %-20s %8s  %8s  %8s  %8s', 'Condition', 'Accuracy', 'Halluc.', 'Quality', 'Tokens'),
+            vsprintf($headerFormat, $headerArgs),
         ];
 
         foreach ($by as $condition => $stats) {
-            $lines[] = sprintf(
-                '  %-20s %7.0f%%  %7.0f%%  %8.1f  %8d',
+            $rowArgs = [
                 $this->labelFor($condition),
                 $stats['accuracy'] * 100,
                 $stats['hallucinationRate'] * 100,
                 $stats['qualityScore'],
                 $stats['avgPromptTokens'] + $stats['avgCompletionTokens'],
-            );
+                $this->formatLatency($stats['avgLatencyMs'], $stats['latencyStdDevMs']),
+            ];
+
+            if ($hasJudgeLatency) {
+                $rowArgs[] = $stats['avgJudgeLatencyMs'] !== null
+                    ? $this->formatLatency($stats['avgJudgeLatencyMs'], $stats['judgeLatencyStdDevMs'])
+                    : '—';
+            }
+
+            $lines[] = vsprintf($rowFormat, $rowArgs);
         }
 
         $lines[] = '  ──────────────────────────────────────────────────────────────────────';
@@ -48,6 +68,19 @@ final class TerminalRenderer
             );
         }
 
+        if (isset($by['necromancer-mcp'], $by['necromancer'])) {
+            $mcpAccDiff = ($by['necromancer-mcp']['accuracy'] - $by['necromancer']['accuracy']) * 100;
+            $mcpHallDiff = ($by['necromancer']['hallucinationRate'] - $by['necromancer-mcp']['hallucinationRate']) * 100;
+            $mcpSign = $mcpAccDiff >= 0 ? '+' : '';
+            $lines[] = '';
+            $lines[] = sprintf(
+                '  Necromancer (MCP) vs Necromancer (static):  %s%.0fpp accuracy · %+.0fpp fewer hallucinations',
+                $mcpSign,
+                $mcpAccDiff,
+                $mcpHallDiff,
+            );
+        }
+
         $lines[] = '';
 
         return implode("\n", $lines);
@@ -59,7 +92,33 @@ final class TerminalRenderer
             'none' => 'No context',
             'manual' => 'Manual AGENTS.md',
             'necromancer' => 'Necromancer',
+            'necromancer-mcp' => 'Necromancer (MCP)',
             default => $condition,
         };
+    }
+
+    /** @param array<string, array{avgJudgeLatencyMs: ?int}> $by */
+    private function hasJudgeLatency(array $by): bool
+    {
+        foreach ($by as $stats) {
+            if ($stats['avgJudgeLatencyMs'] !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function formatLatency(int $avgMs, ?int $stdDevMs): string
+    {
+        $avg = number_format($avgMs / 1000, 1);
+
+        if ($stdDevMs === null) {
+            return "{$avg}s";
+        }
+
+        $stdDev = number_format($stdDevMs / 1000, 1);
+
+        return "{$avg}s ± {$stdDev}s";
     }
 }

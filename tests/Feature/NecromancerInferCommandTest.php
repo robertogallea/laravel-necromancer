@@ -19,7 +19,7 @@ function inferCommandManifest(?string $generatedAt = null): string
     ];
 
     return json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'generated_at' => $generatedAt ?? now()->toISOString(),
             'content_hash' => hash('sha256', json_encode($artifacts, JSON_THROW_ON_ERROR)),

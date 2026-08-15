@@ -5,6 +5,33 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.0.0
+
+### Added
+
+- `necromancer:graph` command, projecting the manifest into a deterministic Artifact Graph: `graph.json` (one node per collected artifact — id, kind, display label, resolved annotations, Discovered Facts — plus structural, grouping, and reference edges, all canonically ordered so an unchanged manifest produces byte-identical output) and a self-contained `graph.html` viewer (inline CSS/JS, no CDN dependencies) rendering a force-directed, kind-colored graph with edges styled distinctly per kind. Structural edges cover the same relationship taxonomy the OKF bundle renders (route→controller, model→relationships/policy/observers, event→listeners, listener→handles, policy→model, observer→model); grouping edges connect an artifact to its declared `domain`/`flow`; reference edges connect an artifact to a declared local `adrs` entry (absolute-URI ADRs are skipped, matching the OKF bundle's external-link treatment). The viewer is interactive: a sidebar doubles as a color legend and per-kind filter (hiding a kind hides its nodes and incident edges); a small edge key independently toggles structural/grouping/reference lines; clicking a node opens an inspect panel with its Architectural Context and Discovered Facts, or its member/referencing artifacts for a synthesized domain/flow/ADR node (hiding the selected node's kind closes the panel); scroll-to-zoom, drag-to-pan, and a Reset view button are also available. The graph data is embedded directly into `graph.html` at write time, so it opens straight from disk with no local server required (`graph.json` is still written alongside it as an independently useful artifact). Entirely independent of `necromancer:okf` (neither requires the other to have run); refuses a stale or partial-scope manifest by default (`--allow-stale`/`--allow-partial` override); writes atomically. Output defaults to `necromancer-graph/`, configurable via `--output=PATH` or the new `output.graph` config key.
+- `necromancer:okf` writes a `README.md` alongside the bundle (purpose, structure, concept kinds, CLI/config reference, and a static mention of the `necromancer:okf-enrich` sibling), and `necromancer:okf-enrich` writes the analogous `okf-enriched/README.md`. Both bundles' `bundle.json` gain a `content_hash` field (the source manifest's `meta.content_hash`), without an `okf_version` bump.
+- `necromancer:generate` announces a Knowledge Bundle's presence (deterministic and/or enriched) when one exists at its configured default path: a `## Knowledge Bundle` section in both Tier 1 (`CLAUDE.md`/`AGENTS.md`, or the Boost context path) and Tier 2 (`NECROMANCER.md`, or the Boost `SKILL.md`), naming its path, regenerate command, and live stats — exempt from `--only`/`--except`/`--paths`, suppressible via a new `okf.announce_in_context` config key. Each line compares that bundle's `content_hash` against the current manifest's and appends a "may be stale — re-run `<command>`" caveat on mismatch; a bundle with no `content_hash` key at all (pre-upgrade) renders with no staleness claim either way.
+
+### Removed
+
+- **BREAKING:** `ManifestReader` no longer adapts pre-1.5 ("v0"/unversioned) manifests in memory. `ManifestReader::read()` — used by every command that reads `necromancer.json` — now rejects any manifest whose `meta.manifest_schema_version` isn't `1`, treating it identically to a missing manifest — every such command shows the same "Necromancer manifest not found. Run necromancer:scan first." error. Run `php artisan necromancer:scan` once after upgrading to regenerate a current-schema manifest.
+- **BREAKING:** `route_metadata.necromancer` is no longer written to the manifest. `route_metadata.raw` (untouched native `Route::getMetadata()` output) is unaffected. Resolved annotations for routes — like every other artifact family since 1.5.0 — are available only through the universal `annotations` key.
+- **BREAKING:** `necromancer:doctor --only=route-metadata-coverage` no longer matches the Artifact Annotation Coverage dimension. Use the canonical `--only=artifact-annotation-coverage` key.
+- **BREAKING:** The singular `adr` parameter was removed from `withNecromancer()` and `RouteMetadataFactory::forMetadata()`. Use the plural `adrs` array parameter instead (available since 1.5.0). The raw-array form (`->metadata(['necromancer' => ['adr' => '...']])`) is unaffected and still merges into `adrs`.
+
+### Changed
+
+- **BREAKING:** The `necromancer:scan` diagnostic codes `AN_LEGACY_VALUE` and `AN_LEGACY_RISK` are renamed to `AN_SCHEMA_INCOMPATIBLE_VALUE` and `AN_SCHEMA_INCOMPATIBLE_RISK`. The underlying check — a native `Route::metadata()` value that can't fit Annotation Schema v1 — is unchanged; only the code name changed, since the condition was never actually tied to manifest schema age.
+- Internal: the relationship taxonomy behind the OKF bundle's `## Relationships` section (route→controller, model→relationships/policy/observers, event→listeners, listener→handles, policy→model, observer→model) is now exposed as structured data via `LaravelNecromancer\Relationships\RelationshipResolver`, extracted out of `ArtifactConceptBuilder`. No user-visible change — rendered bundle output is byte-identical.
+
+### Fixed
+
+- `necromancer:doctor`'s text output no longer misaligns the "Artifact Annotation Coverage" row. Its label is longer than the fixed 24-char column every other dimension pads into, so its progress bar started several columns late; it's now abbreviated to "Artifact Annotation Cov." for the text dashboard only, which fits the column and lines its bar up with the rest. `--json` output, `DimensionResult::$label`, and `--only=artifact-annotation-coverage` are unaffected — they still use the full "Artifact Annotation Coverage" name.
+- `necromancer:doctor`'s text output no longer shifts a row's detail text when its score is 100% or a single digit. The percentage field is now right-padded to a fixed 3-digit width before the `%` sign, so `100%`, ` 82%`, and `  0%` all occupy the same 4 characters and every row's `(...)` detail starts in the same column.
+
+See the [README's "Upgrading to 2.0" section](README.md#upgrading-to-20) for a full migration guide.
+
 ## 1.8.0
 
 ### Added

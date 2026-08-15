@@ -22,10 +22,9 @@ final readonly class RouteMetadataFactory
         ?string $summary = null,
         Risk|string|null $risk = null,
         string|array|null $externalServices = null,
-        ?string $adr = null,
         array $adrs = [],
     ): array {
-        $this->validate($domain, $flow, $capability, $summary, $risk, $externalServices, $adr, $adrs);
+        $this->validate($domain, $flow, $capability, $summary, $risk, $externalServices, $adrs);
 
         $fields = array_filter([
             'domain' => $domain,
@@ -34,7 +33,6 @@ final readonly class RouteMetadataFactory
             'summary' => $summary,
             'risk' => $risk instanceof Risk ? $risk->value : $risk,
             'external_services' => is_string($externalServices) ? [$externalServices] : $externalServices,
-            'adr' => $adr,
             'adrs' => $adrs,
         ], fn (mixed $value): bool => $value !== null && $value !== []);
 
@@ -55,10 +53,9 @@ final readonly class RouteMetadataFactory
         ?string $summary,
         Risk|string|null $risk,
         string|array|null $externalServices,
-        ?string $adr,
         array $adrs,
     ): void {
-        foreach (['domain' => $domain, 'flow' => $flow, 'capability' => $capability, 'summary' => $summary, 'adr' => $adr] as $field => $value) {
+        foreach (['domain' => $domain, 'flow' => $flow, 'capability' => $capability, 'summary' => $summary] as $field => $value) {
             if ($value !== null && trim($value) === '') {
                 throw new InvalidArgumentException("Invalid route annotation {$field}: strings must not be empty.");
             }

@@ -39,6 +39,7 @@ return [
         'context' => base_path('NECROMANCER.md'),
         'claude' => base_path('CLAUDE.md'),
         'agents' => base_path('AGENTS.md'),
+        'graph' => base_path('necromancer-graph'),
     ],
 
     'okf' => [

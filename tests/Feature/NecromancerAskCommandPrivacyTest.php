@@ -10,7 +10,7 @@ use LaravelNecromancer\Integrations\AiDetector;
 function privacyManifest(): string
 {
     return json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'generated_at' => now()->toISOString(),
             'laravel_version' => '13.0',

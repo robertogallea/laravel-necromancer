@@ -25,7 +25,9 @@ final class JsonRenderer
                 'judge_score' => $r->judgeScore,
                 'prompt_tokens' => $r->promptTokens,
                 'completion_tokens' => $r->completionTokens,
+                'latency_ms' => $r->latencyMs,
                 'judge_tokens' => $r->judgeTokens,
+                'judge_latency_ms' => $r->judgeLatencyMs,
                 'golden_answers_trusted' => $r->goldenAnswersTrusted,
             ], $report->results),
         ];

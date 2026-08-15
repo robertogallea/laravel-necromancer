@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
-use FilesystemIterator;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
+use LaravelNecromancer\Support\RecursivePathRemover;
 use RuntimeException;
 
 /**
@@ -42,7 +40,7 @@ final readonly class AtomicBundleWriter
     public function write(string $outputPath, array $concepts, array $index, ?string $readme = null): void
     {
         $tempPath = rtrim($outputPath, '/').'.tmp';
-        $this->removePath($tempPath);
+        RecursivePathRemover::remove($tempPath);
 
         $artifactsDir = $tempPath.'/artifacts';
 
@@ -52,7 +50,7 @@ final readonly class AtomicBundleWriter
 
         foreach ($concepts as $concept) {
             if (file_put_contents($artifactsDir.'/'.$concept->filename, $concept->content."\n") === false) {
-                $this->removePath($tempPath);
+                RecursivePathRemover::remove($tempPath);
 
                 throw new RuntimeException("Unable to write {$concept->filename}.");
             }
@@ -61,13 +59,13 @@ final readonly class AtomicBundleWriter
         $payload = ['okf_version' => '0.2', 'necromancer_schema_version' => 1, ...$index];
 
         if (file_put_contents($tempPath.'/bundle.json', json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n") === false) {
-            $this->removePath($tempPath);
+            RecursivePathRemover::remove($tempPath);
 
             throw new RuntimeException('Unable to write bundle.json.');
         }
 
         if ($readme !== null && file_put_contents($tempPath.'/README.md', $readme."\n") === false) {
-            $this->removePath($tempPath);
+            RecursivePathRemover::remove($tempPath);
 
             throw new RuntimeException('Unable to write README.md.');
         }
@@ -75,33 +73,9 @@ final readonly class AtomicBundleWriter
         try {
             $this->swap->swap($tempPath, $outputPath);
         } catch (RuntimeException $e) {
-            $this->removePath($tempPath);
+            RecursivePathRemover::remove($tempPath);
 
             throw $e;
         }
-    }
-
-    private function removePath(string $path): void
-    {
-        if (is_file($path) || is_link($path)) {
-            unlink($path);
-
-            return;
-        }
-
-        if (! is_dir($path)) {
-            return;
-        }
-
-        $items = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        );
-
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-        }
-
-        rmdir($path);
     }
 }

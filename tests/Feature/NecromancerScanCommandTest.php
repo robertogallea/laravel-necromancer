@@ -154,7 +154,7 @@ test('the scan command projects native route metadata into canonical annotations
 
     expect($route->route_metadata->raw->head->title)->toBe('Cancel subscription')
         ->and($route->route_metadata->raw->necromancer->domain)->toBe(' billing ')
-        ->and($route->route_metadata->necromancer->adrs)->toBe(['docs/adr/001.md', 'docs/adr/002.md'])
+        ->and($route->route_metadata)->not->toHaveProperty('necromancer')
         ->and($route->annotations)->toEqual((object) [
             'domain' => 'billing',
             'flow' => 'subscription-cancellation',
@@ -166,10 +166,10 @@ test('the scan command projects native route metadata into canonical annotations
         ]);
 });
 
-test('the scan command warns about legacy route values excluded from annotations', function () {
+test('the scan command warns about native route metadata values that cannot enter Annotation Schema v1', function () {
     $path = necromancerScanTestPath('necromancer-invalid-route-annotations.json');
-    $route = new NecromancerFakeMetadataRoute(['POST'], '/necromancer/legacy-invalid', ['uses' => fn () => 'ok']);
-    $route->name('necromancer.legacy.invalid');
+    $route = new NecromancerFakeMetadataRoute(['POST'], '/necromancer/schema-invalid', ['uses' => fn () => 'ok']);
+    $route->name('necromancer.schema.invalid');
     $route->metadata(['necromancer' => [
         'domain' => 'billing',
         'risk' => 'urgent',
@@ -178,14 +178,14 @@ test('the scan command warns about legacy route values excluded from annotations
     app(Router::class)->getRoutes()->add($route);
 
     $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'routes'])
-        ->expectsOutputToContain('AN_LEGACY_RISK')
-        ->expectsOutputToContain('AN_LEGACY_VALUE')
+        ->expectsOutputToContain('AN_SCHEMA_INCOMPATIBLE_RISK')
+        ->expectsOutputToContain('AN_SCHEMA_INCOMPATIBLE_VALUE')
         ->assertSuccessful();
 
-    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.legacy.invalid');
+    $route = findManifestRouteByName(expectScanManifest($path), 'necromancer.schema.invalid');
 
     expect($route->route_metadata->raw->necromancer->risk)->toBe('urgent')
-        ->and($route->route_metadata->necromancer->risk)->toBe('urgent')
+        ->and($route->route_metadata)->not->toHaveProperty('necromancer')
         ->and($route->annotations)->toEqual((object) [
             'domain' => 'billing',
             'external_services' => ['stripe'],
@@ -1128,7 +1128,7 @@ test('--diff reports added artifacts since last scan', function () {
     $path = necromancerScanTestPath('necromancer-diff-added.json');
 
     File::put($path, json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => ['models' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -1141,7 +1141,7 @@ test('--diff reports added artifacts since last scan', function () {
 
 test('--diff does not write a new manifest to disk', function () {
     $path = necromancerScanTestPath('necromancer-diff-no-write.json');
-    $originalContent = json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR);
+    $originalContent = json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR);
 
     File::put($path, $originalContent);
 

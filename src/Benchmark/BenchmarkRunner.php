@@ -7,6 +7,10 @@ namespace LaravelNecromancer\Benchmark;
 use Illuminate\Http\Client\ConnectionException;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\TextDelta;
+use LaravelNecromancer\Benchmark\Tools\QueryArtifactsTool;
+use LaravelNecromancer\Benchmark\Tools\QueryModelsTool;
+use LaravelNecromancer\Benchmark\Tools\QueryRoutesTool;
+use LaravelNecromancer\Benchmark\Tools\SearchArtifactsTool;
 
 final class BenchmarkRunner
 {
@@ -57,10 +61,12 @@ final class BenchmarkRunner
                         response: '',
                         promptTokens: 0,
                         completionTokens: 0,
+                        latencyMs: 0,
                         accuracy: 0.0,
                         hallucinationRate: 0.0,
                         judgeScore: null,
                         judgeTokens: null,
+                        judgeLatencyMs: null,
                         goldenAnswersTrusted: false,
                         skipped: true,
                         skipReason: "task '{$task['id']}' is not configured to run under the '{$condition}' condition",
@@ -101,10 +107,12 @@ final class BenchmarkRunner
                     response: '',
                     promptTokens: 0,
                     completionTokens: 0,
+                    latencyMs: 0,
                     accuracy: 0.0,
                     hallucinationRate: 0.0,
                     judgeScore: null,
                     judgeTokens: null,
+                    judgeLatencyMs: null,
                     goldenAnswersTrusted: false,
                     skipped: true,
                     skipReason: "required fact key '{$task['required_key']}' is absent or empty in the manifest",
@@ -114,12 +122,15 @@ final class BenchmarkRunner
 
         $context = $this->loadContext($condition, $options['contextPaths']);
         $instructions = $this->buildInstructions($context);
+        $tools = $condition === 'necromancer-mcp' ? $this->mcpTools() : [];
 
-        $agent = new GenerationAgent($instructions, [], []);
+        $agent = new GenerationAgent($instructions, [], $tools);
 
         $text = '';
         $promptTokens = 0;
         $completionTokens = 0;
+
+        $generationStart = microtime(true);
 
         foreach ($agent->stream($task['prompt'], provider: $options['generationProvider'], model: $options['generationModel'], timeout: $options['timeout']) as $event) {
             if ($event instanceof TextDelta) {
@@ -130,11 +141,14 @@ final class BenchmarkRunner
             }
         }
 
+        $latencyMs = (int) round((microtime(true) - $generationStart) * 1000);
+
         $checks = $this->factChecker->check($text, $task['assertions'], $resolved);
         $goldenAnswersTrusted = empty($resolved) || ! in_array(false, array_column($resolved, 'trusted'), true);
 
         $judgeScore = null;
         $judgeTokens = null;
+        $judgeLatencyMs = null;
 
         if (! $options['noJudge']) {
             // Provide resolved expected values to the judge so its prompt is grounded.
@@ -148,6 +162,8 @@ final class BenchmarkRunner
                     : (is_string($recallValue) ? [$recallValue] : []);
             }
 
+            $judgeStart = microtime(true);
+
             try {
                 $judged = $this->judgeClient->score(
                     taskPrompt: $task['prompt'],
@@ -160,6 +176,7 @@ final class BenchmarkRunner
                 );
                 $judgeScore = (float) $judged['total'];
                 $judgeTokens = $judged['tokens'];
+                $judgeLatencyMs = (int) round((microtime(true) - $judgeStart) * 1000);
             } catch (ConnectionException $e) {
                 $this->warnings[] = "Judge timed out on task {$task['id']} ({$condition}): {$e->getMessage()}";
             } catch (\Throwable $e) {
@@ -175,10 +192,12 @@ final class BenchmarkRunner
             response: $text,
             promptTokens: $promptTokens,
             completionTokens: $completionTokens,
+            latencyMs: $latencyMs,
             accuracy: $checks['accuracy'],
             hallucinationRate: $checks['hallucinationRate'],
             judgeScore: $judgeScore,
             judgeTokens: $judgeTokens,
+            judgeLatencyMs: $judgeLatencyMs,
             goldenAnswersTrusted: $goldenAnswersTrusted,
         );
     }
@@ -193,6 +212,17 @@ final class BenchmarkRunner
         }
 
         return (string) file_get_contents($path);
+    }
+
+    /** @return list<QueryRoutesTool|QueryModelsTool|QueryArtifactsTool|SearchArtifactsTool> */
+    private function mcpTools(): array
+    {
+        return [
+            new QueryRoutesTool,
+            new QueryModelsTool,
+            new QueryArtifactsTool,
+            new SearchArtifactsTool,
+        ];
     }
 
     private function buildInstructions(string $context): string

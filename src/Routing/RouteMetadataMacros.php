@@ -69,7 +69,6 @@ final class RouteMetadataMacros
         ?string $summary = null,
         Risk|string|null $risk = null,
         string|array|null $externalServices = null,
-        ?string $adr = null,
         array $adrs = [],
     ): array {
         return app(RouteMetadataFactory::class)->forMetadata(
@@ -79,7 +78,6 @@ final class RouteMetadataMacros
             summary: $summary,
             risk: $risk,
             externalServices: $externalServices,
-            adr: $adr,
             adrs: $adrs,
         );
     }
@@ -117,7 +115,6 @@ final class RouteMetadataMacros
             ?string $summary = null,
             Risk|string|null $risk = null,
             string|array|null $externalServices = null,
-            ?string $adr = null,
             array $adrs = [],
         ): RouteRegistrar {
             $registrar = new RouteRegistrar(RouteMetadataMacros::bound($this, Router::class));
@@ -131,7 +128,6 @@ final class RouteMetadataMacros
                 summary: $summary,
                 risk: $risk,
                 externalServices: $externalServices,
-                adr: $adr,
                 adrs: $adrs,
             ));
         };
@@ -153,7 +149,6 @@ final class RouteMetadataMacros
             ?string $summary = null,
             Risk|string|null $risk = null,
             string|array|null $externalServices = null,
-            ?string $adr = null,
             array $adrs = [],
         ): RouteRegistrar {
             $registrar = RouteMetadataMacros::bound($this, RouteRegistrar::class);
@@ -167,7 +162,6 @@ final class RouteMetadataMacros
                 summary: $summary,
                 risk: $risk,
                 externalServices: $externalServices,
-                adr: $adr,
                 adrs: $adrs,
             ));
         };
@@ -189,7 +183,6 @@ final class RouteMetadataMacros
             ?string $summary = null,
             Risk|string|null $risk = null,
             string|array|null $externalServices = null,
-            ?string $adr = null,
             array $adrs = [],
         ): Route {
             $route = RouteMetadataMacros::bound($this, Route::class);
@@ -203,7 +196,6 @@ final class RouteMetadataMacros
                 summary: $summary,
                 risk: $risk,
                 externalServices: $externalServices,
-                adr: $adr,
                 adrs: $adrs,
             ));
         };
@@ -225,7 +217,6 @@ final class RouteMetadataMacros
             ?string $summary = null,
             Risk|string|null $risk = null,
             string|array|null $externalServices = null,
-            ?string $adr = null,
             array $adrs = [],
         ): PendingResourceRegistration {
             $registration = RouteMetadataMacros::bound($this, PendingResourceRegistration::class);
@@ -239,7 +230,6 @@ final class RouteMetadataMacros
                 summary: $summary,
                 risk: $risk,
                 externalServices: $externalServices,
-                adr: $adr,
                 adrs: $adrs,
             ));
         };
@@ -261,7 +251,6 @@ final class RouteMetadataMacros
             ?string $summary = null,
             Risk|string|null $risk = null,
             string|array|null $externalServices = null,
-            ?string $adr = null,
             array $adrs = [],
         ): PendingSingletonResourceRegistration {
             $registration = RouteMetadataMacros::bound($this, PendingSingletonResourceRegistration::class);
@@ -275,7 +264,6 @@ final class RouteMetadataMacros
                 summary: $summary,
                 risk: $risk,
                 externalServices: $externalServices,
-                adr: $adr,
                 adrs: $adrs,
             ));
         };

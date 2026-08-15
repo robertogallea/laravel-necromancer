@@ -4,6 +4,36 @@
 
 Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, jobs, events, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers, and more.
 
+## Contents
+
+- [What Necromancer Collects](#what-necromancer-collects)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Step 1 — Scan](#step-1--scan)
+  - [Step 2 — Explore (optional)](#step-2--explore-optional)
+  - [Step 3a — Audit AI readability](#step-3a--audit-ai-readability)
+  - [Step 3b — Check the AI readability score](#step-3b--check-the-ai-readability-score)
+  - [Step 3c — Generate AI context](#step-3c--generate-ai-context)
+  - [Step 3d — Ask a question about your codebase](#step-3d--ask-a-question-about-your-codebase)
+    - [Inspect the AI payload](#inspect-the-ai-payload)
+  - [Step 3e — Infer Architecture Decision Records](#step-3e--infer-architecture-decision-records)
+  - [Step 3f — Generate a source-grounded prompt](#step-3f--generate-a-source-grounded-prompt)
+  - [Step 3g — Compare manifests across branches](#step-3g--compare-manifests-across-branches)
+  - [Step 3h — Benchmark AI context effectiveness](#step-3h--benchmark-ai-context-effectiveness)
+  - [Step 3i — Export an OKF Knowledge Bundle](#step-3i--export-an-okf-knowledge-bundle)
+  - [Step 3j — Generate an AI-Enriched Knowledge Bundle](#step-3j--generate-an-ai-enriched-knowledge-bundle)
+  - [Step 3k — Visualize the Artifact Graph](#step-3k--visualize-the-artifact-graph)
+- [Commands Reference](#commands-reference)
+- [Configuration](#configuration)
+- [Privacy & Exclusions](#privacy--exclusions)
+- [Laravel Boost Integration](#laravel-boost-integration)
+- [MCP Tools](#mcp-tools)
+- [CI Integration](#ci-integration)
+- [Upgrading to 2.0](#upgrading-to-20)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## What Necromancer Collects
 
 The manifest covers 18 artifact types across the full Laravel application structure:
@@ -88,7 +118,7 @@ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
         summary: 'Cancels an active subscription.',
         risk: 'high',
         externalServices: ['stripe'],
-        adr: 'docs/adr/004-subscription-cancellation.md',
+        adrs: ['docs/adr/004-subscription-cancellation.md'],
     );
 ```
 
@@ -234,19 +264,19 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   ──────────────────────────────────────────
   Score: 74%
 
-  Route Clarity          ████████░░  82%  (12/15 named · 14/15 controller-backed)
-  Model Expressiveness   ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
-  Authorization Coverage ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
-  Validation Coverage    ████████░░  80%  (8/10 write routes with FormRequest)
-  Async Clarity          ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
-  Codebase Vocabulary    ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
-  Test Presence          ████████░░  80%  (4/5 models · 3/3 jobs)
-  Artifact Annotation Cov.████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
+  Route Clarity             ████████░░  82%  (12/15 named · 14/15 controller-backed)
+  Model Expressiveness      ██████░░░░  61%  (3/5 casts · 4/5 fillable · 2/5 relationships)
+  Authorization Coverage    ███████░░░  70%  (2/3 policies · 8/12 write routes with auth)
+  Validation Coverage       ████████░░  80%  (8/10 write routes with FormRequest)
+  Async Clarity             ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
+  Codebase Vocabulary       ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
+  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs)
+  Artifact Annotation Cov.  ████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.
 ```
 
-Artifact Annotation Coverage scores N/A (and doesn't affect the overall score) until at least one artifact of any family declares Artifact Annotations — adopting the feature is entirely optional. Its emitted dimension key stays `route-metadata-coverage` throughout 1.x for CI/automation compatibility; `--only=artifact-annotation-coverage` is accepted as a forward-compatible alias for the same key.
+Artifact Annotation Coverage scores N/A (and doesn't affect the overall score) until at least one artifact of any family declares Artifact Annotations — adopting the feature is entirely optional. Its emitted dimension key is `artifact-annotation-coverage`; pass it to `--only` to score just this dimension.
 
 Output a machine-readable score or enforce a CI gate:
 
@@ -615,20 +645,21 @@ The AI reviewer's prompt includes the same "Flagged Artifacts" signal shown in t
 
 ### Step 3h — Benchmark AI context effectiveness
 
-Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, and token cost compared to a hand-written `AGENTS.md` or no context at all:
+Measure how much Necromancer's generated context file improves AI coding-assistant accuracy, hallucination rate, latency, and token cost compared to a hand-written `AGENTS.md` or no context at all:
 
 ```bash
 php artisan necromancer:benchmark
 ```
 
-The command runs a bundled task suite in three conditions — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An optional cross-model AI judge scores quality; automated fact-checks always run.
+The command runs a bundled task suite in three conditions by default — no context, manual `AGENTS.md`, and Necromancer-generated `NECROMANCER.md` — and reports the results side by side. An opt-in fourth condition, `necromancer-mcp`, runs the model with bare instructions plus live, tool-based access to the same route/model/artifact/search queries the MCP server exposes, rather than a pre-assembled document — request it explicitly via `--condition=`. An optional cross-model AI judge scores quality; automated fact-checks always run. Each condition also reports average latency (with standard deviation) for the generation call and, separately, the judge call — shown as `Latency`/`Judge Latency` columns in the terminal and markdown reports, and as raw per-task fields in `--format=json` and the automatic dump; the judge column is omitted entirely when no result carries judge data (e.g. `--no-judge`). When both `necromancer` and `necromancer-mcp` are present in a run, an additional "Necromancer (MCP) vs Necromancer (static)" comparison line shows whether live tool-querying discovers the same facts as effectively as reading the generated document.
 
-Q&A tasks (which measure context *coverage*) only run under the `none` and `manual` conditions — Necromancer would trivially score 100% since the answers are in the context file it generated. Code generation and mini tasks run across all three conditions and measure actual effectiveness.
+Q&A tasks (which measure context *coverage*) run under every condition except the static `necromancer` one — Necromancer would trivially score 100% there since the answers are in the context file it generated; `necromancer-mcp` doesn't have this problem, since the model must still choose the right tool and interpret its output. Code generation and mini tasks run across all active conditions and measure actual effectiveness.
 
 ```bash
 php artisan necromancer:benchmark --no-judge              # automated checks only (single provider)
 php artisan necromancer:benchmark --format=markdown --output=benchmark.md
 php artisan necromancer:benchmark --generate-suite        # generate a suite grounded to your app's manifest
+php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   # static context vs. live tool-querying (opt-in)
 ```
 
 > See **[BENCHMARK.md](BENCHMARK.md)** for full setup instructions, config reference, and bias mitigations.
@@ -637,7 +668,7 @@ php artisan necromancer:benchmark --generate-suite        # generate a suite gro
 
 ### Step 3i — Export an OKF Knowledge Bundle
 
-Project the manifest into a portable, deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact, with authoritative YAML front matter and a concise prose mirror:
+Project the manifest into a portable, deterministic [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) (OKF) bundle — one Markdown file per artifact, with authoritative YAML front matter and a concise prose mirror:
 
 ```bash
 php artisan necromancer:okf
@@ -807,6 +838,45 @@ The same stale-manifest and partial-scope refusals as `necromancer:okf` apply, a
 
 ---
 
+### Step 3k — Visualize the Artifact Graph
+
+Project the manifest into a deterministic **Artifact Graph** — a node/edge visualization of every collected artifact, viewable as an interactive, force-directed, kind-colored graph in the browser:
+
+```bash
+php artisan necromancer:graph
+```
+
+Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact plus their relationships, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. Every collected artifact appears as a node, colored by kind; three kinds of edges connect them:
+
+- **structural** — the same relationship taxonomy the OKF Knowledge Bundle renders: a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model`.
+- **grouping** — an artifact declaring `domain` or `flow` connects to that group (e.g. every artifact tagged `domain: billing` links to `domain:billing`).
+- **reference** — an artifact declaring a local `adrs` entry connects to it (e.g. `adr:docs/adr/0004-x.md`); absolute-URI ADRs are skipped, the same way the OKF bundle leaves them as external links rather than copied concepts.
+
+An edge's target resolves to another node's canonical id when the target is itself a collected artifact (most structural edges, always for grouping/reference); otherwise it carries the raw declared value — a route's `controller`, for instance, almost never resolves, since controllers aren't a collected artifact type. `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an edge with an unresolved endpoint still exists in `graph.json`, just isn't drawn.
+
+`graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
+
+Each node also carries its Discovered Facts — every field the artifact carries besides `id`/`annotations`/`source`/`route_metadata`, the same exclusion `necromancer:okf`'s Artifact Concepts already apply — so the viewer is fully self-contained for inspection, with nothing further to fetch.
+
+The viewer is interactive:
+
+- **Sidebar** — one row per artifact kind present in the graph, doubling as both a color legend and a filter: unchecking a kind hides its nodes and every edge touching them. **Select all** / **Select none** buttons above the list toggle every kind at once.
+- **Edge key** — a small always-visible card showing the solid/dashed/dotted line style for structural/grouping/reference edges, each independently toggleable.
+- **Click-to-inspect** — click a node to open a panel with its canonical Artifact ID, kind, Architectural Context (resolved annotations), and Discovered Facts. Clicking a synthesized domain/flow/ADR node shows its member artifacts (or referencing artifacts, for an ADR) instead. Hiding a selected node's kind via the sidebar closes its panel automatically.
+- **Zoom & pan** — scroll to zoom toward the cursor, drag empty canvas to pan, drag a node to reposition it. **Zoom in** / **Zoom out** buttons in the header step the same zoom centered on the current viewport, and a **Reset view** button refits the camera to the currently visible nodes.
+
+Like `necromancer:okf`, the command never rescans the application, refuses a stale or partial-scope manifest by default, and writes atomically — a failed run never damages a previously-generated graph:
+
+```bash
+php artisan necromancer:graph --allow-stale      # build anyway, e.g. in a throwaway CI check
+php artisan necromancer:graph --allow-partial    # build a deliberately narrow graph
+php artisan necromancer:graph --output=dist/graph # write elsewhere
+```
+
+`necromancer:graph` is entirely independent of `necromancer:okf` — neither requires the other to have run, and their output directories (`necromancer-graph/` vs. `okf/`) never interfere with each other.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -821,9 +891,10 @@ The same stale-manifest and partial-scope refusals as `necromancer:okf` apply, a
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
 | `necromancer:infer` | Generate ADRs via AI | `--locale=`, `--temperature=`, `--fresh`, `--refresh` |
 | `necromancer:diff` | Compare manifests across branches | `--base-manifest=PATH`, `--review`, `--format=markdown`, `--output=PATH` |
-| `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
+| `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, latency, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
+| `necromancer:graph` | Build a deterministic Artifact Graph (nodes only in this release) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 
@@ -852,6 +923,7 @@ return [
     'output' => [
         'manifest' => base_path('necromancer.json'),
         'context'  => base_path('NECROMANCER.md'),
+        'graph'    => base_path('necromancer-graph'),
     ],
 
     // OKF Knowledge Bundle output directory (necromancer:okf)
@@ -947,6 +1019,50 @@ Add these steps to your CI pipeline to enforce manifest freshness and AI-readabi
 - name: Enforce minimum AI readability score
   run: php artisan necromancer:doctor --min-score=80
 ```
+
+## Upgrading to 2.0
+
+Version 2.0 removes the 1.x-only compatibility surfaces that existed to ease the transition to universal Artifact Annotations (1.5.0) and Knowledge Bundles (1.6.0/1.7.0). Nothing about how you *declare* annotations changes — `#[Necromancer]`, `withNecromancer()`, and exact-ID config mappings all work exactly as before. What changes is what 2.0 stops reading, emitting, and accepting.
+
+**1. Manifests older than schema v1 are now rejected, not upgraded.**
+
+Every command that reads `necromancer.json` (`map`, `audit`, `doctor`, `generate`, `ask`, `prompt`, `infer`, `diff`, `okf`, the MCP tools, and more) previously detected a pre-1.5 manifest and silently promoted it in memory. In 2.0 that promotion step is gone: a manifest missing `meta.manifest_schema_version: 1` is treated exactly like a missing manifest, and every command shows the same "Necromancer manifest not found. Run necromancer:scan first." error.
+
+> **Action:** run `php artisan necromancer:scan` once after upgrading to regenerate `necromancer.json`. If you commit the manifest to git, commit the regenerated file too. CI pipelines that only run `necromancer:audit`/`necromancer:doctor`/etc. against a checked-in manifest will fail until it's rescanned with 2.0 installed.
+
+**2. `route_metadata.necromancer` no longer appears in the manifest.**
+
+Routes still carry `route_metadata.raw` — the untouched output of Laravel's native `Route::getMetadata()` — but the `route_metadata.necromancer` projection that mirrored resolved annotations back onto routes specifically has been removed. Resolved annotations for routes (and every other artifact family) live in the universal `annotations` key, which has been present on every artifact since 1.5.0.
+
+> **Action:** if any of your own tooling reads `route_metadata.necromancer.*` from `necromancer.json` directly, switch it to read the artifact's `annotations.*` key instead. Every built-in consumer (`doctor`, `audit`, `generate`, `diff`, `ask`, MCP tools) already reads `annotations` and requires no changes.
+
+**3. `necromancer:doctor --only=route-metadata-coverage` no longer matches anything.**
+
+The dimension's canonical key has been `artifact-annotation-coverage` since 1.5.0; 2.0 removes the `route-metadata-coverage` alias that `--only` accepted for backward compatibility.
+
+> **Action:** update any CI script or shell alias using `--only=route-metadata-coverage` to `--only=artifact-annotation-coverage`.
+
+**4. Two scan diagnostic codes were renamed.**
+
+`AN_LEGACY_VALUE` and `AN_LEGACY_RISK` — printed by `necromancer:scan` when a native `Route::metadata()` declaration carries a value that can't fit Annotation Schema v1 (e.g. `risk: 'yolo'`) — are renamed to `AN_SCHEMA_INCOMPATIBLE_VALUE` and `AN_SCHEMA_INCOMPATIBLE_RISK`. The check itself is unchanged; only the code name changed, since it was never actually about manifest schema age.
+
+> **Action:** update any log parsing or CI assertions that grep scan output for `AN_LEGACY_VALUE`/`AN_LEGACY_RISK`.
+
+**5. The singular `adr` parameter was removed from `withNecromancer()` and `RouteMetadataFactory::forMetadata()`.**
+
+Both accept a plural `adrs` array parameter (added in 1.5.0 alongside `adr`) — that's now the only way to declare ADR references through the macro or factory.
+
+```diff
+ Route::post('/billing/cancel', [SubscriptionController::class, 'cancel'])
+     ->withNecromancer(
+         domain: 'billing',
+         risk: 'high',
+-        adr: 'docs/adr/004-subscription-cancellation.md',
++        adrs: ['docs/adr/004-subscription-cancellation.md'],
+     );
+```
+
+> **Action:** search your route files for `->withNecromancer(` calls passing `adr:` and switch them to `adrs: [...]`. The raw-array form (`->metadata(['necromancer' => ['adr' => ...]])`) is unaffected — Necromancer still reads a singular `adr` key there and merges it into `adrs`, since that's native Laravel data Necromancer doesn't control, not a Necromancer-specific compatibility shim.
 
 ## Contributing
 

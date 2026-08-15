@@ -8,11 +8,16 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
-use LaravelNecromancer\Manifest\ManifestNotFoundException;
+use LaravelNecromancer\Manifest\ArtifactQueryService;
+use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
 
 final class QueryModelsTool extends Tool
 {
+    use LoadsManifestArtifacts;
+
+    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
+
     public function name(): string
     {
         return 'query_models';
@@ -35,28 +40,13 @@ final class QueryModelsTool extends Tool
 
     public function handle(ManifestReader $reader, Request $request): mixed
     {
-        $models = $this->loadArtifacts($reader, 'models');
+        $artifacts = $this->loadArtifactsByType($reader);
 
-        if ($request->has('name')) {
-            $needle = strtolower((string) $request->get('name'));
-            $models = array_values(array_filter($models, fn (array $m): bool => str_contains(strtolower((string) ($m['class'] ?? '')), $needle)
-            ));
-        }
+        $models = $this->queryService->models(
+            $artifacts,
+            name: $request->has('name') ? (string) $request->get('name') : null,
+        );
 
         return Response::json($models);
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function loadArtifacts(ManifestReader $reader, string $type): array
-    {
-        try {
-            $path = (string) config('necromancer.output.manifest', base_path('necromancer.json'));
-
-            return (array) ($reader->read($path)['artifacts'][$type] ?? []);
-        } catch (ManifestNotFoundException) {
-            return [];
-        }
     }
 }

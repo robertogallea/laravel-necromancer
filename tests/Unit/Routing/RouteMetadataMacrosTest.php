@@ -6,6 +6,7 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Routing\Router;
 use Illuminate\Routing\RouteRegistrar;
 use Illuminate\Support\Facades\Route;
+use LaravelNecromancer\Routing\RouteMetadataMacros;
 use LaravelNecromancer\Tests\Fixtures\NecromancerFakeMetadataRoute;
 use LaravelNecromancer\Tests\TestCase;
 
@@ -37,7 +38,7 @@ test('withNecromancer writes every supplied field under the necromancer namespac
         summary: 'Cancels an active subscription.',
         risk: 'high',
         externalServices: ['stripe'],
-        adr: 'docs/adr/004-subscription-cancellation.md',
+        adrs: ['docs/adr/004-subscription-cancellation.md'],
     );
 
     expect($returned)->toBe($route)
@@ -49,9 +50,31 @@ test('withNecromancer writes every supplied field under the necromancer namespac
                 'summary' => 'Cancels an active subscription.',
                 'risk' => 'high',
                 'external_services' => ['stripe'],
-                'adr' => 'docs/adr/004-subscription-cancellation.md',
+                'adrs' => ['docs/adr/004-subscription-cancellation.md'],
             ],
         ]);
+});
+
+test('withNecromancer no longer declares a singular adr parameter on any macro signature', function () {
+    $macros = ['routerMacro', 'registrarMacro', 'routeMacro', 'pendingResourceMacro', 'pendingSingletonMacro'];
+
+    foreach ($macros as $macro) {
+        $closure = (new ReflectionMethod(RouteMetadataMacros::class, $macro))->invoke(new RouteMetadataMacros);
+
+        $parameters = array_map(
+            fn (ReflectionParameter $p): string => $p->getName(),
+            (new ReflectionFunction($closure))->getParameters(),
+        );
+
+        expect($parameters)->not->toContain('adr');
+    }
+
+    $payloadParameters = array_map(
+        fn (ReflectionParameter $p): string => $p->getName(),
+        (new ReflectionMethod(RouteMetadataMacros::class, 'payload'))->getParameters(),
+    );
+
+    expect($payloadParameters)->not->toContain('adr');
 });
 
 test('withNecromancer wraps a single external service string into a list', function () {

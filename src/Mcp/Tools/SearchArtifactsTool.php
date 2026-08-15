@@ -8,31 +8,15 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
-use LaravelNecromancer\Manifest\ManifestNotFoundException;
+use LaravelNecromancer\Manifest\ArtifactQueryService;
+use LaravelNecromancer\Manifest\Concerns\LoadsManifestArtifacts;
 use LaravelNecromancer\Manifest\ManifestReader;
 
 final class SearchArtifactsTool extends Tool
 {
-    private const SUPPORTED_TYPES = [
-        'routes',
-        'models',
-        'form_requests',
-        'jobs',
-        'events',
-        'listeners',
-        'commands',
-        'observers',
-        'policies',
-        'enums',
-        'tests',
-        'scheduled_tasks',
-        'middleware',
-        'livewire_components',
-        'gates',
-        'mailables',
-        'validation_rules',
-        'service_providers',
-    ];
+    use LoadsManifestArtifacts;
+
+    public function __construct(private readonly ArtifactQueryService $queryService = new ArtifactQueryService) {}
 
     public function name(): string
     {
@@ -59,32 +43,13 @@ final class SearchArtifactsTool extends Tool
 
     public function handle(ManifestReader $reader, Request $request): mixed
     {
-        $needle = strtolower((string) ($request->get('query') ?? ''));
-        $typeFilter = $request->has('type') ? (string) $request->get('type') : null;
-        $results = [];
+        $artifacts = $this->loadArtifactsByType($reader);
 
-        try {
-            $path = (string) config('necromancer.output.manifest', base_path('necromancer.json'));
-            $artifacts = (array) ($reader->read($path)['artifacts'] ?? []);
-        } catch (ManifestNotFoundException) {
-            return Response::json([]);
-        }
-
-        foreach ($artifacts as $type => $items) {
-            if (! in_array($type, self::SUPPORTED_TYPES, strict: true)) {
-                continue;
-            }
-
-            if ($typeFilter !== null && $type !== $typeFilter) {
-                continue;
-            }
-
-            foreach ((array) $items as $item) {
-                if (str_contains(strtolower(json_encode($item) ?: ''), $needle)) {
-                    $results[] = ['type' => $type, 'artifact' => $item];
-                }
-            }
-        }
+        $results = $this->queryService->search(
+            $artifacts,
+            (string) ($request->get('query') ?? ''),
+            typeFilter: $request->has('type') ? (string) $request->get('type') : null,
+        );
 
         return Response::json($results);
     }

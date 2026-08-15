@@ -50,7 +50,7 @@ test('the generate command fails with a clear message when the manifest is absen
 
 test('the generate command exits successfully and creates the output file', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'app_url' => 'http://localhost',
             'app_env' => 'testing',
@@ -69,7 +69,7 @@ test('the generate command exits successfully and creates the output file', func
 
 test('the generated file contains the necromancer header comment lines', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -82,7 +82,7 @@ test('the generated file contains the necromancer header comment lines', functio
 
 test('the generated file contains the application overview section with metadata', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'app_url' => 'http://localhost',
             'app_env' => 'testing',
@@ -104,7 +104,7 @@ test('the generated file contains the application overview section with metadata
 
 test('the generated file uses the app name from the manifest in the heading', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'MyDemoApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'MyDemoApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -115,7 +115,7 @@ test('the generated file uses the app name from the manifest in the heading', fu
 
 test('re-running the command when the output file exists triggers the overwrite confirmation', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
     File::put(base_path('NECROMANCER.md'), 'existing content');
@@ -127,7 +127,7 @@ test('re-running the command when the output file exists triggers the overwrite 
 
 test('when the user declines the overwrite confirmation the command fails and does not modify the file', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
     File::put(base_path('NECROMANCER.md'), 'existing content');
@@ -141,7 +141,7 @@ test('when the user declines the overwrite confirmation the command fails and do
 
 test('the force flag skips the overwrite confirmation and succeeds', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
     File::put(base_path('NECROMANCER.md'), 'existing content');
@@ -152,7 +152,7 @@ test('the force flag skips the overwrite confirmation and succeeds', function ()
 
 test('a manifest with routes produces a routes section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 [
@@ -179,7 +179,7 @@ test('a manifest with routes produces a routes section with count and table head
 
 test('the routes section row shows name, method, URI, controller at action, and middleware', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 [
@@ -206,7 +206,7 @@ test('the routes section row shows name, method, URI, controller at action, and 
 
 test('routes with parameters render a parameters column in the routes table', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 [
@@ -235,7 +235,7 @@ test('routes with parameters render a parameters column in the routes table', fu
 
 test('routes with necromancer route metadata render domain risk external services and adr columns', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 [
@@ -246,13 +246,11 @@ test('routes with necromancer route metadata render domain risk external service
                     'action' => 'cancel',
                     'middleware' => [],
                     'source' => null,
-                    'route_metadata' => [
-                        'necromancer' => [
-                            'domain' => 'billing',
-                            'risk' => 'high',
-                            'external_services' => ['stripe'],
-                            'adr' => 'docs/adr/004-subscription-cancellation.md',
-                        ],
+                    'annotations' => [
+                        'domain' => 'billing',
+                        'risk' => 'high',
+                        'external_services' => ['stripe'],
+                        'adrs' => ['docs/adr/004-subscription-cancellation.md'],
                     ],
                 ],
             ],
@@ -271,7 +269,7 @@ test('routes with necromancer route metadata render domain risk external service
 
 test('routes without necromancer route metadata omit the metadata columns', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'controller' => 'OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
@@ -290,7 +288,7 @@ test('routes without necromancer route metadata omit the metadata columns', func
 
 test('routes source their domain risk external services and adr columns from resolved annotations, not route_metadata', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'manifest_schema_version' => 1, 'annotation_schema_version' => 1, 'scope' => ['complete' => true, 'artifact_types' => ['routes']]],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'annotation_schema_version' => 1, 'scope' => ['complete' => true, 'artifact_types' => ['routes']]],
         'artifacts' => [
             'routes' => [
                 [
@@ -333,7 +331,7 @@ test('routes source their domain risk external services and adr columns from res
 
 test('models with annotations render an Architectural Context column', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -354,7 +352,7 @@ test('models with annotations render an Architectural Context column', function 
 
 test('a model annotated with only a summary renders it in the Architectural Context cell', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -373,7 +371,7 @@ test('a model annotated with only a summary renders it in the Architectural Cont
 
 test('models without any annotations omit the Architectural Context column', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Order', 'table' => 'orders', 'fillable' => [], 'casts' => [], 'relationships' => [], 'source' => null],
@@ -388,7 +386,7 @@ test('models without any annotations omit the Architectural Context column', fun
 
 test('jobs with annotations render an Architectural Context column', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'jobs' => [
                 [
@@ -406,7 +404,7 @@ test('jobs with annotations render an Architectural Context column', function ()
 
 test('gates with annotations render an Architectural Context column, even with no class field', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'gates' => [
                 [
@@ -424,7 +422,7 @@ test('gates with annotations render an Architectural Context column, even with n
 
 test('scheduled tasks with annotations render an Architectural Context column', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'scheduled_tasks' => [
                 [
@@ -443,7 +441,7 @@ test('scheduled tasks with annotations render an Architectural Context column', 
 
 test('a manifest with no routes does not include a routes section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['routes' => [], 'models' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -454,7 +452,7 @@ test('a manifest with no routes does not include a routes section', function () 
 
 test('a manifest with models produces a models section with sub-headings', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [],
             'models' => [
@@ -482,7 +480,7 @@ test('a manifest with models produces a models section with sub-headings', funct
 
 test('the model section shows fillable, casts, and relationships bullets', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [],
             'models' => [
@@ -509,7 +507,7 @@ test('the model section shows fillable, casts, and relationships bullets', funct
 
 test('model section omits bullets for empty fillable casts and relationships', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [],
             'models' => [
@@ -536,7 +534,7 @@ test('model section omits bullets for empty fillable casts and relationships', f
 
 test('a manifest with no models does not include a models section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['routes' => [], 'models' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -547,7 +545,7 @@ test('a manifest with no models does not include a models section', function () 
 
 test('the model section shows hidden fields, soft deletes, and scopes when present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -576,7 +574,7 @@ test('the model section shows hidden fields, soft deletes, and scopes when prese
 
 test('the model section omits hidden, soft deletes, and scopes bullets when absent', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -602,7 +600,7 @@ test('the model section omits hidden, soft deletes, and scopes bullets when abse
 
 test('a manifest with both routes and models produces both sections separated by a blank line', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 [
@@ -641,7 +639,7 @@ test('a manifest with both routes and models produces both sections separated by
 
 test('a manifest with form requests produces a form requests section with rules', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'form_requests' => [
                 [
@@ -664,7 +662,7 @@ test('a manifest with form requests produces a form requests section with rules'
 
 test('a manifest with no form requests does not include a form requests section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['form_requests' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -675,7 +673,7 @@ test('a manifest with no form requests does not include a form requests section'
 
 test('the only flag accepts form_requests as a valid type', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'form_requests' => [
                 [
@@ -700,7 +698,7 @@ test('the only flag accepts form_requests as a valid type', function () {
 
 test('a manifest with jobs produces a jobs section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'jobs' => [
                 [
@@ -723,7 +721,7 @@ test('a manifest with jobs produces a jobs section', function () {
 
 test('a job line omits null fields', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'jobs' => [
                 [
@@ -746,7 +744,7 @@ test('a job line omits null fields', function () {
 
 test('a job with all null detail fields renders only the backtick class name', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'jobs' => [
                 [
@@ -769,7 +767,7 @@ test('a job with all null detail fields renders only the backtick class name', f
 
 test('a manifest with no jobs does not include a jobs section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['jobs' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -782,7 +780,7 @@ test('a manifest with no jobs does not include a jobs section', function () {
 
 test('a manifest with events produces an events section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'events' => [
                 [
@@ -803,7 +801,7 @@ test('a manifest with events produces an events section', function () {
 
 test('an event with no listeners renders only the backtick class name', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'events' => [
                 [
@@ -824,7 +822,7 @@ test('an event with no listeners renders only the backtick class name', function
 
 test('a manifest with no events does not include an events section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['events' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -837,7 +835,7 @@ test('a manifest with no events does not include an events section', function ()
 
 test('a manifest with listeners produces a listeners section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'listeners' => [
                 [
@@ -859,7 +857,7 @@ test('a manifest with listeners produces a listeners section', function () {
 
 test('a non-queued listener does not include (queued) annotation', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'listeners' => [
                 [
@@ -881,7 +879,7 @@ test('a non-queued listener does not include (queued) annotation', function () {
 
 test('a listener with multiple handled events lists all event basenames', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'listeners' => [
                 [
@@ -901,7 +899,7 @@ test('a listener with multiple handled events lists all event basenames', functi
 
 test('a listener with an empty handles array renders only the backtick class name', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'listeners' => [
                 [
@@ -923,7 +921,7 @@ test('a listener with an empty handles array renders only the backtick class nam
 
 test('a manifest with no listeners does not include a listeners section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['listeners' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -936,7 +934,7 @@ test('a manifest with no listeners does not include a listeners section', functi
 
 test('a manifest with commands produces an artisan commands section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'commands' => [
                 [
@@ -958,7 +956,7 @@ test('a manifest with commands produces an artisan commands section', function (
 
 test('a command with an empty description renders only the backtick signature', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'commands' => [
                 [
@@ -980,7 +978,7 @@ test('a command with an empty description renders only the backtick signature', 
 
 test('a manifest with no commands does not include an artisan commands section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['commands' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -993,7 +991,7 @@ test('a manifest with no commands does not include an artisan commands section',
 
 test('the terminal output contains a sections line listing only written sections', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [],
             'models' => [],
@@ -1013,7 +1011,7 @@ test('the terminal output contains a sections line listing only written sections
 
 test('the terminal sections line lists all seven names when all artifact types are present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1045,7 +1043,7 @@ test('the terminal sections line lists all seven names when all artifact types a
 
 test('--only=routes produces output with routes section only (no models, jobs, events, listeners, or commands)', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'action' => 'index', 'middleware' => ['auth'], 'source' => null],
@@ -1073,7 +1071,7 @@ test('--only=routes produces output with routes section only (no models, jobs, e
 
 test('--only=routes terminal output contains only overview and routes in sections line', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1091,7 +1089,7 @@ test('--only=routes terminal output contains only overview and routes in section
 
 test('--only=models produces output with models section but not routes', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1111,7 +1109,7 @@ test('--only=models produces output with models section but not routes', functio
 
 test('--only=routes,models produces both sections but not jobs', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1135,7 +1133,7 @@ test('--only=routes,models produces both sections but not jobs', function () {
 
 test('--only=jobs with a manifest containing jobs produces the jobs section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoice', 'queue' => 'emails', 'connection' => null, 'tries' => 3, 'source' => null],
@@ -1150,7 +1148,7 @@ test('--only=jobs with a manifest containing jobs produces the jobs section', fu
 
 test('--only=jobs with no jobs in the manifest produces only the overview section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['jobs' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -1163,7 +1161,7 @@ test('--only=jobs with no jobs in the manifest produces only the overview sectio
 
 test('--only with an unknown type fails with an actionable error', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1174,7 +1172,7 @@ test('--only with an unknown type fails with an actionable error', function () {
 
 test('--only with a valid and an invalid type reports the invalid token only', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1185,7 +1183,7 @@ test('--only with a valid and an invalid type reports the invalid token only', f
 
 test('--only with multiple unknown types reports all invalid tokens in one error', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1196,7 +1194,7 @@ test('--only with multiple unknown types reports all invalid tokens in one error
 
 test('the overview section is always present in the output when --only is used', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'app_url' => 'http://localhost'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'app_url' => 'http://localhost'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1213,7 +1211,7 @@ test('the overview section is always present in the output when --only is used',
 
 test('--only=routes,models terminal output contains overview routes and models in sections line', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1234,7 +1232,7 @@ test('the output option writes the file to the specified path instead of the def
     File::delete($customPath);
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1253,7 +1251,7 @@ test('when Boost is detected and no --output is given Tier 1 goes to the Boost c
     $this->instance(BoostDetector::class, new BoostDetector(ServiceProvider::class));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1359,7 +1357,7 @@ test('when Boost is detected and --output is given Tier 2 goes to --output and T
     File::delete($customPath);
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1376,7 +1374,7 @@ test('when Boost is not detected the file is written to the default standalone p
     $this->instance(BoostDetector::class, new BoostDetector('NonExistent\\Provider'));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1393,7 +1391,7 @@ test('the overwrite confirmation prompt applies to the SKILL.md inside the Boost
     File::put($skillDir.'/SKILL.md', 'existing content');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1409,7 +1407,7 @@ test('the force flag skips the overwrite confirmation for the SKILL.md inside th
     File::put($skillDir.'/SKILL.md', 'existing content');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1421,7 +1419,7 @@ test('when the Boost context directory cannot be created the command falls back 
     config(['necromancer.boost.context_path' => '/nonexistent-root-dir/sub/necromancer.md']);
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1438,7 +1436,7 @@ test('when Boost is detected and the file is written to the Boost path the three
     $this->instance(BoostDetector::class, new BoostDetector(ServiceProvider::class));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1453,7 +1451,7 @@ test('when Boost is detected and the file is written to the Boost path the secti
     $this->instance(BoostDetector::class, new BoostDetector(ServiceProvider::class));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1466,7 +1464,7 @@ test('when Boost is not detected the sections line appears and the Boost-specifi
     $this->instance(BoostDetector::class, new BoostDetector('NonExistent\\Provider'));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoiceEmail', 'queue' => 'emails', 'connection' => 'sync', 'tries' => 3, 'source' => null],
@@ -1487,7 +1485,7 @@ test('when Boost is detected and --output overrides Tier 2 the Boost-specific te
     File::delete($customPath);
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1504,7 +1502,7 @@ test('when Boost is detected but the context directory cannot be created the sta
     config(['necromancer.boost.context_path' => '/nonexistent-root-dir/sub/necromancer.md']);
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1521,7 +1519,7 @@ test('the generate command warns when app files are newer than the manifest gene
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'generated_at' => '1970-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'generated_at' => '1970-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1537,7 +1535,7 @@ test('the generate command does not warn when the manifest generated_at is in th
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'generated_at' => '2099-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'generated_at' => '2099-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1550,7 +1548,7 @@ test('the generate command does not warn when the manifest generated_at is in th
 
 test('a manifest with enums produces an enums section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'enums' => [
                 [
@@ -1586,7 +1584,7 @@ test('a manifest with enums produces an enums section with count and table heade
 
 test('a manifest with policies produces a policies section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'policies' => [
                 [
@@ -1611,7 +1609,7 @@ test('a manifest with policies produces a policies section with count and table 
 
 test('--except=routes excludes routes section but keeps all other present sections', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'action' => 'index', 'middleware' => ['auth'], 'source' => null],
@@ -1633,7 +1631,7 @@ test('--except=routes excludes routes section but keeps all other present sectio
 
 test('--except=listeners,events excludes both listeners and events sections', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1653,7 +1651,7 @@ test('--except=listeners,events excludes both listeners and events sections', fu
 
 test('--except with an unknown type fails with an actionable error', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1664,7 +1662,7 @@ test('--except with an unknown type fails with an actionable error', function ()
 
 test('--except with multiple unknown types reports all invalid tokens', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1675,7 +1673,7 @@ test('--except with multiple unknown types reports all invalid tokens', function
 
 test('--except=routes terminal output does not list routes in sections line', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1693,7 +1691,7 @@ test('--except=routes terminal output does not list routes in sections line', fu
 
 test('the overview section is always present in the output when --except is used', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'app_url' => 'http://localhost'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'app_url' => 'http://localhost'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1711,7 +1709,7 @@ test('the overview section is always present in the output when --except is used
 
 test('using --only and --except together fails with a clear error', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1724,7 +1722,7 @@ test('using --only and --except together fails with a clear error', function () 
 
 test('a single generate run writes both NECROMANCER.md (Tier 2 full) and CLAUDE.md (Tier 1 compact)', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -1749,7 +1747,7 @@ test('a single generate run writes both NECROMANCER.md (Tier 2 full) and CLAUDE.
 
 test('NECROMANCER.md contains full model detail including fillable and casts', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -1774,7 +1772,7 @@ test('NECROMANCER.md contains full model detail including fillable and casts', f
 
 test('CLAUDE.md compact models section does not contain fillable or casts columns', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -1803,7 +1801,7 @@ test('CLAUDE.md compact models section does not contain fillable or casts column
 
 test('CLAUDE.md compact routes section shows prefix grouping not individual route rows', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1825,7 +1823,7 @@ test('CLAUDE.md compact routes section shows prefix grouping not individual rout
 
 test('CLAUDE.md compact content is not affected by the --only flag', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1849,7 +1847,7 @@ test('CLAUDE.md compact content is not affected by the --only flag', function ()
 
 test('CLAUDE.md compact content is not affected by the --except flag', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -1873,7 +1871,7 @@ test('CLAUDE.md compact content is not affected by the --except flag', function 
 
 test('CLAUDE.md is created with necromancer section markers on first run', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1888,7 +1886,7 @@ test('re-running generate replaces the necromancer section in CLAUDE.md and pres
     File::put(base_path('CLAUDE.md'), "# My existing guide\n\nSome content here.\n\n<!-- necromancer:start -->\nold content\n<!-- necromancer:end -->\n\n## More existing content");
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'UpdatedApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'UpdatedApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1905,7 +1903,7 @@ test('generate appends necromancer section markers to existing CLAUDE.md that ha
     File::put(base_path('CLAUDE.md'), "# My existing guide\n\nSome existing content.\n");
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1922,7 +1920,7 @@ test('generate emits a warning when CLAUDE.md has an orphaned opening marker wit
     File::put(base_path('CLAUDE.md'), "# Guide\n\n<!-- necromancer:start -->\norphaned content\n");
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1935,7 +1933,7 @@ test('generate emits a warning when CLAUDE.md has an orphaned opening marker wit
 
 test('CLAUDE.md contains a footer pointing to NECROMANCER.md for full context (no Boost)', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1950,7 +1948,7 @@ test('Boost Tier 1 context file contains a footer pointing to the necromancer sk
     $this->instance(BoostDetector::class, new BoostDetector(ServiceProvider::class));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1968,7 +1966,7 @@ test('when the Boost skill directory cannot be created Tier 2 falls back to NECR
     config(['necromancer.boost.skill_path' => '/nonexistent-root-dir/skills/necromancer']);
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1983,7 +1981,7 @@ test('when the Boost skill directory cannot be created Tier 2 falls back to NECR
 
 test('a single generate run writes AGENTS.md alongside NECROMANCER.md and CLAUDE.md', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -1996,7 +1994,7 @@ test('a single generate run writes AGENTS.md alongside NECROMANCER.md and CLAUDE
 
 test('AGENTS.md is created with necromancer section markers on first run', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -2011,7 +2009,7 @@ test('re-running generate replaces the necromancer section in AGENTS.md and pres
     File::put(base_path('AGENTS.md'), "# My existing guide\n\nSome content here.\n\n<!-- necromancer:start -->\nold content\n<!-- necromancer:end -->\n\n## More existing content");
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'UpdatedApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'UpdatedApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -2028,7 +2026,7 @@ test('generate appends necromancer section markers to existing AGENTS.md that ha
     File::put(base_path('AGENTS.md'), "# My existing guide\n\nSome existing content.\n");
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -2043,7 +2041,7 @@ test('generate appends necromancer section markers to existing AGENTS.md that ha
 
 test('AGENTS.md compact content is not affected by the --only flag', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -2063,7 +2061,7 @@ test('AGENTS.md compact content is not affected by the --only flag', function ()
 
 test('AGENTS.md compact content is not affected by the --except flag', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -2082,7 +2080,7 @@ test('AGENTS.md compact content is not affected by the --except flag', function 
 
 test('AGENTS.md contains a footer pointing to NECROMANCER.md for full context (no Boost)', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -2097,7 +2095,7 @@ test('when Boost is detected AGENTS.md is not written to project root', function
     $this->instance(BoostDetector::class, new BoostDetector(ServiceProvider::class));
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -2108,7 +2106,7 @@ test('when Boost is detected AGENTS.md is not written to project root', function
 
 test('generate includes observers in model section when present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
         'artifacts' => [
             'models' => [[
                 'class' => 'App\\Models\\Order',
@@ -2135,7 +2133,7 @@ test('generate includes observers in model section when present', function () {
 
 test('generate includes job backoff and max_exceptions when present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
         'artifacts' => [
             'jobs' => [[
                 'class' => 'App\\Jobs\\SendEmail',
@@ -2158,7 +2156,7 @@ test('generate includes job backoff and max_exceptions when present', function (
 
 test('generate includes command aliases when present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
         'artifacts' => [
             'commands' => [[
                 'class' => 'App\\Console\\Commands\\CleanOrders',
@@ -2177,7 +2175,7 @@ test('generate includes command aliases when present', function () {
 
 test('generate includes form request stop_on_first_failure when present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
         'artifacts' => [
             'form_requests' => [[
                 'class' => 'App\\Http\\Requests\\StoreOrderRequest',
@@ -2197,7 +2195,7 @@ test('generate includes form request stop_on_first_failure when present', functi
 
 test('generate includes route authorization when present', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'Test', 'laravel_version' => '13', 'php_version' => '8.3', 'app_url' => 'http://localhost', 'app_env' => 'local'],
         'artifacts' => [
             'routes' => [[
                 'name' => 'orders.index',
@@ -2221,7 +2219,7 @@ test('generate includes route authorization when present', function () {
 
 test('a manifest with tests produces a tests section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'tests' => [
                 [
@@ -2248,7 +2246,7 @@ test('a manifest with tests produces a tests section with count and table header
 
 test('the tests section shows file, type, subject basename, and method names', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'tests' => [
                 [
@@ -2272,7 +2270,7 @@ test('the tests section shows file, type, subject basename, and method names', f
 
 test('a manifest with observers produces an observers section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'observers' => [
                 [
@@ -2296,7 +2294,7 @@ test('a manifest with observers produces an observers section with count and tab
 
 test('a manifest with no tests does not include a tests section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [],
     ], JSON_THROW_ON_ERROR));
 
@@ -2310,7 +2308,7 @@ test('a manifest with no tests does not include a tests section', function () {
 
 test('a manifest with scheduled_tasks produces a section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'scheduled_tasks' => [
                 [
@@ -2335,7 +2333,7 @@ test('a manifest with scheduled_tasks produces a section with count and table he
 
 test('a manifest with no scheduled_tasks does not include a scheduled tasks section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['scheduled_tasks' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2346,7 +2344,7 @@ test('a manifest with no scheduled_tasks does not include a scheduled tasks sect
 
 test('scheduled tasks with optional columns render them conditionally', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'scheduled_tasks' => [
                 [
@@ -2376,7 +2374,7 @@ test('scheduled tasks with optional columns render them conditionally', function
 
 test('a manifest with middleware produces a middleware section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'middleware' => [
                 [
@@ -2406,7 +2404,7 @@ test('a manifest with middleware produces a middleware section with count and ta
 
 test('a manifest with no middleware does not include a middleware section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['middleware' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2417,7 +2415,7 @@ test('a manifest with no middleware does not include a middleware section', func
 
 test('a middleware section with only alias-scoped entries omits the Group column', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'middleware' => [
                 [
@@ -2441,7 +2439,7 @@ test('a middleware section with only alias-scoped entries omits the Group column
 
 test('a manifest with livewire_components produces a livewire components section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'livewire_components' => [
                 [
@@ -2469,7 +2467,7 @@ test('a manifest with livewire_components produces a livewire components section
 
 test('a manifest with no livewire_components does not include a livewire components section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['livewire_components' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2480,7 +2478,7 @@ test('a manifest with no livewire_components does not include a livewire compone
 
 test('a manifest with gates produces a gates section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'gates' => [
                 ['ability' => 'edit-post', 'kind' => 'closure', 'parameters' => ['string']],
@@ -2500,7 +2498,7 @@ test('a manifest with gates produces a gates section with count and table header
 
 test('a manifest with no gates does not include a gates section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['gates' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2513,7 +2511,7 @@ test('a manifest with no gates does not include a gates section', function () {
 
 test('a manifest with mailables produces a mailables section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'mailables' => [
                 [
@@ -2547,7 +2545,7 @@ test('a manifest with mailables produces a mailables section with count and tabl
 
 test('the mailables section omits the queue column when no entry has a queue', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'mailables' => [
                 [
@@ -2572,7 +2570,7 @@ test('the mailables section omits the queue column when no entry has a queue', f
 
 test('a manifest with no mailables does not include a mailables section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['mailables' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2585,7 +2583,7 @@ test('a manifest with no mailables does not include a mailables section', functi
 
 test('a manifest with validation_rules produces a validation rules section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'validation_rules' => [
                 [
@@ -2615,7 +2613,7 @@ test('a manifest with validation_rules produces a validation rules section with 
 
 test('a manifest with no validation_rules does not include a validation rules section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['validation_rules' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2626,7 +2624,7 @@ test('a manifest with no validation_rules does not include a validation rules se
 
 test('a manifest with service_providers produces a service providers section with count and table header', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'service_providers' => [
                 [
@@ -2651,7 +2649,7 @@ test('a manifest with service_providers produces a service providers section wit
 
 test('a manifest with no service_providers does not include a service providers section', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => ['service_providers' => []],
     ], JSON_THROW_ON_ERROR));
 
@@ -2662,7 +2660,7 @@ test('a manifest with no service_providers does not include a service providers 
 
 test('--paths includes artifacts whose source file matches a provided prefix', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2686,7 +2684,7 @@ test('--paths includes artifacts whose source file matches a provided prefix', f
 
 test('--paths excludes artifacts that do not match any provided prefix', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2722,7 +2720,7 @@ test('--paths excludes artifacts that do not match any provided prefix', functio
 
 test('--paths excludes artifacts that have no resolvable source file', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2757,7 +2755,7 @@ test('--paths excludes artifacts that have no resolvable source file', function 
 
 test('--paths combines with --only to narrow within the selected type', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2792,7 +2790,7 @@ test('--paths combines with --only to narrow within the selected type', function
 
 test('--paths combines with --except correctly', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2827,7 +2825,7 @@ test('--paths combines with --except correctly', function () {
 
 test('--paths emits a warning for a prefix that matches nothing but does not fail', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2849,7 +2847,7 @@ test('--paths emits a warning for a prefix that matches nothing but does not fai
 
 test('--paths omits a section entirely when all its artifacts are filtered out', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2879,7 +2877,7 @@ test('--paths omits a section entirely when all its artifacts are filtered out',
 
 test('--paths normalizes leading/trailing slashes and backslashes', function () {
     $manifest = [
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2905,7 +2903,7 @@ test('--paths normalizes leading/trailing slashes and backslashes', function () 
 
 test('--paths matches the tests artifact via its top-level file field', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'tests' => [
                 [
@@ -2927,7 +2925,7 @@ test('--paths matches the tests artifact via its top-level file field', function
 
 test('--paths uses boundary-aware matching and does not match sibling prefixes', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 [
@@ -2962,7 +2960,7 @@ test('--paths uses boundary-aware matching and does not match sibling prefixes',
 function generateManifestWithApp(?string $contentHash = null): array
 {
     return [
-        'meta' => ['app_name' => 'TestApp', 'content_hash' => $contentHash],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'content_hash' => $contentHash],
         'artifacts' => (object) [],
     ];
 }
@@ -3077,7 +3075,7 @@ test('with both bundles present both lines appear under one Knowledge Bundle hea
 test('--only never removes the Knowledge Bundle section', function () {
     putKnowledgeBundle('okf', ['artifact_count' => 1]);
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -3093,7 +3091,7 @@ test('--only never removes the Knowledge Bundle section', function () {
 test('--except never removes the Knowledge Bundle section', function () {
     putKnowledgeBundle('okf', ['artifact_count' => 1]);
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'controller' => null, 'action' => null, 'middleware' => [], 'source' => null],
@@ -3109,7 +3107,7 @@ test('--except never removes the Knowledge Bundle section', function () {
 test('--paths never removes the Knowledge Bundle section', function () {
     putKnowledgeBundle('okf', ['artifact_count' => 1]);
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
         'artifacts' => [
             'models' => [
                 ['class' => 'App\\Models\\Invoice', 'table' => 'invoices', 'fillable' => [], 'casts' => [], 'relationships' => [], 'source' => ['file' => 'app/Models/Invoice.php', 'line' => 1]],

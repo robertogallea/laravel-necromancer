@@ -10,7 +10,7 @@ use LaravelNecromancer\Integrations\AiDetector;
 function askCommandManifest(): string
 {
     return json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'generated_at' => now()->toISOString(),
             'laravel_version' => '13.0',
@@ -127,7 +127,7 @@ test('includes the manifest content in the agent instructions', function () {
 
 test('includes a most relevant evidence section ranking matches for the question', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'laravel_version' => '13.0', 'php_version' => '8.4'],
         'artifacts' => [
             'routes' => [
                 ['name' => 'home', 'method' => 'GET', 'uri' => '/', 'middleware' => []],

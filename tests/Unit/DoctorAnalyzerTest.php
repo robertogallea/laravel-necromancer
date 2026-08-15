@@ -8,15 +8,15 @@ function artifactAnnotationDimension(array $artifacts): DimensionResult
     $analyzer = new DoctorAnalyzer($artifacts);
 
     foreach ($analyzer->dimensions() as $dimension) {
-        if ($dimension->key === 'route-metadata-coverage') {
+        if ($dimension->key === 'artifact-annotation-coverage') {
             return $dimension;
         }
     }
 
-    throw new RuntimeException('route-metadata-coverage dimension not found');
+    throw new RuntimeException('artifact-annotation-coverage dimension not found');
 }
 
-test('dimensions() includes route-metadata-coverage as an 8th dimension', function () {
+test('dimensions() includes artifact-annotation-coverage as an 8th dimension', function () {
     $analyzer = new DoctorAnalyzer(['routes' => []]);
 
     expect($analyzer->dimensions())->toHaveCount(8);

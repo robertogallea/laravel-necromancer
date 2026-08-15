@@ -17,7 +17,7 @@ test('the map command fails with a clear message when the manifest is absent', f
 });
 
 test('the map command succeeds when a valid manifest exists at the configured path', function () {
-    $manifest = json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR);
+    $manifest = json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR);
     File::put(base_path('necromancer.json'), $manifest);
 
     $this->artisan('necromancer:map')
@@ -32,7 +32,7 @@ test('the map command resolves the manifest path from config', function () {
         ->expectsOutputToContain('necromancer:scan')
         ->assertFailed();
 
-    File::put($path, json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
+    File::put($path, json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:map')
         ->assertSuccessful();
@@ -42,7 +42,7 @@ test('the map command resolves the manifest path from config', function () {
 
 test('the map command displays route artifacts with method uri name and middleware', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => ['auth', 'verified'], 'controller' => null, 'action' => null],
@@ -61,7 +61,7 @@ test('the map command displays route artifacts with method uri name and middlewa
 
 test('the map command displays model artifacts with short class table and relationships', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [
                 [
@@ -86,7 +86,7 @@ test('the map command displays model artifacts with short class table and relati
 
 test('the map command displays job artifacts with short class and labeled queue fields', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'jobs' => [
                 ['class' => 'App\\Jobs\\SendInvoiceEmail', 'queue' => 'emails', 'connection' => 'redis', 'tries' => 3],
@@ -103,7 +103,7 @@ test('the map command displays job artifacts with short class and labeled queue 
 
 test('the map command displays event artifacts with short class and short listener names', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'events' => [
                 ['class' => 'App\\Events\\OrderPlaced', 'listeners' => ['App\\Listeners\\SendOrderConfirmation', 'App\\Listeners\\SendAuditLog']],
@@ -120,7 +120,7 @@ test('the map command displays event artifacts with short class and short listen
 
 test('the map command displays listener artifacts with short class handles and queued flag', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'listeners' => [
                 ['class' => 'App\\Listeners\\SendOrderConfirmation', 'handles' => ['App\\Events\\OrderPlaced'], 'queued' => true],
@@ -137,7 +137,7 @@ test('the map command displays listener artifacts with short class handles and q
 
 test('the map command displays command artifacts with signature and description', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'commands' => [
                 ['class' => 'App\\Console\\Commands\\PruneOrders', 'signature' => 'orders:prune {--days=30}', 'description' => 'Prune old orders'],
@@ -153,7 +153,7 @@ test('the map command displays command artifacts with signature and description'
 });
 
 test('the map command succeeds and produces no artifact output for an empty manifest', function () {
-    $manifest = json_encode(['meta' => [], 'artifacts' => (object) []], JSON_THROW_ON_ERROR);
+    $manifest = json_encode(['meta' => ['manifest_schema_version' => 1], 'artifacts' => (object) []], JSON_THROW_ON_ERROR);
     File::put(base_path('necromancer.json'), $manifest);
 
     $this->artisan('necromancer:map')
@@ -168,7 +168,7 @@ test('the map command succeeds and produces no artifact output for an empty mani
 
 test('the map command with --type=routes shows only the routes section', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => []],
@@ -188,7 +188,7 @@ test('the map command with --type=routes shows only the routes section', functio
 
 test('the map command with --type=models shows only the models section', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => []],
@@ -208,7 +208,7 @@ test('the map command with --type=models shows only the models section', functio
 
 test('the map command fails with an actionable message when --type names an unknown group', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => []],
@@ -224,7 +224,7 @@ test('the map command fails with an actionable message when --type names an unkn
 
 test('the map command without --type still shows all artifact groups', function () {
     $manifest = json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'routes' => [
                 ['name' => 'orders.index', 'method' => 'GET', 'uri' => '/orders', 'middleware' => []],
@@ -249,7 +249,7 @@ test('the map command warns when app files are newer than the manifest generated
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '1970-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '1970-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -265,7 +265,7 @@ test('the map command does not warn when the manifest generated_at is in the fut
     File::put(base_path('app/Placeholder.php'), '<?php');
 
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => ['generated_at' => '2099-01-01T00:00:00+00:00'],
+        'meta' => ['manifest_schema_version' => 1, 'generated_at' => '2099-01-01T00:00:00+00:00'],
         'artifacts' => (object) [],
     ], JSON_THROW_ON_ERROR));
 
@@ -278,7 +278,7 @@ test('the map command does not warn when the manifest generated_at is in the fut
 
 test('map shows observers for models that have them', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'models' => [[
                 'class' => 'App\\Models\\Order',
@@ -301,7 +301,7 @@ test('map shows observers for models that have them', function () {
 
 test('map shows aliases for commands that have them', function () {
     File::put(base_path('necromancer.json'), json_encode([
-        'meta' => [],
+        'meta' => ['manifest_schema_version' => 1],
         'artifacts' => [
             'commands' => [[
                 'class' => 'App\\Console\\Commands\\CleanOrders',

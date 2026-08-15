@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
+use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 
-test('adapts an unversioned manifest in memory with IDs and conservative scope', function () {
+test('rejects an unversioned manifest', function () {
     $path = tempnam(sys_get_temp_dir(), 'necromancer-manifest-');
 
     file_put_contents($path, json_encode([
@@ -16,23 +17,26 @@ test('adapts an unversioned manifest in memory with IDs and conservative scope',
     ], JSON_THROW_ON_ERROR));
 
     try {
-        $manifest = (new ManifestReader)->read($path);
+        (new ManifestReader)->read($path);
     } finally {
         unlink($path);
     }
+})->throws(ManifestNotFoundException::class);
 
-    expect($manifest['meta'])
-        ->toMatchArray([
-            'manifest_schema_version' => 1,
-            'annotation_schema_version' => 1,
-            'scope' => [
-                'complete' => false,
-                'artifact_types' => ['models', 'routes'],
-            ],
-        ])
-        ->and($manifest['artifacts']['routes'][0]['id'])->toBe('routes:GET:orders')
-        ->and($manifest['artifacts']['models'][0]['id'])->toBe('models:App\\Models\\Order');
-});
+test('rejects a manifest whose schema version is not 1', function () {
+    $path = tempnam(sys_get_temp_dir(), 'necromancer-manifest-');
+
+    file_put_contents($path, json_encode([
+        'meta' => ['manifest_schema_version' => 2],
+        'artifacts' => [],
+    ], JSON_THROW_ON_ERROR));
+
+    try {
+        (new ManifestReader)->read($path);
+    } finally {
+        unlink($path);
+    }
+})->throws(ManifestNotFoundException::class);
 
 test('preserves IDs and resolved content in a current manifest', function () {
     $path = tempnam(sys_get_temp_dir(), 'necromancer-manifest-');
@@ -61,38 +65,4 @@ test('preserves IDs and resolved content in a current manifest', function () {
 
     expect($manifest['artifacts']['scheduled_tasks'][0]['id'])->toBe($secondId)
         ->and($manifest['artifacts']['scheduled_tasks'][1]['id'])->toBe($firstId);
-});
-
-test('promotes legacy route declarations into the universal annotation shape', function () {
-    $path = tempnam(sys_get_temp_dir(), 'necromancer-manifest-');
-
-    file_put_contents($path, json_encode([
-        'meta' => [],
-        'artifacts' => [
-            'routes' => [[
-                'method' => 'POST',
-                'uri' => 'billing/cancel',
-                'route_metadata' => [
-                    'raw' => ['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']],
-                    'necromancer' => ['domain' => 'billing', 'risk' => 'high', 'adr' => 'docs/adr/004.md'],
-                ],
-            ]],
-        ],
-    ], JSON_THROW_ON_ERROR));
-
-    try {
-        $manifest = (new ManifestReader)->read($path);
-    } finally {
-        unlink($path);
-    }
-
-    $route = $manifest['artifacts']['routes'][0];
-
-    expect($route['annotations'])->toBe([
-        'domain' => 'billing',
-        'risk' => 'high',
-        'adrs' => ['docs/adr/004.md'],
-    ])
-        ->and($route['route_metadata']['raw'])->toBe(['necromancer' => ['risk' => 'high', 'adr' => 'docs/adr/004.md']])
-        ->and($route['route_metadata']['necromancer']['adrs'])->toBe(['docs/adr/004.md']);
 });

@@ -47,7 +47,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => 'What routes in this application require authentication? List their names and HTTP methods.',
             'required_key' => 'routes.auth_required',
-            'conditions' => ['none', 'manual'],
+            'conditions' => ['none', 'manual', 'necromancer-mcp'],
             'assertions' => [
                 'must_recall_from' => 'routes.auth_required',
                 'fact_keys' => ['routes.auth_required'],
@@ -64,7 +64,7 @@ final class TaskSuiteGenerator
                 'type' => 'qa',
                 'prompt' => 'Which Eloquent models in this application have observers attached? List the observer class names.',
                 'required_key' => 'models.with_observers',
-                'conditions' => ['none', 'manual'],
+                'conditions' => ['none', 'manual', 'necromancer-mcp'],
                 'assertions' => [
                     'must_recall_from' => 'models.with_observers',
                     'must_not_contain' => ['no observer', 'does not have', 'observer does not exist'],
@@ -78,7 +78,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => "What does the {$model} model observer do, and which lifecycle events does it handle?",
             'required_key' => "models.observer_short_names.{$model}",
-            'conditions' => ['none', 'manual'],
+            'conditions' => ['none', 'manual', 'necromancer-mcp'],
             'assertions' => [
                 'must_recall_from' => "models.observer_short_names.{$model}",
                 'must_not_contain' => ['no observer', 'does not have an observer', 'observer does not exist'],
@@ -104,7 +104,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => 'What jobs exist in this application, and what are their queue names and retry settings?',
             'required_key' => 'jobs.named',
-            'conditions' => ['none', 'manual'],
+            'conditions' => ['none', 'manual', 'necromancer-mcp'],
             'assertions' => [
                 'must_recall_from' => 'jobs.named',
                 'must_not_contain' => ['no jobs', 'no queue'],
@@ -122,7 +122,7 @@ final class TaskSuiteGenerator
                 'type' => 'qa',
                 'prompt' => 'Which Eloquent models in this application declare casts? List the model names.',
                 'required_key' => 'models.with_casts',
-                'conditions' => ['none', 'manual'],
+                'conditions' => ['none', 'manual', 'necromancer-mcp'],
                 'assertions' => [
                     'must_recall_from' => 'models.with_casts',
                     'must_not_contain' => ['no casts', 'no models'],
@@ -136,7 +136,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => "What Eloquent casts are declared on the {$model} model?",
             'required_key' => "models.cast_keys.{$model}",
-            'conditions' => ['none', 'manual'],
+            'conditions' => ['none', 'manual', 'necromancer-mcp'],
             'assertions' => [
                 'must_recall_from' => "models.cast_keys.{$model}",
                 'must_not_contain' => ['no casts', "{$model} model does not exist"],
@@ -153,7 +153,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => 'Which Eloquent models have a corresponding policy registered in this application?',
             'required_key' => 'policies.models',
-            'conditions' => ['none', 'manual'],
+            'conditions' => ['none', 'manual', 'necromancer-mcp'],
             'assertions' => [
                 'must_recall_from' => 'policies.models',
                 'must_not_contain' => ['no policies'],

@@ -9,7 +9,7 @@ use LaravelNecromancer\Integrations\AiDetector;
 function promptCommandManifest(): string
 {
     return json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'generated_at' => now()->toISOString(),
             'laravel_version' => '13.0',
@@ -172,7 +172,7 @@ test('--output writes prompt to file and does not print to stdout', function () 
 
 test('emits warning when matched artifacts have no source and succeeds', function () {
     $manifest = json_encode([
-        'meta' => [
+        'meta' => ['manifest_schema_version' => 1,
             'app_name' => 'TestApp',
             'generated_at' => now()->toISOString(),
             'laravel_version' => '13.0',
