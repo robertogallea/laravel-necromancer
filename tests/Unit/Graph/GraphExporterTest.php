@@ -82,6 +82,42 @@ test('export() embeds the graph data directly in graph.html so it works over fil
         ->and($html)->not->toContain('fetch(');
 });
 
+test('export() embeds Select all / Select none controls that toggle every sidebar kind', function () {
+    $output = graphTempDir().'/graph';
+
+    $manifest = completeGraphManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $html = file_get_contents($output.'/graph.html');
+
+    expect($html)->toContain('id="select-all-kinds"')
+        ->and($html)->toContain('id="select-none-kinds"')
+        ->and($html)->toContain('kindCheckboxes.push({ checkbox: checkbox, kind: kind });')
+        ->and($html)->toContain('hiddenKinds[entry.kind] = false;')
+        ->and($html)->toContain('hiddenKinds[entry.kind] = true;');
+});
+
+test('export() embeds Zoom in / Zoom out controls wired to the shared zoom helper', function () {
+    $output = graphTempDir().'/graph';
+
+    $manifest = completeGraphManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $html = file_get_contents($output.'/graph.html');
+
+    expect($html)->toContain('id="zoom-in"')
+        ->and($html)->toContain('id="zoom-out"')
+        ->and($html)->toContain('function zoomBy(factor, cx, cy)')
+        ->and($html)->toContain("zoomBy(0.9, vb.x + vb.w / 2, vb.y + vb.h / 2);")
+        ->and($html)->toContain("zoomBy(1.1, vb.x + vb.w / 2, vb.y + vb.h / 2);");
+});
+
 test('export() writes derived edges to graph.json for an annotated manifest', function () {
     $output = graphTempDir().'/graph';
 

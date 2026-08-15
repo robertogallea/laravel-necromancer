@@ -84,6 +84,10 @@ final class GraphHtmlTemplate
   .kind-row .kind-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .kind-row .kind-count { color: var(--muted); font-size: 11px; }
 
+  .sidebar-actions { display: flex; gap: 6px; padding: 0 12px 8px; }
+  .sidebar-actions button { flex: 1; font: inherit; font-size: 11px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+  .sidebar-actions button:hover { border-color: var(--accent); }
+
   #edge-key { position: absolute; left: calc(var(--sidebar-w) + 16px); bottom: 16px; z-index: 11; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
   #edge-key .edge-key-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 6px; }
   .edge-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; cursor: pointer; }
@@ -116,11 +120,17 @@ final class GraphHtmlTemplate
     <h1>Necromancer Artifact Graph</h1>
     <div class="header-right">
       <div class="stats" id="stats"></div>
+      <button id="zoom-in" type="button">Zoom in</button>
+      <button id="zoom-out" type="button">Zoom out</button>
       <button id="reset-view" type="button">Reset view</button>
     </div>
   </header>
   <div id="sidebar">
     <div class="sidebar-title">Kinds</div>
+    <div class="sidebar-actions">
+      <button id="select-all-kinds" type="button">Select all</button>
+      <button id="select-none-kinds" type="button">Select none</button>
+    </div>
   </div>
   <svg id="graph"></svg>
   <div id="edge-key">
@@ -322,6 +332,7 @@ final class GraphHtmlTemplate
 
     var hiddenKinds = {};
     var edgeKindHidden = {};
+    var kindCheckboxes = [];
     var selectedNodeId = null;
 
     var edgeGroup = document.createElementNS(NS, 'g');
@@ -413,6 +424,7 @@ final class GraphHtmlTemplate
           hiddenKinds[kind] = !checkbox.checked;
           applyVisibility();
         });
+        kindCheckboxes.push({ checkbox: checkbox, kind: kind });
 
         var swatch = document.createElement('span');
         swatch.className = 'swatch';
@@ -434,6 +446,22 @@ final class GraphHtmlTemplate
       });
     }
     buildSidebar();
+
+    document.getElementById('select-all-kinds').addEventListener('click', function () {
+      kindCheckboxes.forEach(function (entry) {
+        entry.checkbox.checked = true;
+        hiddenKinds[entry.kind] = false;
+      });
+      applyVisibility();
+    });
+
+    document.getElementById('select-none-kinds').addEventListener('click', function () {
+      kindCheckboxes.forEach(function (entry) {
+        entry.checkbox.checked = false;
+        hiddenKinds[entry.kind] = true;
+      });
+      applyVisibility();
+    });
 
     Array.prototype.forEach.call(document.querySelectorAll('#edge-key .edge-row'), function (row) {
       var kind = row.getAttribute('data-edge-kind');
@@ -546,18 +574,30 @@ final class GraphHtmlTemplate
 
     document.getElementById('inspect-close').addEventListener('click', closeInspect);
 
+    function zoomBy(factor, cx, cy) {
+      var newW = Math.min(Math.max(vb.w * factor, 100), 20000);
+      var newH = Math.min(Math.max(vb.h * factor, 100), 20000);
+      vb.x = cx - (cx - vb.x) * (newW / vb.w);
+      vb.y = cy - (cy - vb.y) * (newH / vb.h);
+      vb.w = newW;
+      vb.h = newH;
+      applyViewBox();
+    }
+
     svg.addEventListener('wheel', function (event) {
       event.preventDefault();
       var factor = event.deltaY < 0 ? 0.9 : 1.1;
       var pt = clientToSvgPoint(event.clientX, event.clientY);
-      var newW = Math.min(Math.max(vb.w * factor, 100), 20000);
-      var newH = Math.min(Math.max(vb.h * factor, 100), 20000);
-      vb.x = pt.x - (pt.x - vb.x) * (newW / vb.w);
-      vb.y = pt.y - (pt.y - vb.y) * (newH / vb.h);
-      vb.w = newW;
-      vb.h = newH;
-      applyViewBox();
+      zoomBy(factor, pt.x, pt.y);
     }, { passive: false });
+
+    document.getElementById('zoom-in').addEventListener('click', function () {
+      zoomBy(0.9, vb.x + vb.w / 2, vb.y + vb.h / 2);
+    });
+
+    document.getElementById('zoom-out').addEventListener('click', function () {
+      zoomBy(1.1, vb.x + vb.w / 2, vb.y + vb.h / 2);
+    });
 
     svg.addEventListener('pointerdown', function (event) {
       if (event.target !== svg) { return; }
