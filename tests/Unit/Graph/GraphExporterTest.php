@@ -114,8 +114,8 @@ test('export() embeds Zoom in / Zoom out controls wired to the shared zoom helpe
     expect($html)->toContain('id="zoom-in"')
         ->and($html)->toContain('id="zoom-out"')
         ->and($html)->toContain('function zoomBy(factor, cx, cy)')
-        ->and($html)->toContain("zoomBy(0.9, vb.x + vb.w / 2, vb.y + vb.h / 2);")
-        ->and($html)->toContain("zoomBy(1.1, vb.x + vb.w / 2, vb.y + vb.h / 2);");
+        ->and($html)->toContain('zoomBy(0.9, vb.x + vb.w / 2, vb.y + vb.h / 2);')
+        ->and($html)->toContain('zoomBy(1.1, vb.x + vb.w / 2, vb.y + vb.h / 2);');
 });
 
 test('export() writes derived edges to graph.json for an annotated manifest', function () {
