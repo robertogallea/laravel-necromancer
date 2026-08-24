@@ -915,6 +915,7 @@ Route::singleton('profile', ProfileController::class)->withNecromancer(domain: '
           <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Never reads <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">.env</code> or raw configuration values</li>
           <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Never collects or stores application secrets</li>
           <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Horizon, Telescope, and Debugbar routes excluded by default</li>
+          <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Livewire's unnamed asset routes and Inertia's local DevTools routes excluded by default too</li>
           <li class="flex items-start gap-2"><span class="text-red-700 mt-0.5">—</span> Exclusions apply to every downstream command (map, audit, generate) — excluded artifacts never appear in results</li>
         </ul>
         <div class="mt-4 code-block relative">
