@@ -79,8 +79,16 @@ trait ReadsManifest
         ], 'is_dir');
 
         foreach ($sourcePaths as $dir) {
-            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir)) as $file) {
-                if ($file->isFile() && $file->getMTime() > $threshold) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+
+            foreach ($iterator as $file) {
+                if (! $file->isFile() || $file->getExtension() !== 'php') {
+                    continue;
+                }
+
+                if ($file->getMTime() > $threshold) {
                     return true;
                 }
             }

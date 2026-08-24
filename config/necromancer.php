@@ -10,7 +10,7 @@ return [
             'boost.*', 'storage.*',
             'password.*', 'verification.*', 'login', 'logout', 'register',
         ],
-        'route_uris' => ['up'],
+        'route_uris' => ['up', 'livewire-*', '_inertia/devtools*'],
         'models' => [],
         'tests' => [],
     ],

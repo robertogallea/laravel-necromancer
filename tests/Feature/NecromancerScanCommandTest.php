@@ -414,6 +414,33 @@ test('the scan command respects configured route exclusions', function () {
         ->toContain('necromancer.public-route');
 });
 
+test('the scan command excludes default Livewire and Inertia DevTools routes by URI', function () {
+    $path = necromancerScanTestPath('necromancer-routes-default-uri-exclusions.json');
+
+    Route::get('/livewire-b02e7ba0/livewire.min.js.map', function () {
+        return 'livewire source map';
+    });
+
+    Route::get('/_inertia/devtools/entries', function () {
+        return 'inertia devtools entries';
+    });
+
+    Route::get('/necromancer/unnamed-application-route', function () {
+        return 'unnamed application route';
+    });
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->expectsOutputToContain($path)
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    expect(manifestRouteUris($manifest))
+        ->not->toContain('livewire-b02e7ba0/livewire.min.js.map')
+        ->not->toContain('_inertia/devtools/entries')
+        ->toContain('necromancer/unnamed-application-route');
+});
+
 test('the scan command captures route parameters with optionality and constraints', function () {
     $path = necromancerScanTestPath('necromancer-routes-parameters.json');
 
@@ -1846,6 +1873,14 @@ function manifestRouteNames(stdClass $manifest): array
 {
     return array_map(
         static fn (stdClass $route): ?string => $route->name,
+        $manifest->artifacts->routes ?? [],
+    );
+}
+
+function manifestRouteUris(stdClass $manifest): array
+{
+    return array_map(
+        static fn (stdClass $route): string => $route->uri,
         $manifest->artifacts->routes ?? [],
     );
 }
