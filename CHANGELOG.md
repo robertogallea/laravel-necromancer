@@ -5,6 +5,12 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `necromancer:scan --diff --fail-on-drift` now detects changes to existing artifacts, not only added/removed artifact IDs. Drift is decided by `meta.content_hash`, falling back to an artifact-level diff when the stored manifest has none. Changed artifacts are listed with `~`, and a hash mismatch with no artifact-level change (different scan scope or schema) is reported and fails the gate. Any edit to an artifact's source file (which changes its `source.hash`) now counts as drift. ([#50](https://github.com/robertogallea/laravel-necromancer/issues/50))
+
 ## 2.0.1
 
 - remove non .php files from the staleness check

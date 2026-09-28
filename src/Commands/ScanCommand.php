@@ -7,7 +7,7 @@ namespace LaravelNecromancer\Commands;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
-use LaravelNecromancer\Manifest\ArtifactId;
+use LaravelNecromancer\Diff\ManifestDiffer;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ScanManifest;
@@ -81,77 +81,71 @@ final class ScanCommand extends Command
             return self::FAILURE;
         }
 
-        $oldArtifacts = is_array($old['artifacts']) ? $old['artifacts'] : [];
-        $newArtifacts = is_array($new['artifacts']) ? $new['artifacts'] : [];
+        // Round-trip the fresh payload through JSON so it compares like the decoded manifest on disk.
+        $new = (array) json_decode(json_encode($new, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
 
-        $allTypes = array_unique(array_merge(array_keys($oldArtifacts), array_keys($newArtifacts)));
-        sort($allTypes);
-
-        $changedTypes = [];
-
-        foreach ($allTypes as $type) {
-            $oldKeys = array_map(
-                fn (array $item): string => $this->artifactKey($type, $item),
-                array_map(fn ($item): array => (array) $item, (array) ($oldArtifacts[$type] ?? [])),
+        try {
+            $diff = (new ManifestDiffer)->diff(
+                is_array($old['artifacts'] ?? null) ? $old['artifacts'] : [],
+                is_array($new['artifacts'] ?? null) ? $new['artifacts'] : [],
             );
-            $newKeys = array_map(
-                fn (array $item): string => $this->artifactKey($type, $item),
-                array_map(fn ($item): array => (array) $item, (array) ($newArtifacts[$type] ?? [])),
-            );
+        } catch (InvalidArgumentException $exception) {
+            $this->error("Manifest contains an artifact with no canonical key: {$exception->getMessage()}");
 
-            $added = array_values(array_diff($newKeys, $oldKeys));
-            $removed = array_values(array_diff($oldKeys, $newKeys));
-
-            if ($added !== [] || $removed !== []) {
-                $changedTypes[$type] = ['added' => $added, 'removed' => $removed];
-            }
+            return self::FAILURE;
         }
 
-        if ($changedTypes === []) {
+        $storedHash = $old['meta']['content_hash'] ?? null;
+        $isCurrent = is_string($storedHash) && $storedHash !== ''
+            ? $storedHash === ($new['meta']['content_hash'] ?? null)
+            : $diff->isEmpty();
+
+        if ($isCurrent) {
             $this->info('No changes detected.');
 
             return self::SUCCESS;
         }
 
-        foreach ($changedTypes as $type => $changes) {
-            $addCount = count($changes['added']);
-            $removeCount = count($changes['removed']);
-            $this->line('');
-            $this->line("<fg=yellow>{$type}</> (+{$addCount} / -{$removeCount})");
+        if ($diff->isEmpty()) {
+            $this->warn('Manifest content hash differs (scan scope or schema) but no artifact-level changes were found.');
 
-            foreach ($changes['added'] as $key) {
-                $this->line("  <fg=green>+</> {$key}");
+            return $this->option('fail-on-drift') ? self::FAILURE : self::SUCCESS;
+        }
+
+        $types = array_unique(array_merge(array_keys($diff->added), array_keys($diff->removed), array_keys($diff->changed)));
+        sort($types);
+
+        foreach ($types as $type) {
+            $added = $diff->added[$type] ?? [];
+            $removed = $diff->removed[$type] ?? [];
+            $changed = $diff->changed[$type] ?? [];
+
+            $this->line('');
+            $this->line("<fg=yellow>{$type}</> (+".count($added).' / -'.count($removed).' / ~'.count($changed).')');
+
+            foreach ($added as $artifact) {
+                $this->line("  <fg=green>+</> {$artifact['id']}");
             }
 
-            foreach ($changes['removed'] as $key) {
-                $this->line("  <fg=red>-</> {$key}");
+            foreach ($removed as $artifact) {
+                $this->line("  <fg=red>-</> {$artifact['id']}");
+            }
+
+            foreach ($changed as $change) {
+                $this->line("  <fg=cyan>~</> {$change['to']['id']}");
             }
         }
 
-        $total = array_sum(array_map(
-            fn (array $c): int => count($c['added']) + count($c['removed']),
-            $changedTypes,
-        ));
+        $total = $diff->totalAdditions() + $diff->totalRemovals() + $diff->totalChanges();
 
         $this->line('');
-        $this->line("{$total} change(s) across ".count($changedTypes).' type(s).');
+        $this->line("{$total} change(s) across ".count($types).' type(s).');
 
         if ($this->option('fail-on-drift')) {
             return self::FAILURE;
         }
 
         return self::SUCCESS;
-    }
-
-    private function artifactKey(string $type, array $item): string
-    {
-        $id = $item['id'] ?? null;
-
-        if (is_string($id) && $id !== '') {
-            return $id;
-        }
-
-        return (new ArtifactId)->for($type, $item);
     }
 
     private function resolveOutputPath(): string

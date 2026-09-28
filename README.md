@@ -212,9 +212,11 @@ Keys must be exact IDs — there is no wildcard or pattern syntax, and an unreso
 Check for manifest drift without writing a new file (CI use):
 
 ```bash
-php artisan necromancer:scan --diff                         # show added/removed artifacts
+php artisan necromancer:scan --diff                         # show added/removed/changed artifacts
 php artisan necromancer:scan --diff --fail-on-drift        # exit 1 when drift detected
 ```
+
+Drift means the freshly scanned manifest's `meta.content_hash` differs from the one on disk. A manifest with no `content_hash` is compared artifact by artifact instead. Any change to an existing artifact counts, including an edit to its source file that only changes the recorded `source.hash`, such as reformatting. Changed artifacts are listed with `~`. If the hashes differ but no individual artifact changed (for example, after a schema or hashing change between Necromancer versions), the command says so and still treats it as drift.
 
 ### Step 2 — Explore (optional)
 

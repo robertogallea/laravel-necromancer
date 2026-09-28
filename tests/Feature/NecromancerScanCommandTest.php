@@ -1180,6 +1180,112 @@ test('--diff does not write a new manifest to disk', function () {
     expect(File::get($path))->toBe($originalContent);
 });
 
+test('--diff --fail-on-drift fails when an existing artifact changed without changing its ID', function () {
+    $path = necromancerScanTestPath('necromancer-diff-changed.json');
+
+    useNecromancerFixtureModels();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+    $changedId = $manifest['artifacts']['models'][0]['id'];
+    $manifest['artifacts']['models'][0]['table'] = 'stale_table_name';
+    $manifest['meta']['content_hash'] = hash('sha256', 'stale manifest');
+    File::put($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true, '--fail-on-drift' => true])
+        ->expectsOutputToContain("~ {$changedId}")
+        ->doesntExpectOutputToContain('No changes detected.')
+        ->assertExitCode(1);
+});
+
+test('--diff without --fail-on-drift reports a changed artifact but succeeds', function () {
+    $path = necromancerScanTestPath('necromancer-diff-changed-no-fail.json');
+
+    useNecromancerFixtureModels();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+    $changedId = $manifest['artifacts']['models'][0]['id'];
+    $manifest['artifacts']['models'][0]['table'] = 'stale_table_name';
+    $manifest['meta']['content_hash'] = hash('sha256', 'stale manifest');
+    File::put($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true])
+        ->expectsOutputToContain("~ {$changedId}")
+        ->expectsOutputToContain('1 change(s) across 1 type(s).')
+        ->assertSuccessful();
+});
+
+test('--diff --fail-on-drift fails when the content hash differs even without artifact-level changes', function () {
+    $path = necromancerScanTestPath('necromancer-diff-hash-mismatch.json');
+
+    useNecromancerFixtureModels();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+    $manifest['meta']['content_hash'] = str_repeat('0', 64);
+    File::put($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true, '--fail-on-drift' => true])
+        ->expectsOutputToContain('Manifest content hash differs')
+        ->doesntExpectOutputToContain('No changes detected.')
+        ->assertExitCode(1);
+});
+
+test('--diff --fail-on-drift succeeds on an unchanged codebase', function () {
+    $path = necromancerScanTestPath('necromancer-diff-unchanged-fail-on-drift.json');
+
+    useNecromancerFixtureModels();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true, '--fail-on-drift' => true])
+        ->expectsOutputToContain('No changes detected.')
+        ->assertSuccessful();
+});
+
+test('--diff --fail-on-drift trusts a matching content hash over an artifact-level difference', function () {
+    $path = necromancerScanTestPath('necromancer-diff-hash-match.json');
+
+    useNecromancerFixtureModels();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+    $manifest['artifacts']['models'][0]['table'] = 'hand_edited_table_name';
+    File::put($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true, '--fail-on-drift' => true])
+        ->expectsOutputToContain('No changes detected.')
+        ->assertSuccessful();
+});
+
+test('--diff --fail-on-drift falls back to the artifact-level diff when the manifest has no content hash', function () {
+    $path = necromancerScanTestPath('necromancer-diff-no-hash.json');
+
+    useNecromancerFixtureModels();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+    unset($manifest['meta']['content_hash']);
+    $unchanged = json_encode($manifest, JSON_THROW_ON_ERROR);
+    $manifest['artifacts']['models'][] = [...$manifest['artifacts']['models'][0], 'id' => 'models:App\\Models\\Gone', 'class' => 'App\\Models\\Gone'];
+
+    File::put($path, $unchanged);
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true, '--fail-on-drift' => true])
+        ->expectsOutputToContain('No changes detected.')
+        ->assertSuccessful();
+
+    File::put($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+    $this->artisan('necromancer:scan', ['--output' => $path, '--diff' => true, '--fail-on-drift' => true])
+        ->expectsOutputToContain('- models:App\\Models\\Gone')
+        ->assertExitCode(1);
+});
+
 test('the content_hash is identical across consecutive scans of the same codebase', function () {
     $path = necromancerScanTestPath('necromancer-content-hash-stability.json');
 
@@ -2247,6 +2353,12 @@ function cleanNecromancerScanTestFiles(): void
         necromancerScanTestPath('necromancer-diff-unchanged.json'),
         necromancerScanTestPath('necromancer-diff-added.json'),
         necromancerScanTestPath('necromancer-diff-no-write.json'),
+        necromancerScanTestPath('necromancer-diff-changed.json'),
+        necromancerScanTestPath('necromancer-diff-changed-no-fail.json'),
+        necromancerScanTestPath('necromancer-diff-hash-mismatch.json'),
+        necromancerScanTestPath('necromancer-diff-unchanged-fail-on-drift.json'),
+        necromancerScanTestPath('necromancer-diff-hash-match.json'),
+        necromancerScanTestPath('necromancer-diff-no-hash.json'),
         necromancerScanTestPath('necromancer-enums-backed.json'),
         necromancerScanTestPath('necromancer-only-enums.json'),
         necromancerScanTestPath('necromancer-tests-basic.json'),
