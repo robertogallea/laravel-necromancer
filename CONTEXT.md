@@ -36,6 +36,14 @@ _Avoid_: Annotation, arbitrary data
 A deterministic identifier that uniquely distinguishes an artifact by its type and natural identity.
 _Avoid_: OKF filename, display name
 
+**Action**:
+A single-purpose application class that encapsulates one business operation behind one or more public entrypoint methods.
+_Avoid_: Service, Livewire action, controller action
+
+**Entrypoint**:
+A public method through which an Action's business operation is invoked.
+_Avoid_: Handler, action method
+
 **Knowledge Bundle**:
 A portable collection of interlinked knowledge documents generated to make an application's architecture understandable to people and AI systems.
 _Avoid_: OKF package, metadata dump

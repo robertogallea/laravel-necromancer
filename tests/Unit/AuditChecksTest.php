@@ -657,3 +657,12 @@ test('MissingLocalAdrFileCheck ignores artifacts without adrs', function () {
 
     rmdir($basePath);
 });
+
+test('HighRiskArtifactsWithoutAdrCheck flags a high-risk action with no ADR reference', function () {
+    $result = (new HighRiskArtifactsWithoutAdrCheck)->run(['actions' => [
+        ['class' => 'App\\Actions\\CancelOrder', 'annotations' => ['risk' => 'high'], 'source' => null],
+    ]]);
+
+    expect($result->findings)->toHaveCount(1)
+        ->and($result->findings[0]->message)->toBe('High-risk actions without an ADR reference: App\\Actions\\CancelOrder');
+});

@@ -61,7 +61,7 @@
     <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-2 sm:gap-3 min-w-0">
         <span class="font-display font-semibold text-red-400 tracking-tight text-sm sm:text-base whitespace-nowrap">Laravel Necromancer</span>
-        <span class="text-xs text-gray-600 font-mono hidden sm:inline">v2.0</span>
+        <span class="text-xs text-gray-600 font-mono hidden sm:inline">v2.2</span>
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm text-gray-400">
         <a href="#artifacts" class="hover:text-red-400 transition-colors">Artifacts</a>
@@ -141,7 +141,7 @@ Compact context written to CLAUDE.md</pre>
   <section id="artifacts" class="py-16 px-4 border-b border-gray-800">
     <div class="max-w-5xl mx-auto">
       <h2 class="font-display text-2xl font-bold text-red-400 mb-2">What Necromancer Collects</h2>
-      <p class="text-gray-500 mb-8">The manifest covers 18 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection.</p>
+      <p class="text-gray-500 mb-8">The manifest covers 19 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
@@ -188,66 +188,72 @@ Compact context written to CLAUDE.md</pre>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
           <div class="text-gray-700 font-mono text-xs mb-1">08</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">actions</div>
+          <div class="text-gray-500 text-sm">Entrypoint methods with parameter and return types (<code class="font-mono text-xs">app/Actions</code>)</div>
+        </div>
+
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">09</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">policies</div>
           <div class="text-gray-500 text-sm">Model, policy methods</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">09</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">10</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">enums</div>
           <div class="text-gray-500 text-sm">Backing type, cases</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">10</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">11</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">tests</div>
           <div class="text-gray-500 text-sm">File, type (unit/feature), subject class, test methods</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">11</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">12</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">observers</div>
           <div class="text-gray-500 text-sm">Model, lifecycle hooks, queued status</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">12</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">13</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">scheduled_tasks</div>
           <div class="text-gray-500 text-sm">Command, cron expression, human-readable schedule, flags</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">13</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">14</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">middleware</div>
           <div class="text-gray-500 text-sm">Alias, class, scope (global/group/alias), group name</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">14</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">15</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">livewire_components</div>
           <div class="text-gray-500 text-sm">View, public properties with types, action methods, listened events</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">15</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">16</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">gates</div>
           <div class="text-gray-500 text-sm">Ability, kind (closure/class/before_hook/after_hook), parameters</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">16</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">17</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">mailables</div>
           <div class="text-gray-500 text-sm">Subject, queued status, queue name, view/markdown template</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">17</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">18</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">validation_rules</div>
           <div class="text-gray-500 text-sm">Implicit flag, docblock description</div>
         </div>
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
-          <div class="text-gray-700 font-mono text-xs mb-1">18</div>
+          <div class="text-gray-700 font-mono text-xs mb-1">19</div>
           <div class="font-mono font-semibold text-gray-300 text-sm mb-1">service_providers</div>
           <div class="text-gray-500 text-sm">Deferred flag, source location</div>
         </div>
@@ -273,7 +279,7 @@ Compact context written to CLAUDE.md</pre>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background: hsl(160,65%,60%)"></span>policies</span>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background: hsl(208,65%,60%)"></span>commands</span>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background: hsl(31,65%,60%)"></span>form_requests</span>
-          <span class="text-gray-700">+ 12 more kinds, each colored the same way every time</span>
+          <span class="text-gray-700">+ 13 more kinds, each colored the same way every time</span>
         </div>
       </div>
 
@@ -387,7 +393,7 @@ php artisan necromancer:audit --fail-on=warning    <span class="text-gray-600">#
   Validation Coverage       ████████░░  80%  (8/10 write routes with FormRequest)
   Async Clarity             ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary       ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
-  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs)
+  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs · 2/3 actions)
   Artifact Annotation Cov.  ████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.</pre>

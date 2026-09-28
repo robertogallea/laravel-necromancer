@@ -250,12 +250,14 @@ final class DoctorAnalyzer
         $tests = (array) ($this->artifacts['tests'] ?? []);
         $models = (array) ($this->artifacts['models'] ?? []);
         $jobs = (array) ($this->artifacts['jobs'] ?? []);
+        $actions = (array) ($this->artifacts['actions'] ?? []);
 
         $modelTotal = count($models);
         $jobTotal = count($jobs);
+        $actionTotal = count($actions);
         $testsScanned = array_key_exists('tests', $this->artifacts);
 
-        if (! $testsScanned || ($modelTotal === 0 && $jobTotal === 0)) {
+        if (! $testsScanned || ($modelTotal === 0 && $jobTotal === 0 && $actionTotal === 0)) {
             return new DimensionResult('test-presence', 'Test Presence', 1.0, 'N/A', 0.10);
         }
 
@@ -283,6 +285,15 @@ final class DoctorAnalyzer
             ));
             $ratios[] = $jobsWithTests / $jobTotal;
             $detailParts[] = "{$jobsWithTests}/{$jobTotal} jobs";
+        }
+
+        if ($actionTotal > 0) {
+            $actionsWithTests = count(array_filter(
+                $actions,
+                fn (array $a): bool => TestSubjectMatcher::matches($a['class'] ?? '', $testedSubjects),
+            ));
+            $ratios[] = $actionsWithTests / $actionTotal;
+            $detailParts[] = "{$actionsWithTests}/{$actionTotal} actions";
         }
 
         $score = array_sum($ratios) / count($ratios);

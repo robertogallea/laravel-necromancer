@@ -14,7 +14,7 @@ final class ArtifactId
      * @var list<string>
      */
     private const TYPES = [
-        'routes', 'models', 'form_requests', 'jobs', 'events', 'listeners',
+        'routes', 'models', 'form_requests', 'actions', 'jobs', 'events', 'listeners',
         'commands', 'policies', 'enums', 'tests', 'observers', 'scheduled_tasks',
         'middleware', 'livewire_components', 'gates', 'mailables',
         'validation_rules', 'service_providers',
@@ -82,7 +82,7 @@ final class ArtifactId
             'tests' => 'tests:'.$this->repositoryPath($this->required($artifact, 'file', $type)),
             'middleware' => $this->middlewareId($artifact),
             'gates', 'scheduled_tasks' => throw new InvalidArgumentException("{$type} Artifact IDs require collection context."),
-            'models', 'form_requests', 'jobs', 'events', 'listeners', 'commands', 'policies', 'enums', 'observers', 'livewire_components', 'mailables', 'validation_rules', 'service_providers' => $type.':'.$this->className($artifact, $type),
+            'models', 'form_requests', 'actions', 'jobs', 'events', 'listeners', 'commands', 'policies', 'enums', 'observers', 'livewire_components', 'mailables', 'validation_rules', 'service_providers' => $type.':'.$this->className($artifact, $type),
             default => throw new InvalidArgumentException("Unsupported artifact type '{$type}'."),
         };
     }

@@ -2,7 +2,7 @@
   <img src="docs/banner.png" alt="Laravel Necromancer" width="100%">                                                                                                              
 </p>
 
-Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, jobs, events, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers, and more.
+Laravel Necromancer scans your bootstrapped Laravel application and builds a structured, machine-readable inventory called the **manifest**. From that manifest you can display a terminal map of your application, run an AI-readability audit, and generate a Markdown context file that AI coding agents can load as ambient context — so they always have an accurate picture of your routes, models, actions, jobs, events, observers, scheduled tasks, middleware, Livewire components, gates, mailables, validation rules, service providers, and more.
 
 ## Contents
 
@@ -36,7 +36,7 @@ Laravel Necromancer scans your bootstrapped Laravel application and builds a str
 
 ## What Necromancer Collects
 
-The manifest covers 18 artifact types across the full Laravel application structure:
+The manifest covers 19 artifact types across the full Laravel application structure:
 
 | Type | What it surfaces |
 |---|---|
@@ -47,6 +47,7 @@ The manifest covers 18 artifact types across the full Laravel application struct
 | `listeners` | Handled events, queued status |
 | `commands` | Signature, description, aliases |
 | `form_requests` | Rules, stop_on_first_failure, error_bag |
+| `actions` | Entrypoint methods with parameter and return types (classes under `app/Actions`) |
 | `policies` | Model, policy methods |
 | `enums` | Backing type, cases |
 | `tests` | File, type (unit/feature), subject class, test methods |
@@ -61,7 +62,7 @@ The manifest covers 18 artifact types across the full Laravel application struct
 
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
-Every class-backed type in the table above — `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
+Every class-backed type in the table above — `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
 
 ## Requirements
 
@@ -106,6 +107,36 @@ php artisan necromancer:scan --only=observers,scheduled_tasks,gates
 Necromancer reads PHP attributes (`#[ObservedBy]`, `#[Queue]`, `#[Aliases]`, `#[Authorize]`, etc.) as primary sources alongside class properties. Codebases using the attribute-based API introduced in Laravel 11+ are fully supported — jobs configured via `#[Queue]`/`#[Tries]`/`#[Timeout]`, models with `#[ObservedBy]`/`#[ScopedBy]`, and commands with `#[Aliases]` all appear correctly in the manifest.
 
 Test files in `tests/Unit/` and `tests/Feature/` are scanned and included as a `tests` artifact type. Both Pest functional-style files (`test()`/`it()` calls) and class-based PHPUnit tests are supported. Subject classes are inferred from `uses()` declarations and filename convention (`OrderTest.php` → `App\Models\Order`).
+
+Action classes — single-purpose classes that encapsulate one business operation — are collected from `app/Actions` (including subfolders) as an `actions` artifact type. Any concrete class there with at least one **entrypoint** (a public, non-static method declared on the class itself; `__invoke` counts, other magic methods and inherited methods don't) is included, with its entrypoints' parameter names/types and return type:
+
+```php
+#[Necromancer(domain: 'orders', flow: 'order-cancellation', risk: Risk::High)]
+final class CancelOrder
+{
+    public function handle(Order $order, User $actor): Order { /* ... */ }
+}
+```
+
+```json
+{
+    "id": "actions:App\\Actions\\CancelOrder",
+    "class": "App\\Actions\\CancelOrder",
+    "entrypoints": [
+        {
+            "name": "handle",
+            "parameters": [
+                { "name": "order", "type": "App\\Models\\Order" },
+                { "name": "actor", "type": "App\\Models\\User" }
+            ],
+            "return_type": "App\\Models\\Order"
+        }
+    ],
+    "annotations": { "domain": "orders", "flow": "order-cancellation", "risk": "high" }
+}
+```
+
+Classes under `app/Actions` with no entrypoint (DTOs, exceptions, helpers), abstract classes, interfaces, traits, and enums are skipped. Only a class-level `#[Necromancer]` applies to an Action — a method-level attribute on an entrypoint is ignored. The class types an Action's entrypoints accept become an `operates_on` relationship in the OKF bundle and the Artifact Graph. Only `app/Actions` is scanned: Actions living elsewhere (e.g. `app/Domain/*/Actions`) are not discovered.
 
 On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself. The `withNecromancer()` route macro declares it:
 
@@ -166,7 +197,7 @@ final class SendInvoiceEmail implements ShouldQueue
 }
 ```
 
-The attribute is a single, non-repeatable declaration and applies directly to every class-backed artifact type: models, form requests, jobs, events, listeners, commands, policies, enums, observers, Livewire components, mailables, validation rules, and service providers.
+The attribute is a single, non-repeatable declaration and applies directly to every class-backed artifact type: models, form requests, actions, jobs, events, listeners, commands, policies, enums, observers, Livewire components, mailables, validation rules, and service providers.
 
 On a controller, a class-level attribute supplies defaults for every action, and a method-level attribute refines them — the action wins for any field it declares, silently, with no warning:
 
@@ -272,7 +303,7 @@ Each dimension shows a progress bar, a percentage, and a detail line:
   Validation Coverage       ████████░░  80%  (8/10 write routes with FormRequest)
   Async Clarity             ████████░░  83%  (4/5 jobs configured · 4/4 events with listeners)
   Codebase Vocabulary       ██████░░░░  63%  (5/8 commands described · 1/1 backed enums)
-  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs)
+  Test Presence             ████████░░  80%  (4/5 models · 3/3 jobs · 2/3 actions)
   Artifact Annotation Cov.  ████████░░  83%  (5/6 tagged with domain · 2/2 high-risk with ADR · 1/2 external-service artifacts tested · 4/4 flow-consistent)
 
   Tip: run necromancer:audit for a detailed findings list.
@@ -343,7 +374,7 @@ php artisan necromancer:generate --only=observers,scheduled_tasks
 php artisan necromancer:generate --only=gates,middleware,mailables
 ```
 
-Supported types: `routes`, `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`.
+Supported types: `routes`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`.
 
 Exclude specific sections instead of listing everything you want:
 
@@ -729,7 +760,7 @@ Output replacement is safe to interrupt: the whole bundle is built in a temporar
 
 #### Relationships, Domain/Flow concepts, and ADRs
 
-When an artifact's already-collected fields name another artifact by class — a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model` — the Artifact Concept's body gains a `## Relationships` section rendering each as a Markdown link to that artifact's own concept file when it's resolvable in the bundle, or as plain text when it isn't (a vendor class, or one Necromancer didn't collect):
+When an artifact's already-collected fields name another artifact by class — a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model`, an action's `operates_on` (the class types its entrypoints accept) — the Artifact Concept's body gains a `## Relationships` section rendering each as a Markdown link to that artifact's own concept file when it's resolvable in the bundle, or as plain text when it isn't (a vendor class, or one Necromancer didn't collect):
 
 ```markdown
 ## Relationships
@@ -850,7 +881,7 @@ php artisan necromancer:graph
 
 Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact plus their relationships, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. Every collected artifact appears as a node, colored by kind; three kinds of edges connect them:
 
-- **structural** — the same relationship taxonomy the OKF Knowledge Bundle renders: a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model`.
+- **structural** — the same relationship taxonomy the OKF Knowledge Bundle renders: a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model`, an action's `operates_on` (the class types its entrypoints accept).
 - **grouping** — an artifact declaring `domain` or `flow` connects to that group (e.g. every artifact tagged `domain: billing` links to `domain:billing`).
 - **reference** — an artifact declaring a local `adrs` entry connects to it (e.g. `adr:docs/adr/0004-x.md`); absolute-URI ADRs are skipped, the same way the OKF bundle leaves them as external links rather than copied concepts.
 
@@ -887,7 +918,7 @@ php artisan necromancer:graph --output=dist/graph # write elsewhere
 | `necromancer:map` | Display the manifest in the terminal | `--type=TYPE` |
 | `necromancer:audit` | Run the AI-readability audit (violation list) | `--format=text\|json\|markdown`, `--output=PATH`, `--fail-on=SEVERITY` |
 | `necromancer:doctor` | Show the AI readability score (percentage dashboard) | `--json`, `--min-score=N`, `--only=KEYS` |
-| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (18 types: routes, models, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
+| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (19 types: routes, models, actions, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
 | `necromancer:ask` | Ask a question about your codebase via AI | `--provider=`, `--model=` |
 | `necromancer:inspect-payload` | Show the AI payload size and content for `necromancer:ask` | `--privacy` |
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
@@ -1000,7 +1031,7 @@ When [Laravel MCP](https://github.com/laravel/mcp) is installed, Necromancer aut
 | `query_artifacts` | List artifacts of any current type, optionally filtered by JSON substring |
 | `search_artifacts` | Full-text search across all artifact types |
 
-Use `query_artifacts` when you already know the artifact type (`routes`, `models`, `form_requests`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
+Use `query_artifacts` when you already know the artifact type (`routes`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
 
 When `laravel/mcp` is present, Necromancer also writes its entry into `.mcp.json` automatically on the first `php artisan` run after installation — no manual configuration needed. If `.mcp.json` already exists, the entry is merged without touching other servers.
 

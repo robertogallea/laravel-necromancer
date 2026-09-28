@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Manifest;
 
 use Illuminate\Support\Str;
 use JsonSerializable;
+use LaravelNecromancer\Manifest\ArtifactPayloads\ActionPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\CommandPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EnumPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EventPayload;
@@ -385,6 +386,22 @@ final readonly class StructuralArtifact implements JsonSerializable
             properties: $properties,
             actions: $actions,
             listens: $listens,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ), $annotations);
+    }
+
+    /**
+     * @param  list<array{name: string, parameters: list<array{name: string, type: string|null}>, return_type: string|null}>  $entrypoints
+     */
+    public static function action(
+        string $class,
+        array $entrypoints = [],
+        ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
+    ): self {
+        return new self('actions', new ActionPayload(
+            class: $class,
+            entrypoints: $entrypoints,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ), $annotations);
     }

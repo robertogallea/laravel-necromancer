@@ -1166,7 +1166,7 @@ test('--only with an unknown type fails with an actionable error', function () {
     ], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:generate', ['--only' => 'foo'])
-        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, models, form_requests, jobs, events, listeners, commands')
+        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, models, form_requests, actions, jobs, events, listeners, commands')
         ->assertFailed();
 });
 
@@ -1656,7 +1656,7 @@ test('--except with an unknown type fails with an actionable error', function ()
     ], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:generate', ['--except' => 'foo'])
-        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, models, form_requests, jobs, events, listeners, commands')
+        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, models, form_requests, actions, jobs, events, listeners, commands')
         ->assertFailed();
 });
 
@@ -2577,6 +2577,91 @@ test('a manifest with no mailables does not include a mailables section', functi
     $this->artisan('necromancer:generate')->assertSuccessful();
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Mailables');
+});
+
+// Actions section
+
+function writeNecromancerActionsManifest(): void
+{
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
+        'artifacts' => [
+            'form_requests' => [
+                ['class' => 'App\\Http\\Requests\\StoreOrderRequest', 'source' => null],
+            ],
+            'actions' => [
+                [
+                    'class' => 'App\\Actions\\CancelOrder',
+                    'entrypoints' => [
+                        [
+                            'name' => 'handle',
+                            'parameters' => [
+                                ['name' => 'order', 'type' => 'App\\Models\\Order'],
+                                ['name' => 'actor', 'type' => '?App\\Models\\User'],
+                            ],
+                            'return_type' => 'App\\Models\\Order',
+                        ],
+                        ['name' => 'undo', 'parameters' => [['name' => 'reason', 'type' => null]], 'return_type' => null],
+                    ],
+                    'source' => ['file' => 'app/Actions/CancelOrder.php', 'line' => 12],
+                    'annotations' => ['domain' => 'orders', 'risk' => 'high'],
+                ],
+            ],
+            'jobs' => [
+                ['class' => 'App\\Jobs\\SendInvoice', 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+}
+
+test('a manifest with actions renders an actions section between form requests and jobs', function () {
+    writeNecromancerActionsManifest();
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+
+    expect($content)->toContain('## Actions (1)')
+        ->and($content)->toContain('| Action | Entrypoints | Architectural Context | Source |')
+        ->and($content)->toContain('| CancelOrder | handle(Order $order, ?User $actor): Order, undo($reason) | domain: orders · risk: high | app/Actions/CancelOrder.php:12 |')
+        ->and(strpos($content, '## Form Requests'))->toBeLessThan(strpos($content, '## Actions'))
+        ->and(strpos($content, '## Actions'))->toBeLessThan(strpos($content, '## Jobs'));
+});
+
+test('actions without annotations omit the Architectural Context column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
+        'artifacts' => [
+            'actions' => [
+                ['class' => 'App\\Actions\\RefundOrder', 'entrypoints' => [['name' => '__invoke', 'parameters' => [], 'return_type' => 'void']], 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+
+    expect($content)->toContain('| Action | Entrypoints |')
+        ->and($content)->toContain('| RefundOrder | __invoke(): void |')
+        ->and($content)->not->toContain('Architectural Context');
+});
+
+test('the actions section honours --only and --except', function () {
+    writeNecromancerActionsManifest();
+
+    $this->artisan('necromancer:generate', ['--only' => 'actions', '--force' => true])->assertSuccessful();
+
+    $only = File::get(base_path('NECROMANCER.md'));
+
+    $this->artisan('necromancer:generate', ['--except' => 'actions', '--force' => true])->assertSuccessful();
+
+    $except = File::get(base_path('NECROMANCER.md'));
+
+    expect($only)->toContain('## Actions (1)')
+        ->and($only)->not->toContain('## Jobs')
+        ->and($except)->not->toContain('## Actions')
+        ->and($except)->toContain('## Jobs');
 });
 
 // Validation Rules section
