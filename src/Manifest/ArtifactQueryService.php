@@ -10,6 +10,7 @@ final class ArtifactQueryService
         'routes',
         'models',
         'form_requests',
+        'actions',
         'jobs',
         'events',
         'listeners',

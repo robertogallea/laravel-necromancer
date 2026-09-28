@@ -89,3 +89,19 @@ test('fromDiff flags artifacts across multiple types, not just routes', function
         ->and($types)->toContain('jobs')
         ->and($types)->toContain('models');
 });
+
+test('fromDiff flags an added high-risk action', function () {
+    $diff = new ManifestDiff(
+        added: ['actions' => [
+            ['class' => 'App\\Actions\\CancelOrder', 'annotations' => ['domain' => 'orders', 'risk' => 'high']],
+        ]],
+        removed: [],
+        changed: [],
+    );
+
+    $flagged = FlaggedArtifacts::fromDiff($diff);
+
+    expect($flagged)->toHaveCount(1)
+        ->and($flagged[0]['type'])->toBe('actions')
+        ->and(FlaggedArtifacts::reason($flagged[0]['artifact']))->toBe('domain: orders · risk: high');
+});

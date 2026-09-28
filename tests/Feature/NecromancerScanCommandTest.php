@@ -19,6 +19,7 @@ use LaravelNecromancer\Collection\MailableCollector;
 use LaravelNecromancer\Collection\ModelCollector;
 use LaravelNecromancer\Collection\ObserverCollector;
 use LaravelNecromancer\Collection\PolicyCollector;
+use LaravelNecromancer\Collection\ActionCollector;
 use LaravelNecromancer\Collection\RuleCollector;
 use LaravelNecromancer\Collection\TestCollector;
 use LaravelNecromancer\Commands\ScanCommand;
@@ -50,6 +51,9 @@ use LaravelNecromancer\Tests\Fixtures\NecromancerRouteController;
 use LaravelNecromancer\Tests\Fixtures\Observers\NecromancerIssueObserver;
 use LaravelNecromancer\Tests\Fixtures\Policies\NecromancerPostPolicy;
 use LaravelNecromancer\Tests\Fixtures\Requests\NecromancerStoreOrderRequest;
+use LaravelNecromancer\Tests\Fixtures\Actions\NecromancerArchiveOrder;
+use LaravelNecromancer\Tests\Fixtures\Actions\NecromancerCancelOrder;
+use LaravelNecromancer\Tests\Fixtures\Actions\Orders\NecromancerRefundOrder;
 use LaravelNecromancer\Tests\Fixtures\Rules\NecromancerRequiredIfMemberRule;
 use LaravelNecromancer\Tests\Fixtures\Rules\NecromancerUniqueInProjectRule;
 use PHPUnit\Framework\Assert;
@@ -86,7 +90,7 @@ test('the scan command records complete and partial scan scope', function () {
 
     expect($full->meta->scope->complete)->toBeTrue()
         ->and($full->meta->scope->artifact_types)->toBe([
-            'commands', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
+            'actions', 'commands', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
             'livewire_components', 'mailables', 'middleware', 'models', 'observers',
             'policies', 'routes', 'scheduled_tasks', 'service_providers', 'tests', 'validation_rules',
         ])
@@ -1615,6 +1619,120 @@ test('the scan command collects validation_rules artifacts with correct implicit
         ->and($required->description)->toBeNull();
 });
 
+test('the scan command collects actions with their entrypoint signatures', function () {
+    $path = necromancerScanTestPath('necromancer-actions-basic.json');
+
+    useNecromancerFixtureActions();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    $action = findManifestAction($manifest, NecromancerCancelOrder::class);
+
+    expect($action->id)->toBe('actions:'.NecromancerCancelOrder::class)
+        ->and($action->entrypoints)->toEqual([(object) [
+            'name' => 'handle',
+            'parameters' => [
+                (object) ['name' => 'order', 'type' => NecromancerOrder::class],
+                (object) ['name' => 'actor', 'type' => NecromancerCustomer::class],
+            ],
+            'return_type' => NecromancerOrder::class,
+        ]])
+        ->and($action->source->file)->toContain('Fixtures/Actions/NecromancerCancelOrder.php')
+        ->and($action->source->line)->toBeInt();
+});
+
+test('the scan command discovers only concrete action classes that expose an entrypoint', function () {
+    $path = necromancerScanTestPath('necromancer-actions-discovery.json');
+
+    useNecromancerFixtureActions();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $classes = array_map(
+        fn (stdClass $action): string => $action->class,
+        expectScanManifest($path)->artifacts->actions,
+    );
+
+    expect($classes)->toContain(NecromancerCancelOrder::class)
+        ->toContain(NecromancerRefundOrder::class)
+        ->not->toContain('LaravelNecromancer\\Tests\\Fixtures\\Actions\\AbstractNecromancerAction')
+        ->not->toContain('LaravelNecromancer\\Tests\\Fixtures\\Actions\\NecromancerActionContract')
+        ->not->toContain('LaravelNecromancer\\Tests\\Fixtures\\Actions\\NecromancerActionHelpers')
+        ->not->toContain('LaravelNecromancer\\Tests\\Fixtures\\Actions\\NecromancerActionOutcome')
+        ->not->toContain('LaravelNecromancer\\Tests\\Fixtures\\Actions\\NecromancerOrderData');
+});
+
+test('action entrypoints are the sorted public instance methods declared on the class itself', function () {
+    $path = necromancerScanTestPath('necromancer-actions-entrypoints.json');
+
+    useNecromancerFixtureActions();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $action = findManifestAction(expectScanManifest($path), NecromancerArchiveOrder::class);
+
+    expect($action->entrypoints)->toEqual([
+        (object) ['name' => 'archive', 'parameters' => [], 'return_type' => 'void'],
+        (object) ['name' => 'execute', 'parameters' => [(object) ['name' => 'order', 'type' => null]], 'return_type' => null],
+    ]);
+});
+
+test('action annotations come from the class-level attribute and exact-ID mappings only', function () {
+    $path = necromancerScanTestPath('necromancer-actions-annotations.json');
+
+    useNecromancerFixtureActions();
+
+    config(['necromancer.annotations' => [
+        'actions:'.NecromancerCancelOrder::class => ['capability' => 'order.cancel'],
+    ]]);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    expect(findManifestAction($manifest, NecromancerCancelOrder::class)->annotations)->toEqual((object) [
+        'domain' => 'orders',
+        'flow' => 'order-cancellation',
+        'capability' => 'order.cancel',
+        'risk' => 'high',
+    ])
+        ->and(findManifestAction($manifest, NecromancerRefundOrder::class))->not->toHaveProperty('annotations');
+});
+
+test('an exact-ID mapping for an unknown action emits AN_CONFIG_UNMATCHED', function () {
+    $path = necromancerScanTestPath('necromancer-actions-config-unmatched.json');
+
+    useNecromancerFixtureActions();
+
+    config(['necromancer.annotations' => [
+        'actions:App\\Actions\\DoesNotExist' => ['domain' => 'orders'],
+    ]]);
+
+    $exitCode = Artisan::call('necromancer:scan', ['--output' => $path, '--only' => 'actions']);
+
+    expect($exitCode)->toBe(0)
+        ->and(Artisan::output())->toContain('AN_CONFIG_UNMATCHED');
+});
+
+test('the --only=actions scan restricts to action artifacts', function () {
+    $path = necromancerScanTestPath('necromancer-only-actions.json');
+
+    useNecromancerFixtureActions();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'actions'])
+        ->assertSuccessful();
+
+    $manifest = json_decode((string) File::get($path), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $manifest->artifacts))->toBe(['actions']);
+});
+
 test('the --only=validation_rules scan restricts to validation rule artifacts', function () {
     $path = necromancerScanTestPath('necromancer-only-validation-rules.json');
 
@@ -1925,6 +2043,7 @@ function expectScanManifest(string $path): stdClass
     }
 
     expect(array_keys((array) $manifest->artifacts))->each->toBeIn([
+        'actions',
         'commands',
         'enums',
         'events',
@@ -2276,6 +2395,28 @@ function findManifestMailable(stdClass $manifest, string $class): stdClass
     }
 
     Assert::fail("Expected mailable artifact [{$class}] was not found.");
+}
+
+function useNecromancerFixtureActions(): void
+{
+    app()->bind(
+        ActionCollector::class,
+        fn ($app): ActionCollector => new ActionCollector($app, [[
+            'path' => base_path('tests/Fixtures/Actions'),
+            'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Actions\\',
+        ]]),
+    );
+}
+
+function findManifestAction(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->actions ?? [] as $action) {
+        if ($action->class === $class) {
+            return $action;
+        }
+    }
+
+    Assert::fail("Expected action artifact [{$class}] was not found.");
 }
 
 function useNecromancerFixtureRules(): void

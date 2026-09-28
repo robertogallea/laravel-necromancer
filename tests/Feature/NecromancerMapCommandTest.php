@@ -101,6 +101,26 @@ test('the map command displays job artifacts with short class and labeled queue 
         ->assertSuccessful();
 });
 
+test('the map command displays action artifacts with short class and entrypoint names', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1],
+        'artifacts' => [
+            'actions' => [[
+                'class' => 'App\\Actions\\CancelOrder',
+                'entrypoints' => [
+                    ['name' => 'execute', 'parameters' => [], 'return_type' => null],
+                    ['name' => 'handle', 'parameters' => [['name' => 'order', 'type' => 'App\\Models\\Order']], 'return_type' => 'void'],
+                ],
+            ]],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:map', ['--type' => 'actions'])
+        ->expectsOutputToContain('Actions')
+        ->expectsOutputToContain('CancelOrder  execute, handle')
+        ->assertSuccessful();
+});
+
 test('the map command displays event artifacts with short class and short listener names', function () {
     $manifest = json_encode([
         'meta' => ['manifest_schema_version' => 1],

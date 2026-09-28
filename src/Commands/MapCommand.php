@@ -73,6 +73,7 @@ final class MapCommand extends Command
             'routes' => $this->formatRoute($item),
             'models' => $this->formatModel($item),
             'form_requests' => $this->formatFormRequest($item),
+            'actions' => $this->formatAction($item),
             'jobs' => $this->formatJob($item),
             'events' => $this->formatEvent($item),
             'listeners' => $this->formatListener($item),
@@ -205,5 +206,18 @@ final class MapCommand extends Command
         ]);
 
         return implode('  ', $tokens);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function formatAction(array $item): string
+    {
+        $entrypoints = array_map(
+            fn (mixed $entrypoint): string => is_array($entrypoint) ? (string) ($entrypoint['name'] ?? '') : '',
+            (array) ($item['entrypoints'] ?? []),
+        );
+
+        return class_basename((string) ($item['class'] ?? '')).'  '.implode(', ', $entrypoints);
     }
 }

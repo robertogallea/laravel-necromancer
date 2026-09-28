@@ -88,3 +88,43 @@ test('resolve() returns no edges for artifact types with no relationship taxonom
     expect((new RelationshipResolver)->resolve('jobs', ['queue' => 'emails']))->toBe([])
         ->and((new RelationshipResolver)->resolve('gates', ['ability' => 'edit-post']))->toBe([]);
 });
+
+test('resolve() returns one deduplicated operates_on edge from action entrypoint parameter class types', function () {
+    $facts = [
+        'entrypoints' => [
+            [
+                'name' => 'handle',
+                'parameters' => [
+                    ['name' => 'order', 'type' => 'App\\Models\\Order'],
+                    ['name' => 'actor', 'type' => '?App\\Models\\User'],
+                    ['name' => 'count', 'type' => 'int'],
+                ],
+                'return_type' => 'App\\Models\\Invoice',
+            ],
+            [
+                'name' => 'execute',
+                'parameters' => [
+                    ['name' => 'target', 'type' => 'App\\Models\\Customer|App\\Models\\Order|null'],
+                    ['name' => 'options', 'type' => 'array'],
+                    ['name' => 'same', 'type' => 'self'],
+                    ['name' => 'untyped', 'type' => null],
+                ],
+                'return_type' => null,
+            ],
+        ],
+    ];
+
+    expect((new RelationshipResolver)->resolve('actions', $facts))->toEqual([
+        new RelationshipEdge('operates_on', ['App\\Models\\Order', 'App\\Models\\User', 'App\\Models\\Customer']),
+    ]);
+});
+
+test('resolve() omits the operates_on edge for actions whose parameters have no class types', function () {
+    $facts = [
+        'entrypoints' => [
+            ['name' => 'handle', 'parameters' => [['name' => 'id', 'type' => 'int']], 'return_type' => 'App\\Models\\Order'],
+        ],
+    ];
+
+    expect((new RelationshipResolver)->resolve('actions', $facts))->toBe([]);
+});

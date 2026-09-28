@@ -17,6 +17,14 @@ namespace LaravelNecromancer\Relationships;
 final readonly class RelationshipResolver
 {
     /**
+     * @var list<string>
+     */
+    private const BUILTIN_TYPES = [
+        'int', 'float', 'string', 'bool', 'array', 'iterable', 'callable', 'object', 'mixed',
+        'null', 'false', 'true', 'void', 'never', 'self', 'static', 'parent',
+    ];
+
+    /**
      * @param  array<string, mixed>  $facts
      * @return list<RelationshipEdge>
      */
@@ -33,6 +41,7 @@ final readonly class RelationshipResolver
             'listeners' => $this->listEdges(['handles' => $facts['handles'] ?? []]),
             'policies' => $this->scalarEdges(['model' => $facts['model'] ?? null]),
             'observers' => $this->scalarEdges(['model' => $facts['model'] ?? null]),
+            'actions' => $this->listEdges(['operates_on' => $this->entrypointParameterClasses($facts['entrypoints'] ?? [])]),
             default => [],
         };
     }
@@ -104,5 +113,35 @@ final readonly class RelationshipResolver
         }
 
         return $edges;
+    }
+
+    /**
+     * Class types an action's entrypoints accept, deduplicated in first-seen
+     * order. Nullable, union, and intersection types are split into their parts
+     * and built-in types are dropped, since only classes can be other artifacts.
+     *
+     * @return list<string>
+     */
+    private function entrypointParameterClasses(mixed $entrypoints): array
+    {
+        $classes = [];
+
+        foreach ((array) $entrypoints as $entrypoint) {
+            foreach ((array) (is_array($entrypoint) ? ($entrypoint['parameters'] ?? []) : []) as $parameter) {
+                $type = is_array($parameter) ? ($parameter['type'] ?? null) : null;
+
+                if (! is_string($type)) {
+                    continue;
+                }
+
+                foreach (preg_split('/[|&]/', str_replace(['?', '(', ')'], '', $type)) ?: [] as $part) {
+                    if ($part !== '' && ! in_array(strtolower($part), self::BUILTIN_TYPES, true)) {
+                        $classes[$part] = true;
+                    }
+                }
+            }
+        }
+
+        return array_keys($classes);
     }
 }

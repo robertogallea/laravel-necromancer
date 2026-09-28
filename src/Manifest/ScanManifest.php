@@ -8,6 +8,7 @@ use Composer\InstalledVersions;
 use Illuminate\Contracts\Foundation\Application;
 use JsonException;
 use JsonSerializable;
+use LaravelNecromancer\Collection\ActionCollector;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
@@ -58,6 +59,7 @@ final class ScanManifest implements JsonSerializable
         private MailableCollector $mailableCollector,
         private RuleCollector $ruleCollector,
         private ServiceProviderCollector $serviceProviderCollector,
+        private ActionCollector $actionCollector,
     ) {}
 
     /**
@@ -199,6 +201,7 @@ final class ScanManifest implements JsonSerializable
             // observer map; otherwise collect on demand.
             'models' => fn (): array => $eagerModelArtifacts !== [] ? $eagerModelArtifacts : $this->modelCollector->collect(),
             'form_requests' => fn (): array => $this->formRequestCollector->collect(),
+            'actions' => fn (): array => $this->actionCollector->collect(),
             'jobs' => fn (): array => $this->jobCollector->collect(),
             'events' => fn (): array => $this->eventCollector->collect(),
             'listeners' => fn (): array => $this->listenerCollector->collect(),

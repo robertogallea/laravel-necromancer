@@ -187,3 +187,56 @@ test('a route-only annotated application scores the same as before universal ann
 
     expect($dimension->score)->toBe(1.0);
 });
+
+function testPresenceDimension(array $artifacts): DimensionResult
+{
+    foreach ((new DoctorAnalyzer($artifacts))->dimensions() as $dimension) {
+        if ($dimension->key === 'test-presence') {
+            return $dimension;
+        }
+    }
+
+    throw new RuntimeException('test-presence dimension not found');
+}
+
+test('test-presence scores actions against matching test subjects', function () {
+    $dimension = testPresenceDimension([
+        'actions' => [
+            ['class' => 'App\\Actions\\CancelOrder'],
+            ['class' => 'App\\Actions\\RefundOrder'],
+        ],
+        'tests' => [
+            ['file' => 'tests/Unit/Actions/CancelOrderTest.php', 'subject' => 'App\\Actions\\CancelOrder'],
+        ],
+    ]);
+
+    expect($dimension->score)->toBe(0.5)
+        ->and($dimension->detail)->toBe('1/2 actions');
+});
+
+test('test-presence averages actions alongside models and jobs', function () {
+    $dimension = testPresenceDimension([
+        'models' => [['class' => 'App\\Models\\Order']],
+        'jobs' => [['class' => 'App\\Jobs\\SendInvoice']],
+        'actions' => [['class' => 'App\\Actions\\CancelOrder']],
+        'tests' => [
+            ['file' => 'tests/Unit/Models/OrderTest.php', 'subject' => 'App\\Models\\Order'],
+            ['file' => 'tests/Unit/Jobs/SendInvoiceTest.php', 'subject' => 'App\\Jobs\\SendInvoice'],
+        ],
+    ]);
+
+    expect($dimension->score)->toEqualWithDelta(2 / 3, 0.0001)
+        ->and($dimension->detail)->toBe('1/1 models · 1/1 jobs · 0/1 actions');
+});
+
+test('test-presence detail omits actions when the manifest has none', function () {
+    $dimension = testPresenceDimension([
+        'models' => [['class' => 'App\\Models\\Order']],
+        'tests' => [
+            ['file' => 'tests/Unit/Models/OrderTest.php', 'subject' => 'App\\Models\\Order'],
+        ],
+    ]);
+
+    expect($dimension->score)->toBe(1.0)
+        ->and($dimension->detail)->toBe('1/1 models');
+});

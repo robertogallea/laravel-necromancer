@@ -180,3 +180,14 @@ test('isSupportedType() rejects unknown or legacy type names', function () {
     expect((new ArtifactQueryService)->isSupportedType('requests'))->toBeFalse()
         ->and((new ArtifactQueryService)->isSupportedType(''))->toBeFalse();
 });
+
+test('actions are queryable by type and searchable across types', function () {
+    $action = ['id' => 'actions:App\\Actions\\CancelOrder', 'class' => 'App\\Actions\\CancelOrder'];
+    $artifacts = ['actions' => [$action]];
+
+    $service = new ArtifactQueryService;
+
+    expect($service->isSupportedType('actions'))->toBeTrue()
+        ->and($service->artifactsOfType($artifacts, 'actions'))->toBe([$action])
+        ->and($service->search($artifacts, 'CancelOrder'))->toBe([['type' => 'actions', 'artifact' => $action]]);
+});
