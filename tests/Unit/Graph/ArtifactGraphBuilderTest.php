@@ -235,6 +235,23 @@ test('build() derives structural edges for events, listeners, and routes', funct
     ]);
 });
 
+test('build() resolves a route controller edge to the collected controller node', function () {
+    $manifest = ['artifacts' => [
+        'routes' => [
+            ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null],
+        ],
+        'controllers' => [
+            ['id' => 'controllers:App\\Http\\Controllers\\OrderController', 'class' => 'App\\Http\\Controllers\\OrderController', 'actions' => [], 'source' => null],
+        ],
+    ]];
+
+    $graph = (new ArtifactGraphBuilder)->build($manifest);
+
+    expect($graph->edges)->toEqual([
+        new ArtifactGraphEdge('routes:GET:orders', 'controllers:App\\Http\\Controllers\\OrderController', EdgeKind::Structural),
+    ]);
+});
+
 test('build() derives one grouping edge per declared domain and one per declared flow', function () {
     $manifest = ['artifacts' => [
         'jobs' => [

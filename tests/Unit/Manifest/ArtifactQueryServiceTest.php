@@ -191,3 +191,14 @@ test('actions are queryable by type and searchable across types', function () {
         ->and($service->artifactsOfType($artifacts, 'actions'))->toBe([$action])
         ->and($service->search($artifacts, 'CancelOrder'))->toBe([['type' => 'actions', 'artifact' => $action]]);
 });
+
+test('controllers are queryable by type and searchable across types', function () {
+    $controller = ['id' => 'controllers:App\\Http\\Controllers\\OrderController', 'class' => 'App\\Http\\Controllers\\OrderController'];
+    $artifacts = ['controllers' => [$controller]];
+
+    $service = new ArtifactQueryService;
+
+    expect($service->isSupportedType('controllers'))->toBeTrue()
+        ->and($service->artifactsOfType($artifacts, 'controllers'))->toBe([$controller])
+        ->and($service->search($artifacts, 'OrderController'))->toBe([['type' => 'controllers', 'artifact' => $controller]]);
+});

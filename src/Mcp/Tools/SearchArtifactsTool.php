@@ -37,7 +37,7 @@ final class SearchArtifactsTool extends Tool
             'query' => $schema->string()->required()
                 ->description('Case-insensitive string to search for across all artifact JSON fields'),
             'type' => $schema->string()
-                ->description('Restrict search to one artifact type: routes, models, form_requests, actions, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers'),
+                ->description('Restrict search to one artifact type: routes, controllers, models, form_requests, actions, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers'),
         ];
     }
 

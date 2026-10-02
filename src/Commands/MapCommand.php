@@ -71,6 +71,7 @@ final class MapCommand extends Command
     {
         return match ($type) {
             'routes' => $this->formatRoute($item),
+            'controllers' => $this->formatController($item),
             'models' => $this->formatModel($item),
             'form_requests' => $this->formatFormRequest($item),
             'actions' => $this->formatAction($item),
@@ -219,5 +220,18 @@ final class MapCommand extends Command
         );
 
         return class_basename((string) ($item['class'] ?? '')).'  '.implode(', ', $entrypoints);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function formatController(array $item): string
+    {
+        $actions = array_map(
+            fn (mixed $action): string => is_array($action) ? (string) ($action['name'] ?? '') : '',
+            (array) ($item['actions'] ?? []),
+        );
+
+        return class_basename((string) ($item['class'] ?? '')).'  '.implode(', ', $actions);
     }
 }

@@ -121,6 +121,26 @@ test('the map command displays action artifacts with short class and entrypoint 
         ->assertSuccessful();
 });
 
+test('the map command displays controller artifacts with short class and controller action names', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1],
+        'artifacts' => [
+            'controllers' => [[
+                'class' => 'App\\Http\\Controllers\\OrderController',
+                'actions' => [
+                    ['name' => 'index', 'parameters' => [], 'return_type' => null, 'middleware' => [], 'routes' => []],
+                    ['name' => 'store', 'parameters' => [], 'return_type' => null, 'middleware' => ['auth'], 'routes' => []],
+                ],
+            ]],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:map', ['--type' => 'controllers'])
+        ->expectsOutputToContain('Controllers')
+        ->expectsOutputToContain('OrderController  index, store')
+        ->assertSuccessful();
+});
+
 test('the map command displays event artifacts with short class and short listener names', function () {
     $manifest = json_encode([
         'meta' => ['manifest_schema_version' => 1],

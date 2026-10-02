@@ -96,9 +96,10 @@ final readonly class ArtifactGraphBuilder
      * that names another artifact by class (e.g. a model's `policy`) can
      * resolve to that artifact's own id. Unlike ArtifactConceptBuilder's
      * equivalent classIndex, routes are never a source here — a route has
-     * no `class` field, only `controller`, and no artifact type represents
-     * controllers, so a route→controller edge's `to` is always the raw
-     * controller class string rather than resolved to a sibling route.
+     * no `class` field, only `controller`, so a route→controller edge
+     * resolves to the collected controller artifact, or stays the raw
+     * controller class string when none was collected, rather than
+     * resolving to a sibling route.
      * Middleware is excluded for the same reason BundleExporter excludes
      * it: one class can register globally, in a group, and under an
      * alias, so a bare class name can't resolve to one specific

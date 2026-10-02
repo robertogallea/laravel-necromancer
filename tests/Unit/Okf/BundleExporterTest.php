@@ -438,6 +438,24 @@ test('export() links a resolvable relationship across artifact concepts', functi
         ->and($routeContent)->toContain('- **controller**: [App\\Http\\Controllers\\OrderController](/artifacts/');
 });
 
+test('export() links a route to its collected controller concept', function () {
+    $output = okfTempDir().'/bundle';
+
+    $manifest = completeManifest([
+        'routes' => [['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null]],
+        'controllers' => [['id' => 'controllers:App\\Http\\Controllers\\OrderController', 'class' => 'App\\Http\\Controllers\\OrderController', 'actions' => [], 'source' => null]],
+    ]);
+
+    $result = (new BundleExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    expect($result->successful)->toBeTrue();
+
+    $routeContent = file_get_contents(glob($output.'/artifacts/get-orders-*.md')[0]);
+    $controllerFile = basename(glob($output.'/artifacts/*ordercontroller-*.md')[0]);
+
+    expect($routeContent)->toContain("- **controller**: [App\\Http\\Controllers\\OrderController](/artifacts/{$controllerFile})");
+});
+
 test('export() copies a declared local ADR into the bundle with provenance and links referencing artifacts', function () {
     $base = okfTempDir();
     mkdir($base.'/docs/adr', 0755, true);

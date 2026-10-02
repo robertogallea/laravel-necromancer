@@ -1166,7 +1166,7 @@ test('--only with an unknown type fails with an actionable error', function () {
     ], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:generate', ['--only' => 'foo'])
-        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, models, form_requests, actions, jobs, events, listeners, commands')
+        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, controllers, models, form_requests, actions, jobs, events, listeners, commands')
         ->assertFailed();
 });
 
@@ -1656,7 +1656,7 @@ test('--except with an unknown type fails with an actionable error', function ()
     ], JSON_THROW_ON_ERROR));
 
     $this->artisan('necromancer:generate', ['--except' => 'foo'])
-        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, models, form_requests, actions, jobs, events, listeners, commands')
+        ->expectsOutputToContain('Unknown type(s): foo. Available types: routes, controllers, models, form_requests, actions, jobs, events, listeners, commands')
         ->assertFailed();
 });
 
@@ -2577,6 +2577,96 @@ test('a manifest with no mailables does not include a mailables section', functi
     $this->artisan('necromancer:generate')->assertSuccessful();
 
     expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Mailables');
+});
+
+// Controllers section
+
+function writeNecromancerControllersManifest(): void
+{
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
+        'artifacts' => [
+            'routes' => [
+                ['name' => 'orders.index', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'action' => 'index', 'middleware' => [], 'source' => null],
+            ],
+            'controllers' => [
+                [
+                    'class' => 'App\\Http\\Controllers\\OrderController',
+                    'actions' => [
+                        ['name' => 'index', 'parameters' => [], 'return_type' => 'Illuminate\\View\\View', 'middleware' => ['auth'], 'routes' => ['routes:GET:orders']],
+                        ['name' => 'store', 'parameters' => [['name' => 'request', 'type' => 'App\\Http\\Requests\\StoreOrderRequest']], 'return_type' => null, 'middleware' => [], 'routes' => []],
+                    ],
+                    'source' => ['file' => 'app/Http/Controllers/OrderController.php', 'line' => 9],
+                    'annotations' => ['domain' => 'orders'],
+                ],
+                [
+                    'class' => 'App\\Domain\\Billing\\InvoiceController',
+                    'actions' => [
+                        ['name' => '__invoke', 'parameters' => [], 'return_type' => null, 'middleware' => [], 'routes' => []],
+                    ],
+                    'source' => ['file' => 'app/Domain/Billing/InvoiceController.php', 'line' => 7],
+                ],
+            ],
+            'models' => [
+                ['class' => 'App\\Models\\Order', 'table' => 'orders', 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+}
+
+test('a manifest with controllers renders a controllers section between routes and models', function () {
+    writeNecromancerControllersManifest();
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+
+    expect($content)->toContain('## Controllers (2)')
+        ->and($content)->toContain('| Controller | Actions | Architectural Context | Source |')
+        ->and($content)->toContain('| OrderController | index, store | domain: orders | app/Http/Controllers/OrderController.php:9 |')
+        ->and($content)->toContain('| InvoiceController | __invoke |  | app/Domain/Billing/InvoiceController.php:7 |')
+        ->and(strpos($content, '## Routes'))->toBeLessThan(strpos($content, '## Controllers'))
+        ->and(strpos($content, '## Controllers'))->toBeLessThan(strpos($content, '## Models'));
+});
+
+test('controllers without annotations omit the Architectural Context column', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
+        'artifacts' => [
+            'controllers' => [
+                ['class' => 'App\\Http\\Controllers\\HealthController', 'actions' => [['name' => '__invoke', 'parameters' => [], 'return_type' => null, 'middleware' => [], 'routes' => []]], 'source' => null],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    $content = File::get(base_path('NECROMANCER.md'));
+
+    expect($content)->toContain('| Controller | Actions |')
+        ->and($content)->toContain('| HealthController | __invoke |')
+        ->and($content)->not->toContain('Architectural Context');
+});
+
+test('the controllers section honours --only, --except and --paths', function () {
+    writeNecromancerControllersManifest();
+
+    $this->artisan('necromancer:generate', ['--only' => 'controllers', '--force' => true])->assertSuccessful();
+    $only = File::get(base_path('NECROMANCER.md'));
+
+    $this->artisan('necromancer:generate', ['--except' => 'controllers', '--force' => true])->assertSuccessful();
+    $except = File::get(base_path('NECROMANCER.md'));
+
+    $this->artisan('necromancer:generate', ['--paths' => 'app/Http/Controllers', '--force' => true])->assertSuccessful();
+    $paths = File::get(base_path('NECROMANCER.md'));
+
+    expect($only)->toContain('## Controllers (2)')
+        ->and($only)->not->toContain('## Models')
+        ->and($except)->not->toContain('## Controllers')
+        ->and($except)->toContain('## Models')
+        ->and($paths)->toContain('## Controllers (1)')
+        ->and($paths)->toContain('| OrderController |')
+        ->and($paths)->not->toContain('| InvoiceController |');
 });
 
 // Actions section
