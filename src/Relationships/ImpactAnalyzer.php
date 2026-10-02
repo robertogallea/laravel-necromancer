@@ -4,33 +4,57 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Relationships;
 
+use Generator;
 use LaravelNecromancer\Manifest\ArtifactId;
+use LaravelNecromancer\Okf\ArtifactConceptBuilder;
 
 /**
  * Computes an Impact by walking the manifest's Relationships breadth-first
- * from a starting artifact (docs/adr/0022). Framework-free, so every
- * consumer (necromancer:impact, MCP, affected-test discovery) shares one
- * traversal rule.
+ * from a starting artifact. Framework-free, so every consumer shares the
+ * one traversal rule of docs/adr/0022.
  */
 final readonly class ImpactAnalyzer
 {
+    /**
+     * Node types synthesized from annotations rather than collected.
+     *
+     * @var list<string>
+     */
+    public const CONCEPT_TYPES = ['domain', 'flow', 'adr'];
+
     /**
      * Node types reported in an Impact but never expanded past.
      *
      * @var list<string>
      */
-    private const BOUNDARY_TYPES = ['domain', 'flow', 'adr', 'middleware', 'tests'];
+    private const BOUNDARY_TYPES = [...self::CONCEPT_TYPES, 'middleware', 'tests'];
 
+    /**
+     * ArtifactConceptBuilder::identify() is the package's one per-type
+     * display-label convention, reused as ArtifactGraphBuilder reuses it.
+     */
     public function __construct(
         private RelationshipResolver $relationships = new RelationshipResolver,
+        private ArtifactConceptBuilder $conceptBuilder = new ArtifactConceptBuilder,
     ) {}
 
     /**
+     * Walks level by level: for each distance, the first Relationship in
+     * canonical order linking the frontier to an unvisited node reaches it,
+     * so ties break by canonical order and nodes come out already sorted.
+     *
      * @param  array<string, mixed>  $manifest
      */
     public function analyze(array $manifest, string $start, int $depth): Impact
     {
-        $types = $this->artifactTypes($manifest);
+        $types = [];
+        $labels = [];
+
+        foreach ($this->artifacts($manifest) as $type => [$id, $artifact]) {
+            $types[$id] = $type;
+            $labels[$id] = $this->conceptBuilder->identify($type, $artifact)['title'];
+        }
+
         $relationships = $this->relationships->resolve($manifest);
         $visited = [$start => true];
         $frontier = [$start => true];
@@ -41,8 +65,8 @@ final readonly class ImpactAnalyzer
 
             foreach ($relationships as $relationship) {
                 [$id, $viaFrom, $direction] = match (true) {
-                    isset($frontier[$relationship->from]) && ! isset($visited[$relationship->to]) => [$relationship->to, $relationship->from, 'out'],
-                    isset($frontier[$relationship->to]) && ! isset($visited[$relationship->from]) => [$relationship->from, $relationship->to, 'in'],
+                    isset($frontier[$relationship->from]) && ! isset($visited[$relationship->to]) => [$relationship->to, $relationship->from, ImpactDirection::Out],
+                    isset($frontier[$relationship->to]) && ! isset($visited[$relationship->from]) => [$relationship->from, $relationship->to, ImpactDirection::In],
                     default => [null, null, null],
                 };
 
@@ -52,7 +76,7 @@ final readonly class ImpactAnalyzer
 
                 $type = $types[$id] ?? $this->conceptType($relationship, $id);
                 $visited[$id] = true;
-                $nodes[] = new ImpactNode($id, $type, $distance, $type !== null, $relationship, $viaFrom, $direction);
+                $nodes[] = new ImpactNode($id, $type, $distance, $relationship, $viaFrom, $direction);
 
                 if ($type !== null && ! in_array($type, self::BOUNDARY_TYPES, true)) {
                     $next[$id] = true;
@@ -62,7 +86,7 @@ final readonly class ImpactAnalyzer
             $frontier = $next;
         }
 
-        return new Impact($start, $depth, $nodes);
+        return new Impact($start, $depth, $nodes, $labels);
     }
 
     /**
@@ -76,18 +100,16 @@ final readonly class ImpactAnalyzer
      */
     public function startCandidates(array $manifest, string $input): array
     {
-        if (isset($this->artifactTypes($manifest)[$input])) {
-            return [$input];
-        }
-
         $class = ltrim($input, '\\');
         $candidates = [];
 
-        foreach (ArtifactId::supportedTypes() as $type) {
-            foreach ((array) ($manifest['artifacts'][$type] ?? []) as $artifact) {
-                if (is_array($artifact) && ($artifact['class'] ?? null) === $class && is_string($artifact['id'] ?? null)) {
-                    $candidates[] = $artifact['id'];
-                }
+        foreach ($this->artifacts($manifest) as [$id, $artifact]) {
+            if ($id === $input) {
+                return [$input];
+            }
+
+            if (($artifact['class'] ?? null) === $class) {
+                $candidates[] = $id;
             }
         }
 
@@ -113,23 +135,20 @@ final readonly class ImpactAnalyzer
     }
 
     /**
-     * Artifact ID → artifact type, for every collected artifact.
+     * Every collected artifact carrying an Artifact ID, as [id, artifact]
+     * keyed by its type, in canonical order.
      *
      * @param  array<string, mixed>  $manifest
-     * @return array<string, string>
+     * @return Generator<string, array{string, array<string, mixed>}>
      */
-    private function artifactTypes(array $manifest): array
+    private function artifacts(array $manifest): Generator
     {
-        $types = [];
-
         foreach (ArtifactId::supportedTypes() as $type) {
             foreach ((array) ($manifest['artifacts'][$type] ?? []) as $artifact) {
                 if (is_array($artifact) && is_string($artifact['id'] ?? null)) {
-                    $types[$artifact['id']] = $type;
+                    yield $type => [$artifact['id'], $artifact];
                 }
             }
         }
-
-        return $types;
     }
 }

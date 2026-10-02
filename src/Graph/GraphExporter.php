@@ -32,7 +32,7 @@ final readonly class GraphExporter
      */
     public function export(array $manifest, string $outputPath, bool $stale, bool $allowStale, bool $allowPartial): GraphExportResult
     {
-        $scopeError = $this->validateScope($manifest, $stale, $allowStale, $allowPartial);
+        $scopeError = ManifestScopeGuard::refusal($manifest, $stale, $allowStale, $allowPartial, 'build the graph anyway');
 
         if ($scopeError !== null) {
             return GraphExportResult::failure($scopeError);
@@ -47,14 +47,6 @@ final readonly class GraphExporter
         }
 
         return GraphExportResult::success($outputPath, count($graph->nodes));
-    }
-
-    /**
-     * @param  array<string, mixed>  $manifest
-     */
-    private function validateScope(array $manifest, bool $stale, bool $allowStale, bool $allowPartial): ?string
-    {
-        return ManifestScopeGuard::refusal($manifest, $stale, $allowStale, $allowPartial, 'build the graph anyway');
     }
 
     private function writeAtomically(string $outputPath, ArtifactGraph $graph): void

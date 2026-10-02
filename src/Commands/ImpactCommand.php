@@ -10,20 +10,14 @@ use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ManifestScopeGuard;
-use LaravelNecromancer\Okf\ArtifactConceptBuilder;
+use LaravelNecromancer\Relationships\Impact;
 use LaravelNecromancer\Relationships\ImpactAnalyzer;
+use LaravelNecromancer\Relationships\ImpactDirection;
 use LaravelNecromancer\Relationships\ImpactNode;
 
 final class ImpactCommand extends Command
 {
     use ReadsManifest;
-
-    /**
-     * Concept types --type accepts besides the artifact types.
-     *
-     * @var list<string>
-     */
-    private const CONCEPT_TYPES = ['domain', 'flow', 'adr'];
 
     protected $signature = 'necromancer:impact
         {artifact        : An exact Artifact ID or a fully-qualified class name}
@@ -35,7 +29,7 @@ final class ImpactCommand extends Command
 
     protected $description = 'Show the artifacts, Domains, Flows, and ADRs connected to an artifact through its Relationships';
 
-    public function handle(ManifestReader $reader, ImpactAnalyzer $analyzer, ArtifactConceptBuilder $identity): int
+    public function handle(ManifestReader $reader, ImpactAnalyzer $analyzer): int
     {
         $depth = $this->depth();
         $types = $this->displayTypes();
@@ -100,28 +94,28 @@ final class ImpactCommand extends Command
             return self::SUCCESS;
         }
 
-        $labels = $this->labels($manifest, $identity);
-        $this->line("Impact of {$this->label($impact->start, $labels)} ({$impact->start}), depth {$impact->depth}");
+        $this->line("Impact of {$impact->label($impact->start)} ({$impact->start}), depth {$impact->depth}");
 
         if ($nodes === []) {
             $this->line('');
-            $this->line('No relationships found.');
+            $this->line($impact->nodes === []
+                ? 'No relationships found.'
+                : count($impact->nodes).' node(s) reachable, none of type '.implode(', ', $types).'.');
 
             return self::SUCCESS;
         }
 
-        $this->renderNodes($nodes, $labels);
+        $this->renderNodes($impact, $nodes);
 
         return self::SUCCESS;
     }
 
     /**
-     * @param  list<ImpactNode>  $nodes
-     * @param  array<string, string>  $labels
+     * @param  list<ImpactNode>  $nodes  the Impact's nodes after the --type filter
      */
-    private function renderNodes(array $nodes, array $labels): void
+    private function renderNodes(Impact $impact, array $nodes): void
     {
-        $groupOrder = array_flip([...ArtifactId::supportedTypes(), ...self::CONCEPT_TYPES, 'unresolved']);
+        $groupOrder = array_flip([...ArtifactId::supportedTypes(), ...ImpactAnalyzer::CONCEPT_TYPES, 'unresolved']);
         $byDistance = [];
 
         foreach ($nodes as $node) {
@@ -138,51 +132,17 @@ final class ImpactCommand extends Command
 
                 foreach ($groupNodes as $node) {
                     $relationship = $node->via->type->value;
-                    $line = '    '.$this->label($node->id, $labels).($node->resolved ? '' : ' (unresolved)').'  ';
-                    $line .= $node->direction === 'out' ? "{$relationship} →" : "← {$relationship}";
+                    $line = '    '.$impact->label($node->id).($node->resolved() ? '' : ' (unresolved)').'  ';
+                    $line .= $node->direction === ImpactDirection::Out ? "{$relationship} →" : "← {$relationship}";
 
                     if ($distance > 1) {
-                        $line .= '  via '.$this->label($node->viaFrom, $labels);
+                        $line .= '  via '.$impact->label($node->viaFrom);
                     }
 
                     $this->line($line);
                 }
             }
         }
-    }
-
-    /**
-     * Artifact ID → display label, using the package's per-type label
-     * convention (route method + URI, class name, ...).
-     *
-     * @param  array<string, mixed>  $manifest
-     * @return array<string, string>
-     */
-    private function labels(array $manifest, ArtifactConceptBuilder $identity): array
-    {
-        $labels = [];
-
-        foreach (ArtifactId::supportedTypes() as $type) {
-            foreach ((array) ($manifest['artifacts'][$type] ?? []) as $artifact) {
-                if (is_array($artifact) && is_string($artifact['id'] ?? null)) {
-                    $labels[$artifact['id']] = $identity->identify($type, $artifact)['title'];
-                }
-            }
-        }
-
-        return $labels;
-    }
-
-    /**
-     * Domain/Flow/ADR ids and unresolved ends are their own label.
-     *
-     * @param  array<string, string>  $labels
-     */
-    private function label(string $id, array $labels): string
-    {
-        $label = $labels[$id] ?? '';
-
-        return $label !== '' ? $label : $id;
     }
 
     private function depth(): ?int
@@ -213,7 +173,7 @@ final class ImpactCommand extends Command
         }
 
         $types = array_values(array_filter(array_map('trim', explode(',', $option)), fn (string $type): bool => $type !== ''));
-        $known = [...ArtifactId::supportedTypes(), ...self::CONCEPT_TYPES];
+        $known = [...ArtifactId::supportedTypes(), ...ImpactAnalyzer::CONCEPT_TYPES];
         $unknown = array_diff($types, $known);
 
         if ($unknown !== []) {

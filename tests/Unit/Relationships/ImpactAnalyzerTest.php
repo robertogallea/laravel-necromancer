@@ -18,10 +18,10 @@ function impactOf(array $artifacts, string $start, int $depth = 1): array
         'id' => $node->id,
         'type' => $node->type,
         'distance' => $node->distance,
-        'direction' => $node->direction,
+        'direction' => $node->direction->value,
         'from' => $node->viaFrom,
         'relationship' => $node->via->type->value,
-        'resolved' => $node->resolved,
+        'resolved' => $node->resolved(),
     ], $impact->nodes);
 }
 

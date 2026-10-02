@@ -215,3 +215,18 @@ test('the impact command refuses a partial-scope manifest unless --allow-partial
     $this->artisan('necromancer:impact', ['artifact' => 'App\\Models\\Order', '--allow-partial' => true])
         ->assertSuccessful();
 });
+
+test('--json serializes a Relationship with no metadata as an empty object', function () {
+    writeImpactManifest(impactCommandArtifacts());
+
+    expect(impactOutput(['artifact' => 'App\\Models\\Order', '--type' => 'policies', '--json' => true]))
+        ->toContain('"metadata": {}');
+});
+
+test('a --type filter that hides every reachable node says so', function () {
+    writeImpactManifest(impactCommandArtifacts());
+
+    expect(impactOutput(['artifact' => 'App\\Models\\Order', '--type' => 'jobs']))
+        ->toContain('1 node(s) reachable, none of type jobs.')
+        ->not->toContain('No relationships found.');
+});

@@ -1070,7 +1070,7 @@ Depth 2
 
 The command walks [Relationships](#relationships) in both directions, breadth-first, and reports each node once, at its shortest distance from the start. `authorized_by →` means the start side is the Relationship's `from`; `← operates_on` means it is the `to`. From depth 2 on, `via` names the node that reached it. When two Relationships reach a node at the same distance, the first one in canonical Relationship order wins, so an unchanged manifest always produces identical output.
 
-Domains, Flows, ADRs, middleware, and tests are **Boundary Nodes**: they appear in the result, but the walk never continues past them. Walking through them would return every member of a flow, every route in the `web` group, or every subject a namespace-matched test covers. The start always expands, so `necromancer:impact middleware:alias:auth` does list every route using it. A Relationship end Necromancer didn't collect, such as a vendor controller, is listed as `(unresolved)` and never expanded.
+Domains, Flows, ADRs, middleware, and tests are **Boundary Nodes**: they appear in the result, but the walk never continues past them. Walking through them would return every member of a flow, every route in the `web` group, or every subject a namespace-matched test covers. The start always expands, so `necromancer:impact middleware:alias:auth` does list every route using it. A Relationship end Necromancer didn't collect, such as a vendor controller, is listed as `(unresolved)` and never expanded. Unresolved ends with the same raw class or name are one node, reached through whichever Relationship gets there first.
 
 That's why a route reaches a model at depth 2 and not 1: no Relationship links them directly, only `route → authorized_by → policy ← authorized_by ← model`.
 
@@ -1078,8 +1078,8 @@ That's why a route reaches a model at depth 2 and not 1: no Relationship links t
 |---|---|
 | `artifact` | An exact Artifact ID (`models:App\Models\Order`) or a fully-qualified class name. A class matching several artifacts (e.g. a middleware registered as an alias and in a group) fails and lists the candidate IDs. |
 | `--depth=N` | How many Relationships away to walk. Defaults to 1, must be at least 1. |
-| `--type=TYPES` | Only display these node types: comma-separated artifact types plus `domain`, `flow`, `adr`. The walk itself is unchanged, so `--type=tests --depth=2` still finds tests reached through other nodes. Unresolved nodes have no type, so any `--type` filter hides them. |
-| `--json` | Output `{"start", "depth", "nodes": [{"id", "type", "distance", "resolved", "via": {"from", "relationship", "direction"}}]}`, nodes sorted by distance then canonical order, with `--type` applied. An unresolved node has `type: null`. |
+| `--type=TYPES` | Only display these node types: comma-separated artifact types plus `domain`, `flow`, `adr`. The walk itself is unchanged, so `--type=tests --depth=2` still finds tests reached through other nodes. Unresolved nodes have no type, so any `--type` filter hides them. When the filter hides every reachable node, the command says how many were reachable instead of "No relationships found". |
+| `--json` | Output `{"start", "depth", "nodes": [{"id", "type", "distance", "resolved", "via": {"from", "relationship", "direction"}}]}`, nodes sorted by distance then canonical order, with `--type` applied. An unresolved node has `type: null`. A Relationship with no metadata serializes `metadata` as `{}`, as in `graph.json`. |
 | `--allow-stale` / `--allow-partial` | Analyze a stale or partial-scope manifest, which is refused by default exactly as `necromancer:graph` and `necromancer:okf` refuse it. |
 
 ---
