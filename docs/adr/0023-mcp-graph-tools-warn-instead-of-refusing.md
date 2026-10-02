@@ -1,6 +1,6 @@
 # MCP graph tools warn instead of refusing
 
-The MCP graph tools (`get_artifact`, `get_relationships`, `get_impact`) answer from a stale or partial-scope manifest and report the condition in a `warnings` list, where `necromancer:impact`, `necromancer:graph`, and `necromancer:okf` refuse by default. An MCP caller has no `--allow-stale`/`--allow-partial` to pass, so a refusal could not be overridden, and a coding agent makes the manifest stale with its first edit: refusing would disable the tools for most of a session. `get_impact` also clamps `depth` to at most 3, adding a warning when it does, where the CLI accepts any depth: an agent can ask for depth 10, and the answer lands in its context window rather than a terminal.
+The MCP graph tools (`get_artifact`, `get_relationships`, `get_impact`, `get_affected_tests`) answer from a stale or partial-scope manifest and report the condition in a `warnings` list, where `necromancer:impact`, `necromancer:graph`, and `necromancer:okf` refuse by default. An MCP caller has no `--allow-stale`/`--allow-partial` to pass, so a refusal could not be overridden, and a coding agent makes the manifest stale with its first edit: refusing would disable the tools for most of a session. `get_impact` and `get_affected_tests` also clamp `depth` to at most 3, adding a warning when they do, where the CLI accepts any depth: an agent can ask for depth 10, and the answer lands in its context window rather than a terminal.
 
 ## Considered Options
 

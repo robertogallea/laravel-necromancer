@@ -5,10 +5,14 @@ use Illuminate\Support\Facades\File;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use LaravelNecromancer\Commands\AffectedTestsCommand;
 use LaravelNecromancer\Mcp\NecromancerServer;
+use LaravelNecromancer\Mcp\Tools\GetAffectedTestsTool;
 use LaravelNecromancer\Mcp\Tools\GetArtifactTool;
 use LaravelNecromancer\Mcp\Tools\GetImpactTool;
 use LaravelNecromancer\Mcp\Tools\GetRelationshipsTool;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 function graphToolManifestPath(): string
 {
@@ -69,6 +73,56 @@ function graphToolArtifacts(): array
             ['id' => 'middleware:group:web:App\\Http\\Middleware\\Authenticate', 'alias' => null, 'class' => 'App\\Http\\Middleware\\Authenticate', 'scope' => 'group', 'group' => 'web'],
         ],
     ];
+}
+
+/**
+ * The graph fixture with source files and tests of Order and of its
+ * policy, so a change to Order affects one test directly and one
+ * indirectly.
+ *
+ * @return array<string, list<array<string, mixed>>>
+ */
+function affectedTestsToolArtifacts(): array
+{
+    $artifacts = graphToolArtifacts();
+    $artifacts['models'][0]['source'] = ['file' => 'app/Models/Order.php'];
+    $artifacts['policies'][0]['source'] = ['file' => 'app/Policies/OrderPolicy.php'];
+    $artifacts['tests'] = [
+        ['id' => 'tests:tests/Unit/OrderTest.php', 'file' => 'tests/Unit/OrderTest.php', 'subject' => 'App\\Models\\Order', 'source' => ['file' => 'tests/Unit/OrderTest.php']],
+        ['id' => 'tests:tests/Unit/OrderPolicyTest.php', 'file' => 'tests/Unit/OrderPolicyTest.php', 'subject' => 'App\\Policies\\OrderPolicy', 'source' => ['file' => 'tests/Unit/OrderPolicyTest.php']],
+    ];
+
+    return $artifacts;
+}
+
+/**
+ * The `necromancer:affected-tests --json` output for the same input.
+ *
+ * @param  array<string, mixed>  $parameters
+ * @return array<string, mixed>
+ */
+function affectedTestsCliJson(array $parameters): array
+{
+    if (isset($parameters['stdin'])) {
+        $stream = fopen('php://memory', 'r+');
+        fwrite($stream, $parameters['stdin']);
+        rewind($stream);
+        unset($parameters['stdin']);
+
+        $input = new ArrayInput(['--stdin' => true, '--json' => true, ...$parameters]);
+        $input->setStream($stream);
+        $output = new BufferedOutput;
+
+        $command = app(AffectedTestsCommand::class);
+        $command->setLaravel(app());
+        $command->run($input, $output);
+
+        return json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    Artisan::call('necromancer:affected-tests', ['--json' => true, ...$parameters]);
+
+    return json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
 }
 
 /**
@@ -226,6 +280,7 @@ test('an ambiguous FQCN returns every candidate, and an unknown input is not_fou
     'get_artifact' => fn () => new GetArtifactTool,
     'get_relationships' => fn () => new GetRelationshipsTool,
     'get_impact' => fn () => new GetImpactTool,
+    'get_affected_tests' => fn () => new GetAffectedTestsTool,
 ]);
 
 test('an unreferenced Flow ID is not_found', function (Tool $tool) {
@@ -252,6 +307,7 @@ test('a missing or pre-schema-v1 manifest returns manifest_not_found', function 
     'get_artifact' => fn () => new GetArtifactTool,
     'get_relationships' => fn () => new GetRelationshipsTool,
     'get_impact' => fn () => new GetImpactTool,
+    'get_affected_tests' => fn () => new GetAffectedTestsTool,
 ]);
 
 test('a stale manifest answers with a staleness warning', function (Tool $tool) {
@@ -268,6 +324,7 @@ test('a stale manifest answers with a staleness warning', function (Tool $tool) 
     'get_artifact' => fn () => new GetArtifactTool,
     'get_relationships' => fn () => new GetRelationshipsTool,
     'get_impact' => fn () => new GetImpactTool,
+    'get_affected_tests' => fn () => new GetAffectedTestsTool,
 ]);
 
 test('a partial-scope manifest answers with a warning naming the scanned types', function (Tool $tool) {
@@ -282,6 +339,7 @@ test('a partial-scope manifest answers with a warning naming the scanned types',
     'get_artifact' => fn () => new GetArtifactTool,
     'get_relationships' => fn () => new GetRelationshipsTool,
     'get_impact' => fn () => new GetImpactTool,
+    'get_affected_tests' => fn () => new GetAffectedTestsTool,
 ]);
 
 test('a manifest with no scope metadata is reported as partial without naming types', function () {
@@ -296,12 +354,123 @@ test('a manifest with no scope metadata is reported as partial without naming ty
 test('necromancer server registers the graph tools', function () {
     $defaults = (new ReflectionClass(NecromancerServer::class))->getDefaultProperties();
 
-    expect($defaults['tools'])->toContain(GetArtifactTool::class, GetRelationshipsTool::class, GetImpactTool::class)
-        ->and($defaults['instructions'])->toContain('get_impact')->toContain('flow:');
+    expect($defaults['tools'])->toContain(GetArtifactTool::class, GetRelationshipsTool::class, GetImpactTool::class, GetAffectedTestsTool::class)
+        ->and($defaults['instructions'])->toContain('get_impact')->toContain('flow:')->toContain('After editing files, call `get_affected_tests` with the changed paths');
 });
 
 test('get_impact declares types as a string or an array of strings', function () {
     $types = (new GetImpactTool)->toArray()['inputSchema']['properties']['types'];
 
     expect($types['anyOf'])->toEqual([['type' => 'string'], ['type' => 'array', 'items' => ['type' => 'string']]]);
+});
+
+test('get_affected_tests matches necromancer:affected-tests --json for an artifact, plus depth and warnings', function (array $arguments, array $options, int $depth) {
+    writeGraphToolManifest(affectedTestsToolArtifacts());
+
+    $cli = affectedTestsCliJson(['artifact' => 'App\\Models\\Order', ...$options]);
+    $response = callGraphTool(new GetAffectedTestsTool, ['artifact' => 'App\\Models\\Order', ...$arguments]);
+
+    expect($response->isError())->toBeFalse()
+        ->and(graphToolJson($response))->toBe([...$cli, 'depth' => $depth, 'warnings' => []])
+        ->and(graphToolJson($response))->not->toHaveKey('start');
+})->with([
+    'default depth' => [[], [], 2],
+    'depth 1' => [['depth' => 1], ['--depth' => 1], 1],
+]);
+
+test('get_affected_tests defaults to depth 2, reaching the policy test indirectly', function () {
+    writeGraphToolManifest(affectedTestsToolArtifacts());
+
+    $json = graphToolJson(callGraphTool(new GetAffectedTestsTool, ['artifact' => 'models:App\\Models\\Order']));
+
+    expect($json['depth'])->toBe(2)
+        ->and(array_column($json['directly_affected'], 'file'))->toBe(['tests/Unit/OrderTest.php'])
+        ->and(array_column($json['indirectly_affected'], 'file'))->toBe(['tests/Unit/OrderPolicyTest.php'])
+        ->and($json['unmapped'])->toBe([]);
+});
+
+test('get_affected_tests matches necromancer:affected-tests --stdin --json for changed paths', function () {
+    writeGraphToolManifest(affectedTestsToolArtifacts());
+    $paths = ['./app/Policies/OrderPolicy.php', base_path('tests/Unit/OrderTest.php'), 'routes/web.php', '', 'routes/web.php'];
+
+    $cli = affectedTestsCliJson(['stdin' => implode("\n", $paths)]);
+    $json = graphToolJson(callGraphTool(new GetAffectedTestsTool, ['paths' => $paths]));
+
+    expect($json)->toBe([...$cli, 'depth' => 2, 'warnings' => []])
+        ->and($json['unmapped'])->toBe(['routes/web.php'])
+        ->and($json['directly_affected'])->not->toBe([]);
+});
+
+test('get_affected_tests answers empty sections for empty paths', function (array $paths) {
+    writeGraphToolManifest(affectedTestsToolArtifacts());
+
+    $response = callGraphTool(new GetAffectedTestsTool, ['paths' => $paths]);
+
+    expect($response->isError())->toBeFalse()
+        ->and(graphToolJson($response))->toBe([
+            'directly_affected' => [],
+            'indirectly_affected' => [],
+            'unmapped' => [],
+            'depth' => 2,
+            'warnings' => [],
+        ]);
+})->with([
+    'no paths' => [[]],
+    'blank paths' => [['', '   ']],
+]);
+
+test('get_affected_tests requires exactly one of artifact or paths', function (array $arguments) {
+    writeGraphToolManifest(affectedTestsToolArtifacts());
+
+    $response = callGraphTool(new GetAffectedTestsTool, $arguments);
+
+    expect($response->isError())->toBeTrue()
+        ->and(graphToolJson($response))->toHaveKeys(['error', 'message'])
+        ->and(graphToolJson($response)['error'])->toBe('invalid_input');
+})->with([
+    'both' => [['artifact' => 'App\\Models\\Order', 'paths' => ['app/Models/Order.php']]],
+    'neither' => [[]],
+]);
+
+test('get_affected_tests clamps depth to 1-3 and warns', function (int $requested, int $clamped) {
+    writeGraphToolManifest(affectedTestsToolArtifacts());
+
+    $json = graphToolJson(callGraphTool(new GetAffectedTestsTool, ['artifact' => 'App\\Models\\Order', 'depth' => $requested]));
+
+    expect($json['depth'])->toBe($clamped)
+        ->and($json['warnings'])->toHaveCount(1)
+        ->and($json['warnings'][0])->toContain("clamped to {$clamped}")->toContain('get_affected_tests');
+})->with([
+    'zero' => [0, 1],
+    'ten' => [10, 3],
+]);
+
+test('get_affected_tests warns about unmapped paths only on a stale manifest', function () {
+    $artifacts = affectedTestsToolArtifacts();
+    writeGraphToolManifest($artifacts);
+
+    $fresh = graphToolJson(callGraphTool(new GetAffectedTestsTool, ['paths' => ['routes/web.php']]));
+
+    expect($fresh['unmapped'])->toBe(['routes/web.php'])
+        ->and($fresh['warnings'])->toBe([]);
+
+    $artifacts['jobs'][0]['source'] = ['file' => 'app/Jobs/Missing.php', 'hash' => 'deadbeef'];
+    writeGraphToolManifest($artifacts);
+
+    $stale = graphToolJson(callGraphTool(new GetAffectedTestsTool, ['paths' => ['routes/web.php', 'app/Jobs/NewJob.php']]));
+
+    expect($stale['warnings'])->toHaveCount(2)
+        ->and($stale['warnings'][0])->toContain('stale')
+        ->and($stale['warnings'][1])->toContain('2 unmapped path(s)')->toContain('php artisan necromancer:scan');
+
+    $mapped = graphToolJson(callGraphTool(new GetAffectedTestsTool, ['paths' => ['app/Models/Order.php']]));
+
+    expect($mapped['warnings'])->toHaveCount(1);
+});
+
+test('get_affected_tests declares artifact, paths, and depth', function () {
+    $properties = (new GetAffectedTestsTool)->toArray()['inputSchema']['properties'];
+
+    expect($properties)->toHaveKeys(['artifact', 'paths', 'depth'])
+        ->and($properties['paths'])->toMatchArray(['type' => 'array', 'items' => ['type' => 'string']]);
 });

@@ -16,12 +16,6 @@ final class GetImpactTool extends Tool
 {
     use AnswersGraphQueries;
 
-    /**
-     * The deepest Impact returned over MCP: the answer lands in the
-     * agent's context window (docs/adr/0023).
-     */
-    private const MAX_DEPTH = 3;
-
     public function name(): string
     {
         return 'get_impact';
@@ -69,13 +63,7 @@ final class GetImpactTool extends Tool
         }
 
         $warnings = $this->manifestWarnings($manifest);
-        $depth = (int) ($request->get('depth') ?? 1);
-
-        if ($depth > self::MAX_DEPTH || $depth < 1) {
-            $clamped = max(1, min(self::MAX_DEPTH, $depth));
-            $warnings[] = "Requested depth {$depth} was clamped to {$clamped}; get_impact accepts a depth from 1 to ".self::MAX_DEPTH.'.';
-            $depth = $clamped;
-        }
+        $depth = $this->clampDepth($request->get('depth'), 1, $warnings);
 
         $impact = $analyzer->analyze($manifest, $start, $depth);
 
