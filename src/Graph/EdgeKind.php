@@ -13,4 +13,5 @@ enum EdgeKind: string
     case Structural = 'structural';
     case Grouping = 'grouping';
     case Reference = 'reference';
+    case Behavioral = 'behavioral';
 }

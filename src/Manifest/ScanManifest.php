@@ -11,6 +11,7 @@ use JsonSerializable;
 use LaravelNecromancer\Collection\ActionCollector;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\ControllerCollector;
+use LaravelNecromancer\Collection\DispatchFactResolver;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
@@ -253,6 +254,11 @@ final class ScanManifest implements JsonSerializable
             $this->scope($only)['artifact_types'],
         );
         $this->diagnostics = [...$this->diagnostics, ...$configDiagnostics];
+
+        // Dispatches live only in method bodies, so they are read from the
+        // source of the artifacts this scan already collected (ADR 0020).
+        [$identifiedArtifacts, $dispatchDiagnostics] = (new DispatchFactResolver)->apply($identifiedArtifacts);
+        $this->diagnostics = [...$this->diagnostics, ...$dispatchDiagnostics];
 
         return $identifiedArtifacts;
     }

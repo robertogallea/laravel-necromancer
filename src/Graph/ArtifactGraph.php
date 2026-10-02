@@ -9,7 +9,8 @@ use JsonSerializable;
 /**
  * The deterministic node/edge projection of a manifest: canonically-sorted
  * nodes, one per collected artifact, plus their structural, grouping
- * (domain/flow), and reference (ADR) relationships as edges.
+ * (domain/flow), reference (ADR), and behavioral (dispatch) relationships
+ * as edges.
  */
 final readonly class ArtifactGraph implements JsonSerializable
 {

@@ -500,3 +500,23 @@ test('build() gives a synthetic domain, flow, or adr node no facts', function ()
     expect($syntheticNodes)->toHaveCount(3)
         ->and(array_map(fn (ArtifactGraphNode $n): array => $n->facts, $syntheticNodes))->toBe([[], [], []]);
 });
+
+test('build() derives a behavioral edge per dispatched target without synthesizing a node for it', function () {
+    $manifest = ['artifacts' => [
+        'actions' => [['id' => 'actions:App\\Actions\\PlaceOrder', 'class' => 'App\\Actions\\PlaceOrder', 'dispatches' => [
+            ['target' => 'App\\Jobs\\SendInvoice', 'method' => 'handle', 'mode' => 'queued'],
+            ['target' => 'Vendor\\Billing\\InvoicePaid', 'method' => 'handle', 'mode' => null],
+        ], 'source' => null]],
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]];
+
+    $graph = (new ArtifactGraphBuilder)->build($manifest);
+
+    expect(edgeTuples($graph))->toBe([
+        ['actions:App\\Actions\\PlaceOrder', 'jobs:App\\Jobs\\SendInvoice', 'dispatches', 'behavioral'],
+        ['actions:App\\Actions\\PlaceOrder', 'Vendor\\Billing\\InvoicePaid', 'dispatches', 'behavioral'],
+    ])->and(array_map(fn (ArtifactGraphNode $node): string => $node->id, $graph->nodes))->toBe([
+        'actions:App\\Actions\\PlaceOrder',
+        'jobs:App\\Jobs\\SendInvoice',
+    ]);
+});

@@ -61,6 +61,8 @@ The manifest covers 20 artifact types across the full Laravel application struct
 | `validation_rules` | Implicit flag, docblock description |
 | `service_providers` | Deferred flag, source location |
 
+Every class-backed type can also carry a `dispatches` field listing the jobs, events, and mailables it dispatches — see [Dispatches](#dispatches) below.
+
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
 Every class-backed type in the table above — `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
@@ -176,6 +178,48 @@ An action no route targets has `routes: []`. Routes removed by `exclude.routes`/
 Action middleware comes from the controller's own declarations — `HasMiddleware::middleware()` and `#[Middleware]`/`#[WithoutMiddleware]` attributes, honoring `only`/`except` — and is read without ever instantiating the controller. Middleware registered with `$this->middleware()` in a constructor is therefore not visible here; the route artifact's `middleware` list, which also carries group middleware, still includes it.
 
 A controller's `annotations` come from its class-level `#[Necromancer]` attribute (and exact-ID config mappings). A method-level `#[Necromancer]` keeps refining the annotations of the routes that target that method, as described below, and is not copied onto the controller artifact. A route's `controller` relationship resolves to the controller's concept in the OKF bundle and its node in the Artifact Graph.
+
+#### Dispatches
+
+A dispatch — handing a job to the bus, firing an event, or sending a mailable — only exists inside a method body, so it's the one fact Necromancer reads from source text rather than from the booted application. For every class-backed artifact the scan collected (controllers, models, actions, jobs, events, listeners, commands, policies, form requests, enums, observers, Livewire components, mailables, validation rules, service providers, and class-backed middleware), it parses the artifact's own file with `nikic/php-parser` and records what each method dispatches:
+
+```php
+final class PlaceOrder
+{
+    public function handle(Order $order): void
+    {
+        SendInvoice::dispatch($order);
+        event(new OrderPlaced($order));
+    }
+}
+```
+
+```json
+"dispatches": [
+    { "target": "App\\Events\\OrderPlaced", "method": "handle", "mode": null },
+    { "target": "App\\Jobs\\SendInvoice", "method": "handle", "mode": "queued" }
+]
+```
+
+`target` is the fully-qualified class, resolved through the file's `use` imports (aliases included). `mode` records which API the call went through, not whether the target actually queues — that's the target's own fact:
+
+| Call shape | `mode` |
+|---|---|
+| `dispatch(new X)`, `X::dispatch(...)`, `X::dispatchIf/dispatchUnless(...)`, `Bus::dispatch(new X)`, `$this->dispatch(new X)` | `queued` |
+| `dispatch_sync(new X)`, `X::dispatchSync(...)`, `Bus::dispatchSync(new X)` | `sync` |
+| `Bus::chain([new A, new B])`, `Bus::batch([...])` — one entry per class | `queued` |
+| `event(new X)`, `Event::dispatch(new X)`, `broadcast(new X)` | `null` |
+| `Mail::send(new X)`, `Mail::to(...)->send(new X)` | `sync` |
+| `Mail::to(...)->queue(new X)`, `Mail::to(...)->later(..., new X)` | `queued` |
+
+Entries are sorted by method then target, deduplicated, and carry no line numbers; an artifact that dispatches nothing has no `dispatches` key. Each dispatched target becomes a `dispatches` [Relationship](#relationships).
+
+Limitations:
+
+- Only targets written as a class name (`new X(...)` or `X::...`) are seen. Dynamic targets (`dispatch($job)`, container-resolved classes), string events (`event('order.placed')`, Livewire's `$this->dispatch('browser-event')`), and queued closures are skipped.
+- Only methods written in the artifact's own file are read: a dispatch in a parent class or a trait is not attributed to the child.
+- Closure-based dispatchers (closure routes, scheduled closures, closure gates) have no class to read and are not covered. Notifications are not tracked.
+- If an artifact's file can't be parsed, the scan still succeeds, that artifact gets no `dispatches`, and a non-fatal `DS_PARSE_FAILED` diagnostic names it.
 
 On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself. The `withNecromancer()` route macro declares it:
 
@@ -807,7 +851,7 @@ When an artifact's already-collected fields name another artifact by class — a
 - **controller**: [App\Http\Controllers\OrderController](/artifacts/order-controller-9f21ab34.md)
 ```
 
-These lines are drawn from the same [Relationships](#relationships) the Artifact Graph uses, labelled by the fact that declares them. A concept only lists facts the artifact itself records — a model shows `policy` only when it declares one with `#[UsePolicy]`, even though the policy's own `model` also supports that Relationship. Relationship types beyond these (`uses_middleware`, `validates_with`, `tested_by`, a route's `authorized_by`) are in the graph but not yet rendered in the bundle.
+These lines are drawn from the same [Relationships](#relationships) the Artifact Graph uses, labelled by the fact that declares them. A concept only lists facts the artifact itself records — a model shows `policy` only when it declares one with `#[UsePolicy]`, even though the policy's own `model` also supports that Relationship. Relationship types beyond these (`uses_middleware`, `validates_with`, `tested_by`, `dispatches`, a route's `authorized_by`) are in the graph but not yet rendered in the bundle.
 
 Every artifact tagged with the same `domain` or `flow` annotation value is also made navigable through a synthesized **Domain Concept** or **Flow Concept** — one file per distinct value, linking every member artifact:
 
@@ -937,6 +981,7 @@ A Relationship is a directed, typed link derived from facts and annotations the 
 | `observed_by` | model → observer | the model's `observers` and/or the observer's `model` | reflection | — |
 | `listened_by` | event → listener | the event's `listeners` and/or the listener's `handles` | runtime | — |
 | `operates_on` | action → class | class types the action's entrypoints accept | reflection | — |
+| `dispatches` | artifact → job, event, or mailable | the artifact's `dispatches` (one Relationship per target, however many methods dispatch it) | source | `methods`, `modes` (deduplicated, `null` excluded) |
 | `tested_by` | artifact → test | the test's `subject` — an exact class, or a namespace fanned out to every artifact under it | source | `match: exact\|namespace` |
 | `belongs_to_domain` / `belongs_to_flow` | artifact → `domain:<v>` / `flow:<v>` | the artifact's `domain`/`flow` annotation | annotation | — |
 | `references_adr` | artifact → `adr:<path>` | each local `adrs` annotation entry (absolute URIs skipped) | annotation | — |
@@ -959,7 +1004,7 @@ Each `graph.json` edge carries the full Relationship plus the `kind` its type re
 }
 ```
 
-`kind` is `grouping` for `belongs_to_domain`/`belongs_to_flow`, `reference` for `references_adr`, and `structural` for every other type. Edges are canonically ordered (artifact type, then manifest order), so an unchanged manifest always produces a byte-identical `graph.json`. `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an unresolved edge still exists in `graph.json`, just isn't drawn.
+`kind` is `grouping` for `belongs_to_domain`/`belongs_to_flow`, `reference` for `references_adr`, `behavioral` for `dispatches`, and `structural` for every other type. Edges are canonically ordered (artifact type, then manifest order), so an unchanged manifest always produces a byte-identical `graph.json`. `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference, dash-dot for behavioral) — an unresolved edge still exists in `graph.json`, just isn't drawn.
 
 `graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
 
@@ -968,7 +1013,7 @@ Each node also carries its Discovered Facts — every field the artifact carries
 The viewer is interactive:
 
 - **Sidebar** — one row per artifact kind present in the graph, doubling as both a color legend and a filter: unchecking a kind hides its nodes and every edge touching them. **Select all** / **Select none** buttons above the list toggle every kind at once.
-- **Edge key** — a small always-visible card showing the solid/dashed/dotted line style for structural/grouping/reference edges, each independently toggleable.
+- **Edge key** — a small always-visible card showing the solid/dashed/dotted/dash-dot line style for structural/grouping/reference/behavioral edges, each independently toggleable.
 - **Click-to-inspect** — click a node to open a panel with its canonical Artifact ID, kind, Architectural Context (resolved annotations), Relationships (each edge touching it, by type, outgoing as `type → target` and incoming as `source → type`, with unresolved ones marked), and Discovered Facts. Clicking a synthesized domain/flow/ADR node shows its member artifacts (or referencing artifacts, for an ADR) instead. Hiding a selected node's kind via the sidebar closes its panel automatically.
 - **Zoom & pan** — scroll to zoom toward the cursor, drag empty canvas to pan, drag a node to reposition it. **Zoom in** / **Zoom out** buttons in the header step the same zoom centered on the current viewport, and a **Reset view** button refits the camera to the currently visible nodes.
 

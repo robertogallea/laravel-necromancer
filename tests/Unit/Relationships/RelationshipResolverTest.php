@@ -376,3 +376,23 @@ test('a route authorization naming a model without a policy still falls back alo
 
     expect($routeTargets)->toBe(['policies:App\\Policies\\OrderPolicy' => true, 'view' => false]);
 });
+
+test('an artifact dispatches each target once, merging the methods and modes of every dispatch of it', function () {
+    $relationships = relationshipsOf([
+        'controllers' => [['id' => 'controllers:App\\Http\\Controllers\\OrderController', 'class' => 'App\\Http\\Controllers\\OrderController', 'dispatches' => [
+            ['target' => 'App\\Events\\OrderPlaced', 'method' => 'store', 'mode' => null],
+            ['target' => 'App\\Jobs\\SendInvoice', 'method' => 'store', 'mode' => 'queued'],
+            ['target' => 'App\\Jobs\\SendInvoice', 'method' => 'update', 'mode' => 'sync'],
+            ['target' => 'App\\Jobs\\SendInvoice', 'method' => 'update', 'mode' => 'queued'],
+            ['target' => 'Vendor\\Billing\\InvoicePaid', 'method' => 'update', 'mode' => null],
+        ]]],
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice']],
+        'events' => [['id' => 'events:App\\Events\\OrderPlaced', 'class' => 'App\\Events\\OrderPlaced']],
+    ], 'dispatches');
+
+    expect($relationships)->toBe([
+        ['from' => 'controllers:App\\Http\\Controllers\\OrderController', 'type' => 'dispatches', 'to' => 'events:App\\Events\\OrderPlaced', 'provenance' => ['source'], 'resolved' => true, 'metadata' => ['methods' => ['store'], 'modes' => []]],
+        ['from' => 'controllers:App\\Http\\Controllers\\OrderController', 'type' => 'dispatches', 'to' => 'jobs:App\\Jobs\\SendInvoice', 'provenance' => ['source'], 'resolved' => true, 'metadata' => ['methods' => ['store', 'update'], 'modes' => ['queued', 'sync']]],
+        ['from' => 'controllers:App\\Http\\Controllers\\OrderController', 'type' => 'dispatches', 'to' => 'Vendor\\Billing\\InvoicePaid', 'provenance' => ['source'], 'resolved' => false, 'metadata' => ['methods' => ['update'], 'modes' => []]],
+    ]);
+});

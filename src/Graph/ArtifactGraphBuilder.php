@@ -104,7 +104,7 @@ final readonly class ArtifactGraphBuilder
         $adrNodes = [];
 
         foreach ($edges as $edge) {
-            if ($edge->kind === EdgeKind::Structural || isset($seen[$edge->to])) {
+            if (! in_array($edge->kind, [EdgeKind::Grouping, EdgeKind::Reference], true) || isset($seen[$edge->to])) {
                 continue;
             }
 

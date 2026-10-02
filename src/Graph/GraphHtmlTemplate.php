@@ -48,6 +48,7 @@ final class GraphHtmlTemplate
     --accent: #f87171;
     --edge-grouping: #38bdf8;
     --edge-reference: #f59e0b;
+    --edge-behavioral: #a78bfa;
     --header-h: 45px;
     --sidebar-w: 220px;
     --panel-w: 320px;
@@ -67,6 +68,7 @@ final class GraphHtmlTemplate
   .edge-structural { stroke: var(--border); }
   .edge-grouping { stroke: var(--edge-grouping); stroke-dasharray: 5 3; }
   .edge-reference { stroke: var(--edge-reference); stroke-dasharray: 1 3; stroke-linecap: round; }
+  .edge-behavioral { stroke: var(--edge-behavioral); stroke-dasharray: 8 3 2 3; }
   .edge-hidden { display: none; }
   .node circle { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; }
   .node text { fill: var(--text); font-size: 9px; pointer-events: none; }
@@ -149,6 +151,11 @@ final class GraphHtmlTemplate
       <input type="checkbox" checked>
       <svg class="edge-sample" width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" class="edge edge-reference"/></svg>
       <span>Reference</span>
+    </label>
+    <label class="edge-row" data-edge-kind="behavioral">
+      <input type="checkbox" checked>
+      <svg class="edge-sample" width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" class="edge edge-behavioral"/></svg>
+      <span>Behavioral</span>
     </label>
   </div>
   <aside id="inspect-panel">

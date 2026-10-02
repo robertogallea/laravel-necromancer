@@ -5,6 +5,21 @@ All notable changes to `laravel-necromancer` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- New `dispatches` Discovered Fact on every class-backed artifact (controllers, models, actions, jobs, events, listeners, commands, policies, form requests, enums, observers, Livewire components, mailables, validation rules, service providers, and class-backed middleware): the jobs, events, and mailables each method dispatches, as `{target, method, mode}` entries sorted by method then target. `mode` is `queued`, `sync`, or `null` (events), recording which API the call went through. Per ADR 0020, `necromancer:scan` reads these from the source of the artifacts it already collected, using `nikic/php-parser` with import resolution; it never discovers artifacts this way, and `--only` keeps working. A new `dispatches` Relationship (artifact → target, provenance `source`, one per target with merged `methods`/`modes` metadata) renders in the Artifact Graph as a new `behavioral` edge kind, with its own line style and edge-key toggle in `graph.html`. A file that can't be parsed yields a non-fatal `DS_PARSE_FAILED` scan diagnostic. ([#61](https://github.com/robertogallea/laravel-necromancer/issues/61))
+- `nikic/php-parser` ^5 is now a runtime dependency.
+
+### Changed
+
+- Dispatch facts are collected by default, so the first scan after upgrading changes the `content_hash`, and `necromancer:scan --diff --fail-on-drift` reports drift for every artifact that dispatches something until you run `php artisan necromancer:scan` once. `manifest_schema_version` stays `1`.
+
+### Known limitations
+
+- Only dispatches whose target is written as a class name (`new X(...)`, `X::...`) are seen. Dynamic and container-resolved targets, string events, Livewire browser events, and queued closures are skipped. Dispatches written in a parent class or a trait are not attributed to the child artifact, and closure dispatchers (closure routes, scheduled closures, closure gates) and notifications are not covered.
+
 ## 2.3.0
 
 ### Added

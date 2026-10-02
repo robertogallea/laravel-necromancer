@@ -5,7 +5,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "illuminate/support": "^13.0"
+        "illuminate/support": "^13.0",
+        "nikic/php-parser": "^5.0"
     },
     "require-dev": {
         "laravel/ai": "^0.7.2",

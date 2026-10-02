@@ -21,6 +21,7 @@ enum RelationshipType: string
     case ObservedBy = 'observed_by';
     case ListenedBy = 'listened_by';
     case OperatesOn = 'operates_on';
+    case Dispatches = 'dispatches';
     case TestedBy = 'tested_by';
     case BelongsToDomain = 'belongs_to_domain';
     case BelongsToFlow = 'belongs_to_flow';
@@ -35,6 +36,7 @@ enum RelationshipType: string
         return match ($this) {
             self::BelongsToDomain, self::BelongsToFlow => EdgeKind::Grouping,
             self::ReferencesAdr => EdgeKind::Reference,
+            self::Dispatches => EdgeKind::Behavioral,
             default => EdgeKind::Structural,
         };
     }
