@@ -144,7 +144,7 @@ beforeEach(function () {
 
 afterEach(function () {
     File::delete(base_path('necromancer.json'));
-    File::deleteDirectory(base_path('docs/adr'));
+    File::deleteDirectory(base_path('docs/adr/necromancer'));
 });
 
 test('the infer command is registered in artisan', function () {

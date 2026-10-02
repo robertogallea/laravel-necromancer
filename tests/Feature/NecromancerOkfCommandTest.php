@@ -141,7 +141,7 @@ test('the okf command copies a declared local ADR and synthesizes domain/flow co
 
     expect(count(File::glob(base_path('okf/artifacts/*.md'))))->toBe(4);
 
-    File::deleteDirectory(base_path('docs/adr'));
+    File::delete(base_path('docs/adr/0004-x.md'));
 });
 
 test('the okf command writes a README.md documenting necromancer:okf and necromancer:okf-enrich', function () {
