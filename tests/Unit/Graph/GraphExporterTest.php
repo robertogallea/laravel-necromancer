@@ -223,3 +223,25 @@ test('export() replaces a previously-generated graph in place', function () {
     expect($result->successful)->toBeTrue()
         ->and(file_get_contents($output.'/graph.html'))->not->toBe('<html>old</html>');
 });
+
+test('export() writes dispatches as behavioral edges and gives them their own styled, toggleable edge-key row', function () {
+    $output = graphTempDir().'/graph';
+
+    $manifest = completeGraphManifest([
+        'actions' => [['id' => 'actions:App\\Actions\\PlaceOrder', 'class' => 'App\\Actions\\PlaceOrder', 'dispatches' => [
+            ['target' => 'App\\Jobs\\SendInvoice', 'method' => 'handle', 'mode' => 'queued'],
+        ], 'source' => null]],
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $graph = json_decode((string) file_get_contents($output.'/graph.json'), true, 512, JSON_THROW_ON_ERROR);
+    $html = file_get_contents($output.'/graph.html');
+
+    expect($graph['edges'])->toBe([
+        ['from' => 'actions:App\\Actions\\PlaceOrder', 'to' => 'jobs:App\\Jobs\\SendInvoice', 'type' => 'dispatches', 'kind' => 'behavioral', 'provenance' => ['source'], 'resolved' => true, 'metadata' => ['methods' => ['handle'], 'modes' => ['queued']]],
+    ])->and($html)->toContain('.edge-behavioral {')
+        ->and($html)->toContain('<label class="edge-row" data-edge-kind="behavioral">')
+        ->and($html)->toContain('class="edge edge-behavioral"');
+});

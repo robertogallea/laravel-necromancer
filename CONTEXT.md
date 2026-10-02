@@ -98,7 +98,7 @@ A unit of knowledge describing a domain and connecting the artifacts associated 
 A unit of knowledge describing a flow and connecting the artifacts that participate in it.
 
 **Artifact Graph**:
-A deterministic node/edge visualization of the manifest's artifacts and their structural, grouping (domain/flow), and reference (ADR) relationships.
+A deterministic node/edge visualization of the manifest's artifacts and their structural, grouping (domain/flow), reference (ADR), and behavioral (dispatch) relationships.
 _Avoid_: Concept Graph, dependency graph
 
 **Bundle Announcement**:

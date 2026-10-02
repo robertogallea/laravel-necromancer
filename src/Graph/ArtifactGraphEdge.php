@@ -12,7 +12,7 @@ use stdClass;
 
 /**
  * The Artifact Graph rendering of one Relationship. `kind` (structural,
- * grouping, reference) is derived from the relationship type and drives
+ * grouping, reference, behavioral) is derived from the relationship type and drives
  * graph.html's line styling and per-kind toggles.
  *
  * `from`/`to` are canonical ids — a collected artifact's own id, or a

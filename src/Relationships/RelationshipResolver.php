@@ -96,6 +96,7 @@ final class RelationshipResolver
                     default => null,
                 };
 
+                $this->dispatchRelationships($artifact);
                 $this->annotationRelationships($artifact);
             }
         }
@@ -324,6 +325,31 @@ final class RelationshipResolver
     }
 
     /**
+     * One relationship per dispatched target, however many methods dispatch
+     * it and through whichever APIs; `null` modes (events) are not listed.
+     *
+     * @param  array<string, mixed>  $artifact
+     */
+    private function dispatchRelationships(array $artifact): void
+    {
+        foreach (array_values((array) ($artifact['dispatches'] ?? [])) as $position => $dispatch) {
+            $target = is_array($dispatch) ? ($dispatch['target'] ?? null) : null;
+            $method = is_array($dispatch) ? ($dispatch['method'] ?? null) : null;
+
+            if (! is_string($target) || $target === '' || ! is_string($method)) {
+                continue;
+            }
+
+            $mode = $dispatch['mode'] ?? null;
+
+            $this->addToClass($artifact['id'], RelationshipType::Dispatches, $target, Provenance::Source, 'dispatches', [
+                'methods' => [$method],
+                'modes' => is_string($mode) ? [$mode] : [],
+            ], $position);
+        }
+    }
+
+    /**
      * Domain/Flow/ADR ends are synthesized concepts rather than collected
      * artifacts, but always exist, so these relationships are resolved.
      * Absolute-URI ADRs are external links, not ADR concepts, and skipped.
@@ -451,8 +477,9 @@ final class RelationshipResolver
     /**
      * Records a relationship, merging it into an existing one with the same
      * identity — (from, type, to, discriminator) — by unioning provenance,
-     * evidence, and middleware paths. A heuristic relationship stops being
-     * one as soon as any non-heuristic fact supports it.
+     * evidence, middleware paths, and dispatching methods/modes. A heuristic
+     * relationship stops being one as soon as any non-heuristic fact
+     * supports it.
      */
     private function add(Relationship $relationship): void
     {
@@ -470,6 +497,11 @@ final class RelationshipResolver
         if (isset($metadata['groups'], $relationship->metadata['groups'])) {
             $metadata['groups'] = array_values(array_unique([...$metadata['groups'], ...$relationship->metadata['groups']]));
             $metadata['direct'] = $metadata['direct'] || $relationship->metadata['direct'];
+        }
+
+        if (isset($metadata['methods'], $relationship->metadata['methods'])) {
+            $metadata['methods'] = array_values(array_unique([...$metadata['methods'], ...$relationship->metadata['methods']]));
+            $metadata['modes'] = array_values(array_unique([...$metadata['modes'], ...$relationship->metadata['modes']]));
         }
 
         if (! isset($relationship->metadata['heuristic'])) {
