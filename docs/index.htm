@@ -141,7 +141,7 @@ Compact context written to CLAUDE.md</pre>
   <section id="artifacts" class="py-16 px-4 border-b border-gray-800">
     <div class="max-w-5xl mx-auto">
       <h2 class="font-display text-2xl font-bold text-red-400 mb-2">What Necromancer Collects</h2>
-      <p class="text-gray-500 mb-8">The manifest covers 20 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection. Every class-backed artifact can also carry a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">dispatches</code> field — the jobs, events, and mailables each of its methods dispatches, read from its own source with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">nikic/php-parser</code>.</p>
+      <p class="text-gray-500 mb-8">The manifest covers 21 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection. Every class-backed artifact can also carry a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">dispatches</code> field — the jobs, events, and mailables each of its methods dispatches, read from its own source with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">nikic/php-parser</code>.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
@@ -264,6 +264,12 @@ Compact context written to CLAUDE.md</pre>
           <div class="text-gray-500 text-sm">Deferred flag, source location</div>
         </div>
 
+        <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
+          <div class="text-gray-700 font-mono text-xs mb-1">21</div>
+          <div class="font-mono font-semibold text-gray-300 text-sm mb-1">bindings</div>
+          <div class="text-gray-500 text-sm">Abstract, concrete and how it was learned, lifetime, declaring provider, deferred flag, and the consumer of a contextual binding — read from the booted container, nothing resolved</div>
+        </div>
+
       </div>
     </div>
   </section>
@@ -285,7 +291,7 @@ Compact context written to CLAUDE.md</pre>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background: hsl(160,65%,60%)"></span>policies</span>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background: hsl(208,65%,60%)"></span>commands</span>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background: hsl(31,65%,60%)"></span>form_requests</span>
-          <span class="text-gray-700">+ 14 more kinds, each colored the same way every time</span>
+          <span class="text-gray-700">+ 15 more kinds, each colored the same way every time</span>
         </div>
       </div>
 
@@ -531,14 +537,15 @@ php artisan necromancer:diff --base-manifest=snapshots/before.json</pre>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--output=PATH</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Measures how much Necromancer's generated context improves AI accuracy, hallucination rate, latency, and token cost. Runs a task suite in three conditions by default — no context, manual <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AGENTS.md</code>, and Necromancer-generated <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">NECROMANCER.md</code> — and reports results side by side, including per-condition average latency (generation and, separately, judge). An opt-in fourth condition, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer-mcp</code> (bare instructions plus live, tool-based manifest queries instead of a pre-assembled document), adds a "Necromancer (MCP) vs Necromancer (static)" comparison line when requested via <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--condition=</code>. Use <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--generate-suite</code> to scaffold a grounded task suite from the current manifest before running the benchmark.</p>
+        <p class="text-gray-400 text-sm mb-3">Measures how much Necromancer's generated context improves AI accuracy, hallucination rate, latency, and token cost. Runs a task suite in three conditions by default — no context, manual <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">AGENTS.md</code>, and Necromancer-generated <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">NECROMANCER.md</code> — and reports results side by side, including per-condition average latency (generation and, separately, judge). An opt-in fourth condition, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer-mcp</code> (bare instructions plus live, tool-based manifest queries instead of a pre-assembled document), adds a "Necromancer (MCP) vs Necromancer (static)" comparison line when requested via <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--condition=</code>. A second opt-in condition, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer-mcp-graph</code>, adds the <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">get_artifact</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">get_relationships</code>, and <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">get_impact</code> graph tools, measuring what following Relationships adds over flat queries. Use <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--generate-suite</code> to scaffold a grounded task suite from the current manifest before running the benchmark.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:benchmark
 php artisan necromancer:benchmark --generate-suite   <span class="text-gray-600"># scaffold tasks from manifest → config/benchmark-tasks.php</span>
 php artisan necromancer:benchmark --generate-suite --suite-output=custom/tasks.php
 php artisan necromancer:benchmark --no-judge        <span class="text-gray-600"># automated checks only</span>
 php artisan necromancer:benchmark --format=markdown --output=benchmark.md
-php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   <span class="text-gray-600"># static context vs. live tool-querying</span></pre>
+php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   <span class="text-gray-600"># static context vs. live tool-querying</span>
+php artisan necromancer:benchmark --condition=necromancer-mcp,necromancer-mcp-graph   <span class="text-gray-600"># flat queries vs. graph tools</span></pre>
           <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
         </div>
       </div>
@@ -611,7 +618,7 @@ php artisan necromancer:okf --output=dist/okf</pre>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-partial</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic <strong class="text-gray-200">Artifact Graph</strong> — see it <a href="#visualize" class="text-red-400 hover:text-red-300 transition-colors">pictured above</a>. Every edge is a typed <strong class="text-gray-200">Relationship</strong> derived from facts the manifest already holds — <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">handled_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">uses_middleware</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">validates_with</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">authorized_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">relates_to</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">observed_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">listened_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">operates_on</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">tested_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">dispatches</code> — each carrying its provenance (runtime, reflection, source, annotation) and whether both ends were collected. Relationships are never stored in <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer.json</code>. <strong class="text-gray-200">Structural</strong> edges link artifacts; <strong class="text-gray-200">behavioral</strong> edges (dash-dot) show what an artifact dispatches; <strong class="text-gray-200">grouping</strong> edges connect an artifact to its declared domain/flow; <strong class="text-gray-200">reference</strong> edges connect it to a declared local ADR. The sidebar doubles as a color-coded legend and kind filter. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> is self-contained (no CDN dependencies) and opens straight from disk — no server needed. Entirely independent of <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code>; refuses a stale or partial manifest by default; writes atomically.</p>
+        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic <strong class="text-gray-200">Artifact Graph</strong> — see it <a href="#visualize" class="text-red-400 hover:text-red-300 transition-colors">pictured above</a>. Every edge is a typed <strong class="text-gray-200">Relationship</strong> derived from facts the manifest already holds — <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">handled_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">uses_middleware</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">validates_with</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">authorized_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">relates_to</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">observed_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">listened_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">operates_on</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">tested_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">dispatches</code>, and for bindings <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">resolved_as</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">registered_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">consumed_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">takes_precedence_over</code> — each carrying its provenance (runtime, reflection, source, annotation) and whether both ends were collected. Relationships are never stored in <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer.json</code>. <strong class="text-gray-200">Structural</strong> edges link artifacts; <strong class="text-gray-200">behavioral</strong> edges (dash-dot) show what an artifact dispatches; <strong class="text-gray-200">grouping</strong> edges connect an artifact to its declared domain/flow; <strong class="text-gray-200">reference</strong> edges connect it to a declared local ADR. The sidebar doubles as a color-coded legend and kind filter. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> is self-contained (no CDN dependencies) and opens straight from disk — no server needed. Entirely independent of <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code>; refuses a stale or partial manifest by default; writes atomically.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:graph
 php artisan necromancer:graph --allow-stale --allow-partial
@@ -797,8 +804,13 @@ php artisan necromancer:generate</pre>
           <p class="text-gray-500 text-sm mt-2">List everything reachable from an artifact — the same shape as <code class="font-mono text-xs">necromancer:impact --json</code>, depth 1–3.</p>
         </div>
 
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">get_affected_tests</code>
+          <p class="text-gray-500 text-sm mt-2">List the tests affected by a changed artifact or by changed file paths — the same sections as <code class="font-mono text-xs">necromancer:affected-tests --json</code>. Agents are told to call it with the paths they edited.</p>
+        </div>
+
       </div>
-      <p class="text-gray-500 text-sm mb-8">The three graph tools follow Relationships deterministically, with no LLM. Since an agent makes the manifest stale with its first edit, they answer from a stale or partial-scope manifest anyway and say so in a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">warnings</code> list, instead of refusing like the CLI.</p>
+      <p class="text-gray-500 text-sm mb-8">The four graph tools follow Relationships deterministically, with no LLM. Since an agent makes the manifest stale with its first edit, they answer from a stale or partial-scope manifest anyway and say so in a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">warnings</code> list, instead of refusing like the CLI.</p>
       <div class="code-block relative">
         <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">{
   "mcpServers": {
@@ -899,7 +911,7 @@ php artisan necromancer:generate</pre>
                 <code class="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">config('necromancer.annotations')</code>
               </td>
               <td class="py-3 text-gray-500 align-top">
-                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> on closures, test files, gates, scheduled tasks, and registration-specific middleware — keyed by exact canonical Artifact ID, no wildcards
+                <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">annotations</code> on closures, test files, gates, scheduled tasks, bindings, and registration-specific middleware — keyed by exact canonical Artifact ID, no wildcards
               </td>
             </tr>
           </tbody>
@@ -1003,9 +1015,11 @@ Route::singleton('profile', ProfileController::class)->withNecromancer(domain: '
         <div class="mt-4 code-block relative">
           <pre class="bg-black border border-gray-800 text-gray-300 font-mono text-xs p-4 rounded-lg overflow-x-auto"><span class="text-gray-600">// config/necromancer.php</span>
 'exclude' => [
-    'routes' => ['horizon.*', 'telescope.*', 'debugbar.*'],
-    'models' => [],
-    'tests'  => [],
+    'routes'     => ['horizon.*', 'telescope.*', 'debugbar.*'],
+    'route_uris' => ['up', 'livewire-*', '_inertia/devtools*'],
+    'models'     => [],
+    'tests'      => [],
+    'bindings'   => [],   // Str::is() patterns matched against a binding's abstract
 ],</pre>
         </div>
       </div>
