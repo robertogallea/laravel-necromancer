@@ -5,6 +5,9 @@ use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\AiServiceProvider;
 use Laravel\Ai\Prompts\AgentPrompt;
 use LaravelNecromancer\Benchmark\GenerationAgent;
+use LaravelNecromancer\Benchmark\Tools\GetArtifactTool as BenchmarkGetArtifactTool;
+use LaravelNecromancer\Benchmark\Tools\GetImpactTool as BenchmarkGetImpactTool;
+use LaravelNecromancer\Benchmark\Tools\GetRelationshipsTool as BenchmarkGetRelationshipsTool;
 use LaravelNecromancer\Benchmark\Tools\QueryArtifactsTool as BenchmarkQueryArtifactsTool;
 use LaravelNecromancer\Benchmark\Tools\QueryModelsTool as BenchmarkQueryModelsTool;
 use LaravelNecromancer\Benchmark\Tools\QueryRoutesTool as BenchmarkQueryRoutesTool;
@@ -621,6 +624,80 @@ test('necromancer-mcp condition builds the generation agent with bare instructio
     });
 });
 
+test('necromancer-mcp-graph condition builds the generation agent with bare instructions, the four query tools, and the three graph tools', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(['auth authorize Route::get']);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp-graph'],
+        '--type' => ['codegen'],
+    ])->assertSuccessful();
+
+    GenerationAgent::assertPrompted(function (AgentPrompt $prompt): bool {
+        $toolClasses = array_map(get_class(...), iterator_to_array($prompt->agent->tools()));
+        sort($toolClasses);
+
+        $expected = [
+            BenchmarkGetArtifactTool::class,
+            BenchmarkGetImpactTool::class,
+            BenchmarkGetRelationshipsTool::class,
+            BenchmarkQueryArtifactsTool::class,
+            BenchmarkQueryModelsTool::class,
+            BenchmarkQueryRoutesTool::class,
+            BenchmarkSearchArtifactsTool::class,
+        ];
+        sort($expected);
+
+        return $prompt->agent->instructions() === 'You are a Laravel expert. Answer questions about this codebase accurately and concisely.'
+            && $toolClasses === $expected;
+    });
+});
+
+test('necromancer-mcp and necromancer-mcp-graph cap the tool-calling loop at the same number of steps', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp', 'necromancer-mcp-graph'],
+        '--type' => ['codegen'],
+    ])->assertSuccessful();
+
+    $stepsByToolCount = [];
+
+    GenerationAgent::assertPrompted(function (AgentPrompt $prompt) use (&$stepsByToolCount): bool {
+        $stepsByToolCount[count(iterator_to_array($prompt->agent->tools()))] = $prompt->agent->maxSteps();
+
+        return count($stepsByToolCount) === 2;
+    });
+
+    expect(array_keys($stepsByToolCount))->toEqualCanonicalizing([4, 7])
+        ->and(array_unique($stepsByToolCount))->toHaveCount(1);
+});
+
+test('necromancer-mcp-graph is NOT included by default when --condition is omitted entirely', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-default-conditions-graph-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--type' => ['codegen'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $conditions = array_values(array_unique(array_column(json_decode(File::get($outputPath), true)['results'], 'condition')));
+
+    expect($conditions)->toEqualCanonicalizing(['none', 'manual', 'necromancer']);
+
+    File::delete($outputPath);
+});
+
 test('the none condition still builds the generation agent with no tools attached', function () {
     File::put(base_path('necromancer.json'), benchmarkManifest());
     GenerationAgent::fake(['auth authorize Route::get']);
@@ -776,6 +853,84 @@ test('markdown output omits the Necromancer (MCP) vs Necromancer (static) line w
     expect(File::get($outputPath))->not->toContain('Necromancer (MCP) vs Necromancer (static)');
 });
 
+test('terminal output shows the Necromancer (MCP graph) vs Necromancer (MCP) line and the MCP graph label when both MCP conditions ran', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp', 'necromancer-mcp-graph'],
+        '--type' => ['codegen'],
+    ])
+        ->expectsOutputToContain('Necromancer (MCP graph) vs Necromancer (MCP):  +0pp accuracy · +0pp fewer hallucinations')
+        ->expectsOutputToContain('Necromancer (MCP graph)')
+        ->assertSuccessful();
+});
+
+test('terminal output omits the Necromancer (MCP graph) vs Necromancer (MCP) line unless both MCP conditions ran', function (array $conditions) {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => $conditions,
+        '--type' => ['codegen'],
+    ])
+        ->doesntExpectOutputToContain('Necromancer (MCP graph) vs Necromancer (MCP)')
+        ->assertSuccessful();
+})->with([
+    'without necromancer-mcp' => [['necromancer', 'necromancer-mcp-graph']],
+    'without necromancer-mcp-graph' => [['necromancer', 'necromancer-mcp']],
+]);
+
+test('markdown output shows the Necromancer (MCP graph) vs Necromancer (MCP) line only when both MCP conditions ran', function (array $conditions, bool $shown) {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+    GenerationAgent::fake(array_fill(0, 20, 'auth authorize Route::get'));
+
+    $outputPath = base_path('benchmark-test-output.md');
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => $conditions,
+        '--type' => ['codegen'],
+        '--format' => 'markdown',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $markdown = File::get($outputPath);
+    File::delete($outputPath);
+
+    expect(str_contains($markdown, '**Necromancer (MCP graph) vs Necromancer (MCP):** +0pp accuracy · +0pp hallucination reduction'))->toBe($shown)
+        ->and($markdown)->toContain($conditions === ['necromancer', 'necromancer-mcp'] ? 'Necromancer (MCP)' : 'Necromancer (MCP graph)');
+})->with([
+    'both MCP conditions' => [['necromancer-mcp', 'necromancer-mcp-graph'], true],
+    'without necromancer-mcp' => [['necromancer', 'necromancer-mcp-graph'], false],
+    'without necromancer-mcp-graph' => [['necromancer', 'necromancer-mcp'], false],
+]);
+
+test('the listener and dispatch Q&A tasks are skipped when no event has a listener and nothing dispatches', function () {
+    File::put(base_path('necromancer.json'), benchmarkManifest());
+
+    $outputPath = base_path('benchmark-relationship-tasks-test.json');
+    File::delete($outputPath);
+
+    $this->artisan('necromancer:benchmark', [
+        '--no-judge' => true,
+        '--condition' => ['necromancer-mcp-graph'],
+        '--type' => ['qa'],
+        '--no-dump' => true,
+        '--format' => 'json',
+        '--output' => $outputPath,
+    ])->assertSuccessful();
+
+    $results = collect(json_decode(File::get($outputPath), true)['results'])->keyBy('task_id');
+    File::delete($outputPath);
+
+    expect($results['qa-006']['skipped'])->toBeTrue()
+        ->and($results['qa-007']['skipped'])->toBeTrue()
+        ->and($results['qa-001']['skipped'])->toBeFalse();
+});
+
 test('--generate-suite writes a PHP task file and exits without benchmarking', function () {
     File::put(base_path('necromancer.json'), benchmarkManifest());
 
@@ -792,7 +947,7 @@ test('--generate-suite writes a PHP task file and exits without benchmarking', f
     expect(file_exists($outputPath))->toBeTrue();
 
     $tasks = require $outputPath;
-    expect($tasks)->toBeArray()->toHaveCount(12);
+    expect($tasks)->toBeArray()->toHaveCount(14);
 
     @unlink($outputPath);
 });

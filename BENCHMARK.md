@@ -1,6 +1,6 @@
 # necromancer:benchmark — AI Context Benchmark
 
-`necromancer:benchmark` measures how much Necromancer's generated context file improves AI coding-assistant effectiveness on your codebase. It runs a bundled task suite in three conditions by default — plus an optional fourth, `necromancer-mcp` — scores each response automatically and optionally with an AI judge, and reports accuracy, hallucination rate, quality, latency, and token cost side by side.
+`necromancer:benchmark` measures how much Necromancer's generated context file improves AI coding-assistant effectiveness on your codebase. It runs a bundled task suite in three conditions by default — plus two optional ones, `necromancer-mcp` and `necromancer-mcp-graph` — scores each response automatically and optionally with an AI judge, and reports accuracy, hallucination rate, quality, latency, and token cost side by side.
 
 ---
 
@@ -14,6 +14,7 @@ Every task in the suite runs once per **context condition**:
 | `manual` | A hand-written context file (default: `AGENTS.md`, configurable via `benchmark.manual_context_path`) |
 | `necromancer` | The Necromancer-generated `NECROMANCER.md` |
 | `necromancer-mcp` | No context file — instead, the model has access to four read-only tools that query the manifest live |
+| `necromancer-mcp-graph` | No context file — the four query tools of `necromancer-mcp` plus three graph tools that follow Relationships |
 
 ### The `necromancer-mcp` condition
 
@@ -21,7 +22,17 @@ Rather than reading a pre-assembled document, this condition gives the generatio
 
 Despite the name, this condition doesn't start Necromancer's actual MCP server or use the MCP protocol — it uses `laravel/ai`-native tool implementations that mirror the same four query operations, so no `laravel/mcp` installation or running server is required. The name reflects the *capability* being approximated — what a real MCP-connected client like Claude Code or Cursor would have access to — not the wire mechanism underneath. The tool-calling loop is capped at 8 steps per task, pinned explicitly rather than left to `laravel/ai`'s framework-computed default, so runs stay reproducible across `laravel/ai` version upgrades.
 
-Q&A tasks are an exception, but only for the *static* `necromancer` condition: because `NECROMANCER.md` is generated directly from the manifest, a Q&A task asking "which models have observers?" would trivially retrieve the answer from the context — the AI is just reading back what it was told. `necromancer-mcp` doesn't have this problem, since the model isn't handed the answer — it has to choose the right tool and interpret structured output — so Q&A tasks run under `none`, `manual`, and `necromancer-mcp`, and are excluded only from the static `necromancer` condition.
+Q&A tasks are an exception, but only for the *static* `necromancer` condition: because `NECROMANCER.md` is generated directly from the manifest, a Q&A task asking "which models have observers?" would trivially retrieve the answer from the context — the AI is just reading back what it was told. `necromancer-mcp` doesn't have this problem, since the model isn't handed the answer — it has to choose the right tool and interpret structured output — so Q&A tasks run under `none`, `manual`, `necromancer-mcp`, and `necromancer-mcp-graph`, and are excluded only from the static `necromancer` condition.
+
+### The `necromancer-mcp-graph` condition
+
+This condition adds the MCP server's graph tools — `get_artifact`, `get_relationships`, and `get_impact` — to the four query tools of `necromancer-mcp`. Each one returns exactly what its MCP counterpart returns for the same manifest and input, `warnings` and error bodies included, because both wrap the same query service. `get_affected_tests` isn't included: no task asks which tests to run, and the model never edits files.
+
+It's a separate condition, not an addition to `necromancer-mcp`, so `necromancer-mcp`'s results stay comparable across versions (a condition's tool set never changes once published, see ADR 0009). The two conditions use the same bare instructions, the same 8-step cap, and the same Q&A tasks, so the difference between them measures what following Relationships adds over flat queries. It's opt-in:
+
+```bash
+php artisan necromancer:benchmark --condition=necromancer-mcp,necromancer-mcp-graph --no-judge
+```
 
 Each response is scored by:
 
@@ -30,7 +41,7 @@ Each response is scored by:
 
 Wall-clock latency is measured independently around each AI call — the generation call, and separately the judge call when it runs — so a slow judge model is never mistaken for a slow generation model. Each condition's report shows the average latency (with standard deviation, when at least two results are available) for both.
 
-The primary comparison is **Necromancer vs. manual** — proving the generated context outperforms a hand-written one, not just an empty context. A secondary comparison, **Necromancer (MCP) vs. Necromancer (static)**, shows whether live tool-querying discovers the same facts as effectively as reading the pre-generated document — see the comparison line in the example output below.
+The primary comparison is **Necromancer vs. manual** — proving the generated context outperforms a hand-written one, not just an empty context. A secondary comparison, **Necromancer (MCP) vs. Necromancer (static)**, shows whether live tool-querying discovers the same facts as effectively as reading the pre-generated document — see the comparison line in the example output below. A third, **Necromancer (MCP graph) vs. Necromancer (MCP)**, shows what the graph tools add.
 
 ---
 
@@ -78,7 +89,7 @@ php artisan necromancer:generate
 ## Running the benchmark
 
 ```bash
-# Full benchmark — all 12 tasks × 3 conditions × AI judge
+# Full benchmark — all 14 tasks × 3 conditions × AI judge
 php artisan necromancer:benchmark
 
 # Automated checks only (single provider, no judge cost)
@@ -166,6 +177,16 @@ php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp --no-j
 ```
 
 The `Necromancer (MCP) vs Necromancer (static)` line only appears when both `necromancer` and `necromancer-mcp` are present in the run — omitted, not shown blank, otherwise. `--format=markdown` renders the same comparison line the same way.
+
+### Comparing `necromancer-mcp-graph` against `necromancer-mcp`
+
+When both MCP conditions run, a `Necromancer (MCP graph) vs Necromancer (MCP)` line follows, with the same accuracy and hallucination deltas:
+
+```
+  Necromancer (MCP graph) vs Necromancer (MCP):  +6pp accuracy · +0pp fewer hallucinations
+```
+
+It's omitted unless both conditions are present, in the terminal and in `--format=markdown`.
 
 ---
 
@@ -288,7 +309,7 @@ php artisan necromancer:benchmark --no-dump
 
 | Option | Description |
 |---|---|
-| `--condition=*` | Conditions to run: `none`, `manual`, `necromancer`, `necromancer-mcp`. Default: `none`, `manual`, `necromancer`. |
+| `--condition=*` | Conditions to run: `none`, `manual`, `necromancer`, `necromancer-mcp`, `necromancer-mcp-graph`. Default: `none`, `manual`, `necromancer`. |
 | `--type=*` | Task types: `qa`, `codegen`, `mini`. Default: all. |
 | `--no-judge` | Skip the AI-as-judge pass (automated checks only). |
 | `--no-dump` | Skip writing the per-run dump to `storage/`. |
@@ -324,11 +345,11 @@ php artisan necromancer:benchmark --no-dump
 
 ## Task suite
 
-The bundled suite is **generic** — it works on any Laravel application by using manifest-derived fact keys (`routes.auth_required`, `models.with_observers`, etc.) and skipping tasks whose `required_key` is absent from the manifest. It contains 12 tasks:
+The bundled suite is **generic** — it works on any Laravel application by using manifest-derived fact keys (`routes.auth_required`, `models.with_observers`, etc.) and skipping tasks whose `required_key` is absent from the manifest. It contains 14 tasks:
 
 | Category | Count | Tests |
 |---|---|---|
-| Q&A | 5 | Route auth, model observers, job retry config, model casts, policies |
+| Q&A | 7 | Route auth, model observers, job retry config, model casts, policies, event listeners, dispatches |
 | Code generation | 4 | Adding routes, model casts, FormRequests, event listeners |
 | Mini end-to-end | 3 | Multi-step features combining routes, jobs, listeners, and resources |
 
@@ -339,12 +360,23 @@ Each task carries `must_contain` / `must_not_contain` string assertions for auto
     'id'         => 'qa-001',
     'type'       => 'qa',
     'prompt'     => '...',
-    'conditions' => ['none', 'manual'],   // skip the necromancer and necromancer-mcp conditions
+    'conditions' => ['none', 'manual'],   // skip the necromancer and both MCP conditions
     'assertions' => [...],
 ]
 ```
 
-Omitting `conditions` (or setting it to `null`) means the task runs under all active conditions. All built-in Q&A tasks set `['none', 'manual', 'necromancer-mcp']` by default — excluding only the static `necromancer` condition, whose context already contains the answer verbatim.
+Omitting `conditions` (or setting it to `null`) means the task runs under all active conditions. All built-in Q&A tasks set `['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph']` by default — excluding only the static `necromancer` condition, whose context already contains the answer verbatim. A custom suite that whitelists conditions must add `necromancer-mcp-graph` to its tasks for them to run under that condition; tasks without `conditions` run under it automatically.
+
+Two Q&A tasks are answered by following Relationships:
+
+| Task | Question | Scored on | Golden answer |
+|---|---|---|---|
+| `qa-006` | Which events have listeners, and which listener handles each? | Recall of listener names | `events.listeners`: every `listened_by` Relationship's listener, cross-checked against the event dispatcher's registered listeners |
+| `qa-007` | Which classes dispatch jobs, events, or mailables, and what do they dispatch? | Recall of dispatched class names | `dispatches.targets`: every `dispatches` Relationship's target, trusted as-is (the runtime has nothing to check a dispatch against) |
+
+Each is skipped when its key resolves empty: no event has a listener, or nothing dispatches.
+
+Aggregate scores are only comparable between runs with the same task set. Adding these tasks shifts every condition's averages compared with a run of the older 12-task suite, while each task's own results stay comparable through its task ID in the result dump.
 
 ### Generating a grounded suite
 
@@ -357,7 +389,9 @@ php artisan necromancer:scan
 php artisan necromancer:benchmark --generate-suite
 ```
 
-This writes `config/benchmark-tasks.php` with prompts and assertions tailored to your application's real artifacts (e.g. `"What does the Order model observer do?"` instead of a generic observer question). Wire it up in `config/necromancer.php`:
+This writes `config/benchmark-tasks.php` with prompts and assertions tailored to your application's real artifacts (e.g. `"What does the Order model observer do?"` instead of a generic observer question). Every generated Q&A task lists `necromancer-mcp-graph` in its `conditions`, and the generated suite includes `qa-006` and `qa-007` unchanged.
+
+It also adds one task the bundled suite doesn't have, `qa-008`: "What is directly connected to the `<Model>` model?", for the model taking part in the most Relationships (the earliest in manifest order on a tie). Its golden answer, `impact.labels.<Artifact ID>`, is the label of every node `necromancer:impact` reaches from that model at depth 1, scored on recall and trusted as-is. The task is omitted when no model has a Relationship. Wire it up in `config/necromancer.php`:
 
 ```php
 'benchmark' => [
@@ -406,12 +440,12 @@ Each task must follow this shape:
 
 | Risk | Mitigation |
 |---|---|
-| Q&A tasks trivially score 100% under Necromancer (the answer is literally in the context file) | Q&A tasks only run under `none`, `manual`, and `necromancer-mcp` — the static `necromancer` condition is excluded by default via the `conditions` field |
-| Manifest-derived golden answers favour Necromancer | Each `fact_key` is cross-checked against the framework runtime (`Route::getRoutes()`, `class_exists()`) before use; mismatches are flagged in the report |
+| Q&A tasks trivially score 100% under Necromancer (the answer is literally in the context file) | Q&A tasks only run under `none`, `manual`, `necromancer-mcp`, and `necromancer-mcp-graph` — the static `necromancer` condition is excluded by default via the `conditions` field |
+| Manifest-derived golden answers favour Necromancer | Fact keys with a runtime equivalent are cross-checked against the framework (`Route::getRoutes()`, `class_exists()`, the event dispatcher's listeners) before use; mismatches are flagged in the report |
 | AI judge favours its own output style | Generation and judge use **different models** (e.g. Claude generates, GPT-4o judges) |
 | No-context is an unfair baseline | The **manual vs. necromancer** comparison is the primary claim; no-context is a lower bound only |
 | Latency differences look like a speed verdict on the model | The `none`/`manual`/`necromancer` context files differ in size, so a slower `necromancer` condition likely reflects a longer prompt, not a slower model — latency is reported for diagnostics, not as an accuracy/quality-style comparison claim |
-| `necromancer-mcp`'s `Tokens` figure understates true cost when the model makes more than one tool call | `laravel/ai`'s streaming events only expose token usage for the final tool-calling round — intermediate rounds' usage isn't visible, so this condition's token figure is a lower bound, not an apples-to-apples comparison with the other three conditions |
+| The MCP conditions' `Tokens` figure understates true cost when the model makes more than one tool call | `laravel/ai`'s streaming events only expose token usage for the final tool-calling round — intermediate rounds' usage isn't visible, so these conditions' token figures are a lower bound, not an apples-to-apples comparison with the context-file conditions |
 
 ---
 
@@ -421,4 +455,4 @@ Each task must follow this shape:
 - At least one AI provider in `config/ai.php`
 - `necromancer.json` present (run `php artisan necromancer:scan` first)
 - For the `manual` condition: an `AGENTS.md` at the project root (default) or the path set in `benchmark.manual_context_path`
-- The `necromancer-mcp` condition does **not** require `laravel/mcp` — despite the name, it uses native `laravel/ai` tool implementations rather than the MCP protocol, so no MCP server needs to be running
+- Neither MCP condition requires `laravel/mcp` — despite the names, both use native `laravel/ai` tool implementations rather than the MCP protocol, so no MCP server needs to be running

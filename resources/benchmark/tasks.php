@@ -8,14 +8,14 @@
 // must_not_contain: universal hallucination markers (case-insensitive).
 return [
 
-    // ─── Q&A tasks (5) ───────────────────────────────────────────────────────
+    // ─── Q&A tasks (7) ───────────────────────────────────────────────────────
 
     [
         'id' => 'qa-001',
         'type' => 'qa',
         'prompt' => 'What routes in this application require authentication? List their names and HTTP methods.',
         'required_key' => 'routes.auth_required',
-        'conditions' => ['none', 'manual', 'necromancer-mcp'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
         'assertions' => [
             'must_recall_from' => 'routes.auth_required',
             'fact_keys' => ['routes.auth_required'],
@@ -27,7 +27,7 @@ return [
         'type' => 'qa',
         'prompt' => 'Which Eloquent models in this application have observers attached? List the observer class names.',
         'required_key' => 'models.with_observers',
-        'conditions' => ['none', 'manual', 'necromancer-mcp'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
         'assertions' => [
             'must_recall_from' => 'models.with_observers',
             'must_not_contain' => ['no observer', 'does not have', 'observer does not exist'],
@@ -40,7 +40,7 @@ return [
         'type' => 'qa',
         'prompt' => 'What jobs exist in this application, and what are their queue names and retry settings?',
         'required_key' => 'jobs.named',
-        'conditions' => ['none', 'manual', 'necromancer-mcp'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
         'assertions' => [
             'must_recall_from' => 'jobs.named',
             'must_not_contain' => ['no jobs', 'no queue'],
@@ -53,7 +53,7 @@ return [
         'type' => 'qa',
         'prompt' => 'Which Eloquent models in this application declare casts? List the model names.',
         'required_key' => 'models.with_casts',
-        'conditions' => ['none', 'manual', 'necromancer-mcp'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
         'assertions' => [
             'must_recall_from' => 'models.with_casts',
             'must_not_contain' => ['no casts', 'no models'],
@@ -66,11 +66,39 @@ return [
         'type' => 'qa',
         'prompt' => 'Which Eloquent models have a corresponding policy registered in this application?',
         'required_key' => 'policies.models',
-        'conditions' => ['none', 'manual', 'necromancer-mcp'],
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
         'assertions' => [
             'must_recall_from' => 'policies.models',
             'must_not_contain' => ['no policies'],
             'fact_keys' => ['policies.models'],
+        ],
+    ],
+
+    // Relationship-based: answerable by following listened_by / dispatches
+    // Relationships (get_relationships, get_impact) as well as by reading
+    // each artifact's own facts.
+
+    [
+        'id' => 'qa-006',
+        'type' => 'qa',
+        'prompt' => 'Which events have listeners, and which listener handles each?',
+        'required_key' => 'events.listeners',
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
+        'assertions' => [
+            'must_recall_from' => 'events.listeners',
+            'fact_keys' => ['events.listeners'],
+        ],
+    ],
+
+    [
+        'id' => 'qa-007',
+        'type' => 'qa',
+        'prompt' => 'Which classes dispatch jobs, events, or mailables, and what do they dispatch?',
+        'required_key' => 'dispatches.targets',
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
+        'assertions' => [
+            'must_recall_from' => 'dispatches.targets',
+            'fact_keys' => ['dispatches.targets'],
         ],
     ],
 

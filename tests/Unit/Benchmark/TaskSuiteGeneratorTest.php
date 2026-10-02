@@ -1,5 +1,6 @@
 <?php
 
+use LaravelNecromancer\Benchmark\TaskSuite;
 use LaravelNecromancer\Benchmark\TaskSuiteGenerator;
 use LaravelNecromancer\Benchmark\TaskSuiteWriter;
 
@@ -25,15 +26,15 @@ $manifest = fn (): array => [
     ],
 ];
 
-it('generates 12 tasks', function () use ($manifest) {
+it('generates 14 tasks', function () use ($manifest) {
     $tasks = (new TaskSuiteGenerator($manifest()))->generate();
-    expect($tasks)->toHaveCount(12);
+    expect($tasks)->toHaveCount(14);
 });
 
 it('generates all expected task ids', function () use ($manifest) {
     $tasks = (new TaskSuiteGenerator($manifest()))->generate();
     $ids = array_column($tasks, 'id');
-    expect($ids)->toContain('qa-001', 'qa-002', 'qa-003', 'qa-004', 'qa-005');
+    expect($ids)->toContain('qa-001', 'qa-002', 'qa-003', 'qa-004', 'qa-005', 'qa-006', 'qa-007');
     expect($ids)->toContain('codegen-001', 'codegen-002', 'codegen-003', 'codegen-004');
     expect($ids)->toContain('mini-001', 'mini-002', 'mini-003');
 });
@@ -90,12 +91,15 @@ it('falls back to generic codegen-004 when no events exist', function () {
     expect($codegen004['assertions'])->toHaveKey('must_recall_from');
 });
 
-it('sets conditions to [none, manual, necromancer-mcp] on all Q&A tasks', function () use ($manifest) {
-    $tasks = (new TaskSuiteGenerator($manifest()))->generate();
+it('sets conditions to [none, manual, necromancer-mcp, necromancer-mcp-graph] on all Q&A tasks', function () use ($manifest) {
+    $tasks = [
+        ...(new TaskSuiteGenerator($manifest()))->generate(),
+        ...(new TaskSuiteGenerator(impactGeneratorManifest()))->generate(),
+    ];
     $qaTasks = array_filter($tasks, fn ($t) => $t['type'] === 'qa');
 
     foreach ($qaTasks as $task) {
-        expect($task['conditions'])->toBe(['none', 'manual', 'necromancer-mcp']);
+        expect($task['conditions'])->toBe(['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph']);
     }
 });
 
@@ -126,7 +130,7 @@ it('renders a valid PHP file', function () use ($manifest) {
     expect($output)->toContain('2026-06-08');
 });
 
-it('rendered file can be required and returns 12 tasks', function () use ($manifest) {
+it('rendered file can be required and returns 14 tasks', function () use ($manifest) {
     $tasks = (new TaskSuiteGenerator($manifest()))->generate();
     $output = (new TaskSuiteWriter)->render($tasks, '2026-06-08');
 
@@ -135,5 +139,78 @@ it('rendered file can be required and returns 12 tasks', function () use ($manif
     $loaded = require $tmpFile;
     @unlink($tmpFile);
 
-    expect($loaded)->toBeArray()->toHaveCount(12);
+    expect($loaded)->toBeArray()->toHaveCount(14);
+});
+
+/**
+ * Order and Invoice take part in three Relationships each (Order:
+ * relates_to User, authorized_by OrderPolicy, Invoice's relates_to Order;
+ * Invoice: that relates_to, authorized_by InvoicePolicy, belongs_to_flow
+ * billing), so the tie breaks to Order, the earlier one in manifest
+ * order. User only takes part in Order's relates_to.
+ */
+function impactGeneratorManifest(): array
+{
+    return ['artifacts' => [
+        'models' => [
+            ['id' => 'models:App\\Models\\User', 'class' => 'App\\Models\\User'],
+            [
+                'id' => 'models:App\\Models\\Order',
+                'class' => 'App\\Models\\Order',
+                'policy' => 'App\\Policies\\OrderPolicy',
+                'relationships' => [['type' => 'belongsTo', 'related' => 'App\\Models\\User', 'method' => 'customer']],
+            ],
+            [
+                'id' => 'models:App\\Models\\Invoice',
+                'class' => 'App\\Models\\Invoice',
+                'policy' => 'App\\Policies\\InvoicePolicy',
+                'relationships' => [['type' => 'belongsTo', 'related' => 'App\\Models\\Order', 'method' => 'order']],
+                'annotations' => ['flow' => 'billing'],
+            ],
+        ],
+        'policies' => [
+            ['id' => 'policies:App\\Policies\\OrderPolicy', 'class' => 'App\\Policies\\OrderPolicy'],
+            ['id' => 'policies:App\\Policies\\InvoicePolicy', 'class' => 'App\\Policies\\InvoicePolicy'],
+        ],
+    ]];
+}
+
+it('generates the listener and dispatch Q&A tasks of the bundled suite', function () use ($manifest) {
+    $tasks = collect((new TaskSuiteGenerator($manifest()))->generate())->keyBy('id');
+
+    expect($tasks['qa-006'])->toBe((new TaskSuite)->tasks()[5])
+        ->and($tasks['qa-007'])->toBe((new TaskSuite)->tasks()[6]);
+});
+
+it('generates an impact task for the model with the most Relationships, breaking ties by manifest order', function () {
+    $task = collect((new TaskSuiteGenerator(impactGeneratorManifest()))->generate())->firstWhere('id', 'qa-008');
+
+    expect($task)->toBe([
+        'id' => 'qa-008',
+        'type' => 'qa',
+        'prompt' => 'What is directly connected to the Order model?',
+        'required_key' => 'impact.labels.models:App\\Models\\Order',
+        'conditions' => ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'],
+        'assertions' => [
+            'must_recall_from' => 'impact.labels.models:App\\Models\\Order',
+            'fact_keys' => ['impact.labels.models:App\\Models\\Order'],
+        ],
+    ]);
+});
+
+it('omits the impact task when no model has a Relationship', function () use ($manifest) {
+    $ids = array_column((new TaskSuiteGenerator($manifest()))->generate(), 'id');
+
+    expect($ids)->not->toContain('qa-008');
+});
+
+it('renders the impact task so it loads back with its Artifact ID key intact', function () {
+    $tasks = (new TaskSuiteGenerator(impactGeneratorManifest()))->generate();
+
+    $tmpFile = sys_get_temp_dir().'/necromancer-test-suite-'.uniqid().'.php';
+    file_put_contents($tmpFile, (new TaskSuiteWriter)->render($tasks, '2026-06-08'));
+    $loaded = require $tmpFile;
+    @unlink($tmpFile);
+
+    expect(collect($loaded)->firstWhere('id', 'qa-008'))->toBe(collect($tasks)->firstWhere('id', 'qa-008'));
 });

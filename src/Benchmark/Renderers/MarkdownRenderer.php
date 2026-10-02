@@ -72,6 +72,17 @@ final class MarkdownRenderer
             );
         }
 
+        if (isset($by['necromancer-mcp-graph'], $by['necromancer-mcp'])) {
+            $graphAccDiff = ($by['necromancer-mcp-graph']['accuracy'] - $by['necromancer-mcp']['accuracy']) * 100;
+            $graphHallDiff = ($by['necromancer-mcp']['hallucinationRate'] - $by['necromancer-mcp-graph']['hallucinationRate']) * 100;
+            $lines[] = '';
+            $lines[] = sprintf(
+                '**Necromancer (MCP graph) vs Necromancer (MCP):** %+.0fpp accuracy · %+.0fpp hallucination reduction',
+                $graphAccDiff,
+                $graphHallDiff,
+            );
+        }
+
         return implode("\n", $lines)."\n";
     }
 
@@ -82,6 +93,7 @@ final class MarkdownRenderer
             'manual' => 'Manual CLAUDE.md',
             'necromancer' => 'Necromancer',
             'necromancer-mcp' => 'Necromancer (MCP)',
+            'necromancer-mcp-graph' => 'Necromancer (MCP graph)',
             default => $condition,
         };
     }
