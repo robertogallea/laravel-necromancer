@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
+use LaravelNecromancer\Manifest\ManifestScopeGuard;
 use LaravelNecromancer\Relationships\Relationship;
 use LaravelNecromancer\Relationships\RelationshipEvidence;
 use LaravelNecromancer\Relationships\RelationshipResolver;
@@ -79,18 +80,7 @@ final readonly class BundleExporter
      */
     public function validateScope(array $manifest, bool $stale, bool $allowStale, bool $allowPartial): ?string
     {
-        if ($stale && ! $allowStale) {
-            return 'Manifest may be stale — source files have changed since it was generated. Run necromancer:scan to refresh, or pass --allow-stale to export anyway.';
-        }
-
-        $scope = is_array($manifest['meta']['scope'] ?? null) ? $manifest['meta']['scope'] : [];
-        $complete = (bool) ($scope['complete'] ?? false);
-
-        if (! $complete && ! $allowPartial) {
-            return 'Manifest scope is partial — it was produced by a scan that did not cover every artifact type. Run a full necromancer:scan, or pass --allow-partial to export anyway.';
-        }
-
-        return null;
+        return ManifestScopeGuard::refusal($manifest, $stale, $allowStale, $allowPartial, 'export anyway');
     }
 
     /**

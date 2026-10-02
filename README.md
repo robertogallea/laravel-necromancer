@@ -24,6 +24,7 @@ Laravel Necromancer scans your bootstrapped Laravel application and builds a str
   - [Step 3i — Export an OKF Knowledge Bundle](#step-3i--export-an-okf-knowledge-bundle)
   - [Step 3j — Generate an AI-Enriched Knowledge Bundle](#step-3j--generate-an-ai-enriched-knowledge-bundle)
   - [Step 3k — Visualize the Artifact Graph](#step-3k--visualize-the-artifact-graph)
+  - [Step 3l — Analyze an artifact's Impact](#step-3l--analyze-an-artifacts-impact)
 - [Commands Reference](#commands-reference)
 - [Configuration](#configuration)
 - [Privacy & Exclusions](#privacy--exclusions)
@@ -1045,6 +1046,44 @@ php artisan necromancer:graph --output=dist/graph # write elsewhere
 
 ---
 
+### Step 3l — Analyze an artifact's Impact
+
+Ask what is connected to one artifact before you change it:
+
+```bash
+php artisan necromancer:impact "App\Models\Order" --depth=2
+```
+
+```text
+Impact of App\Models\Order (models:App\Models\Order), depth 2
+
+Depth 1
+  policies
+    App\Policies\OrderPolicy  authorized_by →
+  actions
+    App\Actions\CancelOrder  ← operates_on
+
+Depth 2
+  routes
+    GET orders  ← authorized_by  via App\Policies\OrderPolicy
+```
+
+The command walks [Relationships](#relationships) in both directions, breadth-first, and reports each node once, at its shortest distance from the start. `authorized_by →` means the start side is the Relationship's `from`; `← operates_on` means it is the `to`. From depth 2 on, `via` names the node that reached it. When two Relationships reach a node at the same distance, the first one in canonical Relationship order wins, so an unchanged manifest always produces identical output.
+
+Domains, Flows, ADRs, middleware, and tests are **Boundary Nodes**: they appear in the result, but the walk never continues past them. Walking through them would return every member of a flow, every route in the `web` group, or every subject a namespace-matched test covers. The start always expands, so `necromancer:impact middleware:alias:auth` does list every route using it. A Relationship end Necromancer didn't collect, such as a vendor controller, is listed as `(unresolved)` and never expanded.
+
+That's why a route reaches a model at depth 2 and not 1: no Relationship links them directly, only `route → authorized_by → policy ← authorized_by ← model`.
+
+| Option | Description |
+|---|---|
+| `artifact` | An exact Artifact ID (`models:App\Models\Order`) or a fully-qualified class name. A class matching several artifacts (e.g. a middleware registered as an alias and in a group) fails and lists the candidate IDs. |
+| `--depth=N` | How many Relationships away to walk. Defaults to 1, must be at least 1. |
+| `--type=TYPES` | Only display these node types: comma-separated artifact types plus `domain`, `flow`, `adr`. The walk itself is unchanged, so `--type=tests --depth=2` still finds tests reached through other nodes. Unresolved nodes have no type, so any `--type` filter hides them. |
+| `--json` | Output `{"start", "depth", "nodes": [{"id", "type", "distance", "resolved", "via": {"from", "relationship", "direction"}}]}`, nodes sorted by distance then canonical order, with `--type` applied. An unresolved node has `type: null`. |
+| `--allow-stale` / `--allow-partial` | Analyze a stale or partial-scope manifest, which is refused by default exactly as `necromancer:graph` and `necromancer:okf` refuse it. |
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -1063,6 +1102,7 @@ php artisan necromancer:graph --output=dist/graph # write elsewhere
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
 | `necromancer:graph` | Build a deterministic Artifact Graph (artifacts and their Relationships) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
+| `necromancer:impact` | List the artifacts, Domains, Flows, and ADRs connected to an artifact through its Relationships | `--depth=N`, `--type=TYPES`, `--json`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 
