@@ -38,7 +38,7 @@ Laravel Necromancer scans your bootstrapped Laravel application and builds a str
 
 ## What Necromancer Collects
 
-The manifest covers 20 artifact types across the full Laravel application structure:
+The manifest covers 21 artifact types across the full Laravel application structure:
 
 | Type | What it surfaces |
 |---|---|
@@ -62,12 +62,13 @@ The manifest covers 20 artifact types across the full Laravel application struct
 | `mailables` | Subject, queued status, queue name, view/markdown template |
 | `validation_rules` | Implicit flag, docblock description |
 | `service_providers` | Deferred flag, source location |
+| `bindings` | Abstract, concrete class and how it was learned, lifetime, declaring provider, deferred flag |
 
 Every class-backed type can also carry a `dispatches` field listing the jobs, events, and mailables it dispatches — see [Dispatches](#dispatches) below.
 
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
-Every class-backed type in the table above — `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
+Every class-backed type in the table above — `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, `scheduled_tasks`, and `bindings` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
 
 ## Requirements
 
@@ -246,6 +247,51 @@ Limitations:
 - Closure-based dispatchers (closure routes, scheduled closures, closure gates) have no class to read and are not covered. Notifications are not tracked.
 - If an artifact's file can't be parsed, the scan still succeeds, that artifact gets no `dispatches`, and a non-fatal `DS_PARSE_FAILED` diagnostic names it.
 
+#### Bindings
+
+Code that type-hints `PaymentGateway` doesn't say which class Laravel provides for it; the booted container does. After boot, the scan reads the container's binding map, its stored instances, and its scoped keys, and records one `bindings` artifact per binding whose abstract or concrete is in the application namespace:
+
+```php
+$this->app->bind(PaymentGateway::class, StripeGateway::class);
+```
+
+```json
+{
+    "id": "bindings:App\\Contracts\\PaymentGateway",
+    "abstract": "App\\Contracts\\PaymentGateway",
+    "concrete": "App\\Services\\StripeGateway",
+    "concrete_source": "class",
+    "lifetime": "transient",
+    "provider": null,
+    "deferred": false,
+    "source": { "file": "app/Services/StripeGateway.php", "line": 7, "line_end": 20, "hash": "..." }
+}
+```
+
+The ID is `bindings:` plus the raw container key, which can be a non-class string such as `payments`. Nothing is resolved and no factory closure is called, so `concrete_source` records how the concrete was learned:
+
+| `concrete_source` | Registration |
+|---|---|
+| `class` | a class-string binding (`bind(A::class, B::class)`, `singleton(B::class)`) |
+| `return_type` | a closure whose declared return type names a class (`bind(A::class, fn (): B => ...)`) |
+| `instance` | a key only `instance()` registered: the stored object's class |
+| `attribute` | an interface or class with a `#[Bind]` attribute matching the scan's environment |
+| `null` | a closure with no class return type; `concrete` is `null` too |
+
+`lifetime` is `instance` for a key with a stored instance and no binding, then `scoped`, `singleton`, or `transient`. A singleton resolved during boot still reports `singleton`.
+
+`provider` is set only from declarations that need no execution: an application provider's `$bindings`/`$singletons` property, or a deferrable provider's `provides()`. A binding registered in `register()` code has `provider: null`. `deferred` is `true` for an abstract an application `DeferrableProvider` provides, and such a binding is kept even when neither its abstract nor its concrete is in the application namespace. Artisan loads every deferred provider before a command runs, so its bindings are in the binding map by scan time.
+
+`#[Bind]`, `#[Singleton]`, and `#[Scoped]` are resolved lazily by Laravel, so they are looked for on the application types the same scan's Action entrypoint parameters, controller action parameters, and test class references reach. `--only=bindings` alone finds none of them.
+
+Add `Str::is()` patterns to `exclude.bindings` to drop bindings by abstract. Bindings are annotated only through exact-ID mappings. Each binding is `resolved_as` its concrete and `registered_by` its provider, and a class that matches no collected artifact resolves to the binding of that abstract (see [Relationships](#relationships)).
+
+Limitations:
+
+- A binding reflects the environment the scan ran in: `environment('production') ? Live::class : Fake::class` records whichever the scanning environment chose.
+- Contextual bindings (`when()->needs()->give()`, `#[Give]`), aliases, `extend()` decorators, and `#[BindWhen]` are not represented.
+- `#[Bind]` on a type reached only through a job's, listener's, or other class's constructor is not found.
+
 On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself. The `withNecromancer()` route macro declares it:
 
 ```php
@@ -332,7 +378,7 @@ final class EnsureTwoFactorIsEnabled
 
 #### Annotating non-reflectable artifacts with exact-ID mappings
 
-Closures, test files, gates, and scheduled tasks have no class or method to carry a `#[Necromancer]` attribute. The `annotations` key in `config/necromancer.php` covers these — and adds a registration-specific override on top of any other family, including middleware — by mapping an exact, opaque canonical Artifact ID (the same `id` every artifact already carries in the manifest) to a Schema v1 field array:
+Closures, test files, gates, scheduled tasks, and bindings have no class or method to carry a `#[Necromancer]` attribute. The `annotations` key in `config/necromancer.php` covers these — and adds a registration-specific override on top of any other family, including middleware — by mapping an exact, opaque canonical Artifact ID (the same `id` every artifact already carries in the manifest) to a Schema v1 field array:
 
 ```php
 'annotations' => [
@@ -482,7 +528,9 @@ php artisan necromancer:generate --only=observers,scheduled_tasks
 php artisan necromancer:generate --only=gates,middleware,mailables
 ```
 
-Supported types: `routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`.
+Supported types: `routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`, `bindings`.
+
+The Bindings section starts with the environment the scan ran in (for example, "As resolved in `local`."), since a binding can differ between environments.
 
 Exclude specific sections instead of listing everything you want:
 
@@ -1025,10 +1073,12 @@ A Relationship is a directed, typed link derived from facts and annotations the 
 | `tested_by` | artifact → test | the test's `subject` — an exact class, or a namespace fanned out to every artifact under it — and each class or route name in the test's `references` | source | `match: exact\|namespace\|reference` (a subject match wins when both link the same pair) |
 | `belongs_to_domain` / `belongs_to_flow` | artifact → `domain:<v>` / `flow:<v>` | the artifact's `domain`/`flow` annotation | annotation | — |
 | `references_adr` | artifact → `adr:<path>` | each local `adrs` annotation entry (absolute URIs skipped) | annotation | — |
+| `resolved_as` | binding → concrete class | the binding's `concrete` (no Relationship when it's `null`) | runtime for a `class`/`instance` concrete, reflection for `return_type`/`attribute` | — |
+| `registered_by` | binding → service provider | the binding's `provider` | reflection | — |
 
 **Provenance** records how the evidence was obtained — `runtime` (the application's runtime state, e.g. the router or event dispatcher), `reflection` (declared code structure), `source` (source text, e.g. test files), or `annotation` (an Artifact Annotation). A Relationship supported by several facts carries each of their provenances.
 
-A Relationship whose end isn't a collected artifact — a vendor controller, a listener handling a framework event, a test subject that matches nothing — keeps the raw class or name for that end and is marked `resolved: false`.
+A class end that matches no collected artifact but matches a binding's `abstract` resolves to that binding, so an Action's `operates_on App\Contracts\PaymentGateway` reaches `bindings:App\Contracts\PaymentGateway`, and through `resolved_as` the concrete. A collected artifact always wins. A Relationship whose end isn't a collected artifact — a vendor controller, a listener handling a framework event, a test subject that matches nothing — keeps the raw class or name for that end and is marked `resolved: false`.
 
 Each `graph.json` edge carries the full Relationship plus the `kind` its type renders as:
 
@@ -1169,7 +1219,7 @@ The command exits 0 whenever it can answer, including when no test is affected, 
 | `necromancer:map` | Display the manifest in the terminal | `--type=TYPE` |
 | `necromancer:audit` | Run the AI-readability audit (violation list) | `--format=text\|json\|markdown`, `--output=PATH`, `--fail-on=SEVERITY` |
 | `necromancer:doctor` | Show the AI readability score (percentage dashboard) | `--json`, `--min-score=N`, `--only=KEYS` |
-| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (20 types: routes, controllers, models, actions, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
+| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (21 types: routes, controllers, models, actions, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers, bindings), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
 | `necromancer:ask` | Ask a question about your codebase via AI | `--provider=`, `--model=` |
 | `necromancer:inspect-payload` | Show the AI payload size and content for `necromancer:ask` | `--privacy` |
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
@@ -1195,6 +1245,7 @@ return [
         'route_uris' => ['up', 'livewire-*', '_inertia/devtools*'],   // matched against the route URI (works for unnamed routes such as Laravel's /up health check)
         'models'     => [],
         'tests'      => [],   // glob patterns matched against relative file paths, e.g. 'tests/Fixtures/*'
+        'bindings'   => [],   // Str::is() patterns matched against a binding's abstract, e.g. 'App\\Contracts\\Legacy*'
     ],
 
     // Test discovery roots — override the default tests/Unit and tests/Feature scan paths
@@ -1288,7 +1339,7 @@ When [Laravel MCP](https://github.com/laravel/mcp) is installed, Necromancer aut
 | `get_impact` | List everything reachable from an artifact, Domain, Flow, or ADR, like [`necromancer:impact --json`](#step-3l--analyze-an-artifacts-impact) |
 | `get_affected_tests` | List the tests affected by a changed artifact or by changed file paths, like [`necromancer:affected-tests --json`](#step-3m--find-the-tests-affected-by-a-change) |
 
-Use `query_artifacts` when you already know the artifact type (`routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
+Use `query_artifacts` when you already know the artifact type (`routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`, or `bindings`). Use `search_artifacts` when you need to search across types.
 
 #### Graph tools
 

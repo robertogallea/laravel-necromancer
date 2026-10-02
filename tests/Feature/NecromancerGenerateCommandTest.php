@@ -2805,8 +2805,6 @@ test('a manifest with service_providers produces a service providers section wit
                 [
                     'class' => 'App\\Providers\\AppServiceProvider',
                     'deferred' => false,
-                    'bindings' => [],
-                    'singletons' => [],
                 ],
             ],
         ],
@@ -2820,6 +2818,79 @@ test('a manifest with service_providers produces a service providers section wit
         ->toContain('## Service Providers (1)')
         ->toContain('AppServiceProvider')
         ->toContain('| Class |');
+});
+
+test('a manifest with bindings produces a bindings section labelled with the scan environment', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'app_env' => 'local'],
+        'artifacts' => [
+            'bindings' => [
+                [
+                    'id' => 'bindings:App\\Contracts\\PaymentGateway',
+                    'abstract' => 'App\\Contracts\\PaymentGateway',
+                    'concrete' => 'App\\Services\\StripeGateway',
+                    'concrete_source' => 'class',
+                    'lifetime' => 'singleton',
+                    'provider' => 'App\\Providers\\PaymentServiceProvider',
+                    'deferred' => true,
+                    'annotations' => ['domain' => 'billing'],
+                ],
+                [
+                    'id' => 'bindings:payments',
+                    'abstract' => 'payments',
+                    'concrete' => null,
+                    'concrete_source' => null,
+                    'lifetime' => 'transient',
+                    'provider' => null,
+                    'deferred' => false,
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))
+        ->toContain("## Bindings (2)\n\nAs resolved in `local`.\n\n| Abstract | Concrete | Lifetime | Provider | Architectural Context |")
+        ->toContain('| App\\Contracts\\PaymentGateway | App\\Services\\StripeGateway | singleton (deferred) | PaymentServiceProvider | domain: billing |')
+        ->toContain('| payments |  | transient |  |  |');
+});
+
+test('the bindings section takes part in --except', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'app_env' => 'local'],
+        'artifacts' => [
+            'bindings' => [['id' => 'bindings:payments', 'abstract' => 'payments', 'concrete' => null, 'concrete_source' => null, 'lifetime' => 'transient', 'provider' => null, 'deferred' => false]],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate', ['--except' => 'bindings'])->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))->not->toContain('## Bindings');
+});
+
+test('the service providers section has no bindings or singletons columns', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp'],
+        'artifacts' => [
+            'service_providers' => [
+                [
+                    'class' => 'App\\Providers\\AppServiceProvider',
+                    'deferred' => false,
+                    'bindings' => [['abstract' => 'App\\Contracts\\Gateway', 'concrete' => 'App\\Services\\Stripe']],
+                    'singletons' => [['abstract' => 'App\\Ledger', 'concrete' => 'App\\Ledger']],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))
+        ->toContain('| Class | Deferred |')
+        ->not->toContain('| Bindings')
+        ->not->toContain('| Singletons')
+        ->not->toContain('Gateway → Stripe');
 });
 
 test('a manifest with no service_providers does not include a service providers section', function () {

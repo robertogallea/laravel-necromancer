@@ -9,15 +9,11 @@ use JsonSerializable;
 final readonly class ServiceProviderPayload implements JsonSerializable
 {
     /**
-     * @param  list<array{abstract: string, concrete: string}>  $bindings
-     * @param  list<array{abstract: string, concrete: string}>  $singletons
      * @param  array<string, mixed>|null  $source
      */
     public function __construct(
         public string $class,
         public bool $deferred,
-        public array $bindings,
-        public array $singletons,
         public ?array $source,
     ) {}
 
@@ -29,8 +25,6 @@ final readonly class ServiceProviderPayload implements JsonSerializable
         $data = [
             'class' => $this->class,
             'deferred' => $this->deferred,
-            'bindings' => $this->bindings,
-            'singletons' => $this->singletons,
         ];
 
         if ($this->source !== null) {

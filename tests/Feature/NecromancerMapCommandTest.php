@@ -141,6 +141,24 @@ test('the map command displays controller artifacts with short class and control
         ->assertSuccessful();
 });
 
+test('the map command displays binding artifacts with their concrete and lifetime', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1],
+        'artifacts' => [
+            'bindings' => [
+                ['abstract' => 'App\\Contracts\\PaymentGateway', 'concrete' => 'App\\Services\\StripeGateway', 'concrete_source' => 'class', 'lifetime' => 'singleton', 'provider' => null, 'deferred' => false],
+                ['abstract' => 'payments', 'concrete' => null, 'concrete_source' => null, 'lifetime' => 'transient', 'provider' => null, 'deferred' => false],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:map', ['--type' => 'bindings'])
+        ->expectsOutputToContain('Bindings')
+        ->expectsOutputToContain('PaymentGateway  StripeGateway (singleton)')
+        ->expectsOutputToContain('payments  ? (transient)')
+        ->assertSuccessful();
+});
+
 test('the map command displays event artifacts with short class and short listener names', function () {
     $manifest = json_encode([
         'meta' => ['manifest_schema_version' => 1],

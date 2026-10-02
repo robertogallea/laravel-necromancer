@@ -7,6 +7,7 @@ namespace LaravelNecromancer\Manifest;
 use Illuminate\Support\Str;
 use JsonSerializable;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ActionPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\BindingPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\CommandPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ControllerPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EnumPayload;
@@ -481,25 +482,41 @@ final readonly class StructuralArtifact implements JsonSerializable
         ));
     }
 
-    /**
-     * @param  list<array{abstract: string, concrete: string}>  $bindings
-     * @param  list<array{abstract: string, concrete: string}>  $singletons
-     */
     public static function serviceProvider(
         string $class,
         bool $deferred = false,
-        array $bindings = [],
-        array $singletons = [],
         ?SourceLocation $source = null,
         ArtifactAnnotations $annotations = new ArtifactAnnotations,
     ): self {
         return new self('service_providers', new ServiceProviderPayload(
             class: $class,
             deferred: $deferred,
-            bindings: $bindings,
-            singletons: $singletons,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ), $annotations);
+    }
+
+    /**
+     * @param  'class'|'return_type'|'instance'|'attribute'|null  $concreteSource
+     * @param  'transient'|'singleton'|'scoped'|'instance'|null  $lifetime
+     */
+    public static function binding(
+        string $abstract,
+        ?string $concrete = null,
+        ?string $concreteSource = null,
+        ?string $lifetime = 'transient',
+        ?string $provider = null,
+        bool $deferred = false,
+        ?SourceLocation $source = null,
+    ): self {
+        return new self('bindings', new BindingPayload(
+            abstract: $abstract,
+            concrete: $concrete,
+            concreteSource: $concreteSource,
+            lifetime: $lifetime,
+            provider: $provider,
+            deferred: $deferred,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ));
     }
 
     /**

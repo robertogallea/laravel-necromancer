@@ -14,7 +14,7 @@ A class that matches no collected artifact but matches a binding's abstract reso
 ## Consequences
 
 - A binding reflects the environment the scan ran in. `environment('production') ? Live : Fake` records whichever the scanning environment chose, so generated context labels the section with `meta.app_env`.
-- A deferred provider's bindings aren't registered at boot. They appear with `deferred: true`, and their concrete is `null` unless the provider's properties declare it.
+- A binding an application deferred provider provides is marked `deferred: true`. Artisan loads every deferred provider before a command runs, so at scan time those bindings are already in the binding map and report their real concrete and lifetime. Only a scan run outside the console kernel can meet an unloaded deferred provider; its abstracts then come from `provides()` alone, with the concrete and lifetime its properties declare, or `null`.
 - `#[Bind]`/`#[Singleton]`/`#[Scoped]` attributes are resolved lazily by Laravel, so they are found only on application types already reached by collected facts (Action entrypoint and controller action parameters, test class references).
 - Contextual bindings, aliases, and `extend()` decorators are not represented.
 - Removing `service_providers.bindings`/`singletons` and adding `bindings` artifacts makes the first scan after upgrading report drift for every application.

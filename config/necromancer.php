@@ -13,6 +13,7 @@ return [
         'route_uris' => ['up', 'livewire-*', '_inertia/devtools*'],
         'models' => [],
         'tests' => [],
+        'bindings' => [],   // Str::is() patterns matched against a binding's abstract
     ],
 
     'tests' => [

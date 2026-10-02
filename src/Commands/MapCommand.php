@@ -79,6 +79,7 @@ final class MapCommand extends Command
             'events' => $this->formatEvent($item),
             'listeners' => $this->formatListener($item),
             'commands' => $this->formatCommand($item),
+            'bindings' => $this->formatBinding($item),
             default => (string) json_encode($item),
         };
     }
@@ -233,5 +234,16 @@ final class MapCommand extends Command
         );
 
         return class_basename((string) ($item['class'] ?? '')).'  '.implode(', ', $actions);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function formatBinding(array $item): string
+    {
+        $concrete = is_string($item['concrete'] ?? null) ? class_basename($item['concrete']) : '?';
+        $lifetime = is_string($item['lifetime'] ?? null) ? $item['lifetime'] : '?';
+
+        return class_basename((string) ($item['abstract'] ?? '')).'  '.$concrete.' ('.$lifetime.')';
     }
 }

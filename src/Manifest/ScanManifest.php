@@ -9,6 +9,7 @@ use Illuminate\Contracts\Foundation\Application;
 use JsonException;
 use JsonSerializable;
 use LaravelNecromancer\Collection\ActionCollector;
+use LaravelNecromancer\Collection\BindingCollector;
 use LaravelNecromancer\Collection\CommandCollector;
 use LaravelNecromancer\Collection\ControllerCollector;
 use LaravelNecromancer\Collection\DispatchFactResolver;
@@ -64,6 +65,7 @@ final class ScanManifest implements JsonSerializable
         private ServiceProviderCollector $serviceProviderCollector,
         private ActionCollector $actionCollector,
         private ControllerCollector $controllerCollector,
+        private BindingCollector $bindingCollector,
     ) {}
 
     /**
@@ -195,6 +197,8 @@ final class ScanManifest implements JsonSerializable
         $observerCollector = $this->observerCollector->withModelMap($observerModelMap);
         $routeNoiseFilter = new RouteNoiseFilter(array_values($routeExclusions), array_values($routeUriExclusions));
         $controllerCollector = $this->controllerCollector->withRouteNoiseFilter($routeNoiseFilter);
+        $bindingExclusions = config('necromancer.exclude.bindings', []);
+        $bindingCollector = $this->bindingCollector->withExclusions(is_array($bindingExclusions) ? array_values(array_filter($bindingExclusions, 'is_string')) : []);
 
         $collectors = [
             'routes' => function (): array {
@@ -224,6 +228,7 @@ final class ScanManifest implements JsonSerializable
             'mailables' => fn (): array => $this->mailableCollector->collect(),
             'validation_rules' => fn (): array => $this->ruleCollector->collect(),
             'service_providers' => fn (): array => $this->serviceProviderCollector->collect(),
+            'bindings' => fn (): array => $bindingCollector->collect(),
         ];
 
         if ($only !== []) {
@@ -248,11 +253,13 @@ final class ScanManifest implements JsonSerializable
         // artifact families (closures, test files, gates, scheduled tasks) and a
         // fill-only, registration-specific escape hatch for every other family.
         // They can only be resolved after every artifact has its canonical ID.
+        // Bindings are mapped after attribute bindings are added below.
+        $scopeTypes = $this->scope($only)['artifact_types'];
         $annotationConfig = config('necromancer.annotations', []);
         $configResolver = new AnnotationConfigurationResolver(is_array($annotationConfig) ? $annotationConfig : []);
         [$identifiedArtifacts, $configDiagnostics] = $configResolver->apply(
             $identifiedArtifacts,
-            $this->scope($only)['artifact_types'],
+            array_values(array_diff($scopeTypes, ['bindings'])),
         );
         $this->diagnostics = [...$this->diagnostics, ...$configDiagnostics];
 
@@ -266,7 +273,48 @@ final class ScanManifest implements JsonSerializable
         [$identifiedArtifacts, $referenceDiagnostics] = (new TestReferenceFactResolver($this->app->getNamespace()))->apply($identifiedArtifacts);
         $this->diagnostics = [...$this->diagnostics, ...$referenceDiagnostics];
 
+        if (in_array('bindings', $scopeTypes, true)) {
+            // `#[Bind]` bindings are found through the types other collected
+            // facts reach, test references included (ADR 0025).
+            $identifiedArtifacts = $this->withAttributeBindings($identifiedArtifacts, $bindingCollector);
+            [$bindingArtifacts, $bindingDiagnostics] = $configResolver->apply(
+                ['bindings' => $identifiedArtifacts['bindings'] ?? []],
+                ['bindings'],
+            );
+            $this->diagnostics = [...$this->diagnostics, ...$bindingDiagnostics];
+
+            if ($bindingArtifacts['bindings'] !== []) {
+                $identifiedArtifacts['bindings'] = $bindingArtifacts['bindings'];
+            }
+        }
+
         return $identifiedArtifacts;
+    }
+
+    /**
+     * @param  array<string, list<array<string, mixed>>>  $artifacts
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function withAttributeBindings(array $artifacts, BindingCollector $bindingCollector): array
+    {
+        $attributeBindings = $bindingCollector->attributeBindings($artifacts);
+
+        if ($attributeBindings === []) {
+            return $artifacts;
+        }
+
+        $bindings = $artifacts['bindings'] ?? [];
+
+        foreach ($attributeBindings as $binding) {
+            $data = $binding->jsonSerialize();
+            $bindings[] = ['id' => (new ArtifactId)->for('bindings', $data), ...$data];
+        }
+
+        usort($bindings, static fn (array $a, array $b): int => $a['id'] <=> $b['id']);
+        $artifacts['bindings'] = $bindings;
+        ksort($artifacts);
+
+        return $artifacts;
     }
 
     /**

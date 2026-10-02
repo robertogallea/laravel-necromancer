@@ -27,6 +27,7 @@ final class ArtifactQueryService
         'mailables',
         'validation_rules',
         'service_providers',
+        'bindings',
     ];
 
     private const DEFAULT_LIMIT = 50;
