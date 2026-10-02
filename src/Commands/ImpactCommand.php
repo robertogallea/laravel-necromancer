@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
+use LaravelNecromancer\Commands\Concerns\ResolvesImpactStart;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ManifestScopeGuard;
@@ -17,6 +18,7 @@ use LaravelNecromancer\Relationships\ImpactNode;
 final class ImpactCommand extends Command
 {
     use ReadsManifest;
+    use ResolvesImpactStart;
 
     protected $signature = 'necromancer:impact
         {artifact        : An exact Artifact ID, a fully-qualified class name, or a domain:/flow:/adr: ID}
@@ -30,7 +32,7 @@ final class ImpactCommand extends Command
 
     public function handle(ManifestReader $reader, ImpactAnalyzer $analyzer): int
     {
-        $depth = $this->depth();
+        $depth = $this->impactDepth();
         $types = $this->displayTypes();
 
         if ($depth === null || $types === null) {
@@ -59,26 +61,13 @@ final class ImpactCommand extends Command
             return self::FAILURE;
         }
 
-        $input = (string) $this->argument('artifact');
-        $candidates = $analyzer->startCandidates($manifest, $input);
+        $start = $this->resolveImpactStart($analyzer, $manifest, (string) $this->argument('artifact'));
 
-        if ($candidates === []) {
-            $this->error("No artifact matches '{$input}'. Pass an exact Artifact ID, a fully-qualified class name, or a referenced domain:/flow:/adr: ID.");
-
+        if ($start === null) {
             return self::FAILURE;
         }
 
-        if (count($candidates) > 1) {
-            $this->error("'{$input}' matches several artifacts. Pass one of these Artifact IDs instead:");
-
-            foreach ($candidates as $candidate) {
-                $this->line("  {$candidate}");
-            }
-
-            return self::FAILURE;
-        }
-
-        $impact = $analyzer->analyze($manifest, $candidates[0], $depth);
+        $impact = $analyzer->analyze($manifest, $start, $depth);
         $nodes = $impact->nodesOfTypes($types);
 
         if ($this->option('json')) {
@@ -139,19 +128,6 @@ final class ImpactCommand extends Command
                 }
             }
         }
-    }
-
-    private function depth(): ?int
-    {
-        $depth = (string) $this->option('depth');
-
-        if (! ctype_digit($depth) || (int) $depth < 1) {
-            $this->error('The --depth option must be an integer of at least 1.');
-
-            return null;
-        }
-
-        return (int) $depth;
     }
 
     /**

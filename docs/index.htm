@@ -141,7 +141,7 @@ Compact context written to CLAUDE.md</pre>
   <section id="artifacts" class="py-16 px-4 border-b border-gray-800">
     <div class="max-w-5xl mx-auto">
       <h2 class="font-display text-2xl font-bold text-red-400 mb-2">What Necromancer Collects</h2>
-      <p class="text-gray-500 mb-8">The manifest covers 20 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection.</p>
+      <p class="text-gray-500 mb-8">The manifest covers 20 artifact types across the full Laravel application structure. Every artifact carries a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">source</code> field with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">file</code>, <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">line</code>, and <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">hash</code> for precise citations and stale detection. Every class-backed artifact can also carry a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">dispatches</code> field — the jobs, events, and mailables each of its methods dispatches, read from its own source with <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">nikic/php-parser</code>.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 
         <div class="border border-gray-800 rounded-lg p-4 hover:border-red-900 transition-colors">
@@ -555,7 +555,7 @@ php artisan necromancer:benchmark --condition=necromancer,necromancer-mcp   <spa
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-partial</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact under <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/artifacts/</code>, with authoritative YAML front matter and a concise Architectural Context prose mirror. Resolvable cross-artifact relationships (a route's controller, a model's relationships/policy/observers, event/listener pairings) render as Markdown links; every shared <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">domain</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">flow</code> value gets a synthesized, linked concept; and declared local ADRs are copied into the bundle with provenance — a missing one fails the export.</p>
+        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic Open Knowledge Format (OKF) bundle — one Markdown file per artifact under <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">okf/artifacts/</code>, with authoritative YAML front matter and a concise Architectural Context prose mirror. Resolvable cross-artifact relationships (a route's controller, a model's relationships/policy/observers, event/listener pairings) render as Markdown links, followed by one line each for <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">uses_middleware</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">validates_with</code>, a route's <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">authorized_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">dispatches</code>, and <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">tested_by</code>; every shared <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">domain</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">flow</code> value gets a synthesized, linked concept; and declared local ADRs are copied into the bundle with provenance — a missing one fails the export.</p>
         <div class="code-block relative mb-3">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">---
 title: "SendInvoiceEmail"
@@ -611,12 +611,66 @@ php artisan necromancer:okf --output=dist/okf</pre>
             <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-partial</span>
           </div>
         </div>
-        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic <strong class="text-gray-200">Artifact Graph</strong> — see it <a href="#visualize" class="text-red-400 hover:text-red-300 transition-colors">pictured above</a>. <strong class="text-gray-200">Structural</strong> edges mirror the OKF bundle's relationship taxonomy (route→controller, model→relationships/policy/observers, event→listeners); <strong class="text-gray-200">grouping</strong> edges connect an artifact to its declared domain/flow; <strong class="text-gray-200">reference</strong> edges connect it to a declared local ADR. The sidebar doubles as a color-coded legend and kind filter. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> is self-contained (no CDN dependencies) and opens straight from disk — no server needed. Entirely independent of <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code>; refuses a stale or partial manifest by default; writes atomically.</p>
+        <p class="text-gray-400 text-sm mb-3">Projects the manifest into a deterministic <strong class="text-gray-200">Artifact Graph</strong> — see it <a href="#visualize" class="text-red-400 hover:text-red-300 transition-colors">pictured above</a>. Every edge is a typed <strong class="text-gray-200">Relationship</strong> derived from facts the manifest already holds — <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">handled_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">uses_middleware</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">validates_with</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">authorized_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">relates_to</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">observed_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">listened_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">operates_on</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">tested_by</code>, <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">dispatches</code> — each carrying its provenance (runtime, reflection, source, annotation) and whether both ends were collected. Relationships are never stored in <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer.json</code>. <strong class="text-gray-200">Structural</strong> edges link artifacts; <strong class="text-gray-200">behavioral</strong> edges (dash-dot) show what an artifact dispatches; <strong class="text-gray-200">grouping</strong> edges connect an artifact to its declared domain/flow; <strong class="text-gray-200">reference</strong> edges connect it to a declared local ADR. The sidebar doubles as a color-coded legend and kind filter. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">graph.html</code> is self-contained (no CDN dependencies) and opens straight from disk — no server needed. Entirely independent of <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">necromancer:okf</code>; refuses a stale or partial manifest by default; writes atomically.</p>
         <div class="code-block relative">
           <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:graph
 php artisan necromancer:graph --allow-stale --allow-partial
 php artisan necromancer:graph --output=dist/graph
 open necromancer-graph/graph.html   # opens directly, no server needed</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-10 mb-4">Before you change it</h3>
+
+      <!-- necromancer:impact -->
+      <div class="border border-gray-800 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:impact</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--depth=N</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--type=TYPES</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--json</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-stale</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-partial</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Lists everything connected to an artifact through its Relationships, in both directions, each node once at its shortest distance. Start from an Artifact ID, a class name, or a <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">domain:</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">flow:</code>/<code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">adr:</code> ID. Domains, Flows, ADRs, middleware, and tests are <strong class="text-gray-200">Boundary Nodes</strong>: reported, never walked through, so one shared flow or the <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">web</code> group doesn't pull in half the app. Output is deterministic.</p>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:impact "App\Models\Order" --depth=2
+php artisan necromancer:impact flow:checkout
+php artisan necromancer:impact "App\Models\Order" --type=routes,tests --json</pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+      </div>
+
+      <!-- necromancer:affected-tests -->
+      <div class="border border-red-900/40 rounded-lg p-6 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <code class="font-mono font-semibold text-sm bg-black text-red-400 px-3 py-1 rounded border border-red-900">necromancer:affected-tests</code>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--stdin</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--depth=N</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--json</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--paths</span>
+            <span class="bg-gray-800 text-gray-400 font-mono text-xs rounded px-2 py-0.5">--allow-stale</span>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">Answers "which tests should I run?". It walks the same Impact (depth 2 by default) and keeps the tests reached through <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">tested_by</code>. <strong class="text-gray-200">Directly affected</strong> tests cover the changed artifact itself; <strong class="text-gray-200">indirectly affected</strong> ones cover something it reaches. Pass one artifact, or pipe in changed files with <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--stdin</code>: each path maps to every artifact whose source it is, a changed test counts on its own, and paths no artifact comes from (routes files, migrations, views) are listed as unmapped. <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--paths</code> prints only test files, ready for a test runner. A git-diff workflow usually needs <code class="font-mono text-xs bg-gray-800 px-1 py-0.5 rounded text-gray-300">--allow-stale</code> or a fresh scan.</p>
+        <div class="code-block relative mb-3">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">Affected tests for models:App\Models\Order, depth 2
+
+Directly affected
+  tests/Unit/OrderTest.php  <span class="text-gray-600">← via App\Models\Order</span>
+
+Indirectly affected
+  tests/Unit/OrderPolicyTest.php  <span class="text-gray-600">← via App\Policies\OrderPolicy</span></pre>
+          <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
+        </div>
+        <div class="code-block relative">
+          <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">php artisan necromancer:affected-tests "App\Models\Order"
+git diff --name-only main | php artisan necromancer:affected-tests --stdin --allow-stale
+git diff --name-only main | php artisan necromancer:affected-tests --stdin --paths --allow-stale | xargs vendor/bin/pest</pre>
           <button onclick="copyCode(this)" class="copy-btn absolute top-3 right-3 text-xs bg-gray-700 text-gray-400 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Copy</button>
         </div>
       </div>
@@ -728,7 +782,23 @@ php artisan necromancer:generate</pre>
           <p class="text-gray-500 text-sm mt-2">Full-text search across all artifact types. Use when you need to search across types.</p>
         </div>
 
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">get_artifact</code>
+          <p class="text-gray-500 text-sm mt-2">Return one artifact's full payload, by Artifact ID or class name.</p>
+        </div>
+
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">get_relationships</code>
+          <p class="text-gray-500 text-sm mt-2">List every Relationship an artifact, Domain, Flow, or ADR takes part in, outgoing and incoming.</p>
+        </div>
+
+        <div class="bg-[#0a0a0f] border border-gray-800 rounded-lg p-5">
+          <code class="font-mono font-semibold text-sm text-gray-300">get_impact</code>
+          <p class="text-gray-500 text-sm mt-2">List everything reachable from an artifact — the same shape as <code class="font-mono text-xs">necromancer:impact --json</code>, depth 1–3.</p>
+        </div>
+
       </div>
+      <p class="text-gray-500 text-sm mb-8">The three graph tools follow Relationships deterministically, with no LLM. Since an agent makes the manifest stale with its first edit, they answer from a stale or partial-scope manifest anyway and say so in a <code class="font-mono text-sm bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">warnings</code> list, instead of refusing like the CLI.</p>
       <div class="code-block relative">
         <pre class="bg-black text-gray-300 font-mono text-sm p-4 rounded-lg overflow-x-auto border border-gray-800">{
   "mcpServers": {

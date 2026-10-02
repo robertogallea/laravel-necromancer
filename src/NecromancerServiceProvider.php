@@ -7,6 +7,7 @@ namespace LaravelNecromancer;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Mcp\Server;
+use LaravelNecromancer\Commands\AffectedTestsCommand;
 use LaravelNecromancer\Commands\AskCommand;
 use LaravelNecromancer\Commands\AuditCommand;
 use LaravelNecromancer\Commands\BenchmarkCommand;
@@ -77,6 +78,7 @@ final class NecromancerServiceProvider extends ServiceProvider
                 OkfEnrichCommand::class,
                 GraphCommand::class,
                 ImpactCommand::class,
+                AffectedTestsCommand::class,
             ]);
         }
 
