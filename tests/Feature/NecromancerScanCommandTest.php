@@ -99,7 +99,7 @@ test('the scan command records complete and partial scan scope', function () {
 
     expect($full->meta->scope->complete)->toBeTrue()
         ->and($full->meta->scope->artifact_types)->toBe([
-            'actions', 'commands', 'controllers', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
+            'actions', 'bindings', 'commands', 'controllers', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
             'livewire_components', 'mailables', 'middleware', 'models', 'observers',
             'policies', 'routes', 'scheduled_tasks', 'service_providers', 'tests', 'validation_rules',
         ])
@@ -1985,8 +1985,8 @@ test('the scan command collects service_provider artifacts', function () {
 
     expect($provider->class)->toBe(NecromancerFixtureServiceProvider::class)
         ->and($provider->deferred)->toBeFalse()
-        ->and($provider->bindings)->toBeArray()
-        ->and($provider->singletons)->toBeArray()
+        ->and($provider)->not->toHaveProperty('bindings')
+        ->and($provider)->not->toHaveProperty('singletons')
         ->and($provider->source->file)->toContain('NecromancerFixtureServiceProvider.php');
 });
 

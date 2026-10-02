@@ -249,3 +249,38 @@ test('a Flow ID as the start lists the flow members, and an unreferenced one sti
         ->expectsOutputToContain("No artifact matches 'flow:nope'")
         ->assertFailed();
 });
+
+test('the impact command walks through a binding to the concrete class the container provides', function () {
+    writeImpactManifest([
+        'actions' => [
+            ['id' => 'actions:App\\Actions\\ChargeOrder', 'class' => 'App\\Actions\\ChargeOrder', 'entrypoints' => [[
+                'name' => 'handle',
+                'parameters' => [['name' => 'gateway', 'type' => 'App\\Contracts\\PaymentGateway']],
+                'return_type' => 'void',
+            ]]],
+            ['id' => 'actions:App\\Actions\\StripeCharge', 'class' => 'App\\Actions\\StripeCharge', 'entrypoints' => []],
+        ],
+        'bindings' => [[
+            'id' => 'bindings:App\\Contracts\\PaymentGateway',
+            'abstract' => 'App\\Contracts\\PaymentGateway',
+            'concrete' => 'App\\Actions\\StripeCharge',
+            'concrete_source' => 'class',
+            'lifetime' => 'transient',
+            'provider' => null,
+            'deferred' => false,
+        ]],
+    ]);
+
+    expect(impactOutput(['artifact' => 'actions:App\\Actions\\ChargeOrder', '--depth' => 2]))->toBe(<<<'TEXT'
+        Impact of App\Actions\ChargeOrder (actions:App\Actions\ChargeOrder), depth 2
+
+        Depth 1
+          bindings
+            App\Contracts\PaymentGateway  operates_on →
+
+        Depth 2
+          actions
+            App\Actions\StripeCharge  resolved_as →  via App\Contracts\PaymentGateway
+
+        TEXT);
+});

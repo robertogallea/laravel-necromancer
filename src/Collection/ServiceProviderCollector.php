@@ -70,8 +70,6 @@ final readonly class ServiceProviderCollector
         return StructuralArtifact::serviceProvider(
             class: $class,
             deferred: $deferred,
-            bindings: [],
-            singletons: [],
             source: $source,
             annotations: (new ClassAnnotationResolver)->resolve(AttributeReader::first($reflection, Necromancer::class), $reflection->getName()),
         );

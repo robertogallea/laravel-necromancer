@@ -72,6 +72,10 @@ _Avoid_: Handler, endpoint
 A public controller method that handles HTTP requests routed to it. Distinct from an **Action**, which is not tied to HTTP routing.
 _Avoid_: Endpoint, route action, entrypoint
 
+**Binding**:
+The service container's answer to which concrete implementation Laravel provides when an abstract is requested, and for how long that instance is reused (its lifetime). Only bindings whose abstract or concrete belongs to the application count, and they reflect the environment the scan ran in.
+_Avoid_: Registration, service, dependency
+
 **Relationship**:
 A directed, typed link from an artifact to another artifact, a Domain, a Flow, or an ADR, derived from the artifact's discovered facts and annotations rather than recorded separately. A relationship whose target is not a collected artifact is still a relationship, marked unresolved.
 _Avoid_: Edge (a graph rendering of a relationship), dependency

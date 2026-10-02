@@ -31,6 +31,14 @@ final class RelationshipResolver
     private array $classIndex = [];
 
     /**
+     * Binding abstract → its Artifact ID, the fallback for a class no
+     * collected artifact has (ADR 0025).
+     *
+     * @var array<string, string>
+     */
+    private array $bindingIndex = [];
+
+    /**
      * Middleware registrations, for resolving a route's middleware names.
      *
      * @var list<array{id: string, class: string, scope: string, alias: string, group: string}>
@@ -80,6 +88,7 @@ final class RelationshipResolver
     {
         $artifacts = (array) ($manifest['artifacts'] ?? []);
         $this->classIndex = $this->buildClassIndex($artifacts);
+        $this->bindingIndex = $this->buildBindingIndex($artifacts);
         $this->middleware = $this->buildMiddlewareIndex($artifacts);
         $this->controllerActions = $this->buildControllerActionIndex($artifacts);
         $this->policyByModel = $this->buildPolicyIndex($artifacts);
@@ -102,6 +111,7 @@ final class RelationshipResolver
                     'policies' => $this->pairRelationship($artifact, 'model', RelationshipType::AuthorizedBy, Provenance::Reflection, ['heuristic' => true]),
                     'observers' => $this->pairRelationship($artifact, 'model', RelationshipType::ObservedBy, Provenance::Reflection),
                     'tests' => $this->testRelationships($artifact),
+                    'bindings' => $this->bindingRelationships($artifact),
                     default => null,
                 };
 
@@ -288,7 +298,7 @@ final class RelationshipResolver
                 continue;
             }
 
-            $from = $this->classIndex[$class] ?? null;
+            $from = $this->classTarget($class);
 
             $this->add(new Relationship($from ?? $class, $type, $artifact['id'], [$provenance], $from !== null, $metadata, [
                 new RelationshipEvidence($artifact['id'], $field, $class, $position),
@@ -315,7 +325,7 @@ final class RelationshipResolver
                 continue;
             }
 
-            $from = $kind === TestReferenceFactResolver::CLASS_REFERENCE ? ($this->classIndex[$target] ?? null) : ($this->routeNames[$target] ?? null);
+            $from = $kind === TestReferenceFactResolver::CLASS_REFERENCE ? $this->classTarget($target) : ($this->routeNames[$target] ?? null);
 
             $this->add(new Relationship($from ?? $target, RelationshipType::TestedBy, $test['id'], [Provenance::Source], $from !== null, ['match' => TestMatch::Reference->value], [
                 new RelationshipEvidence($test['id'], 'references', $target, $position),
@@ -356,7 +366,8 @@ final class RelationshipResolver
         }
 
         if (! $matched) {
-            $this->add(new Relationship($subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], false, ['match' => TestMatch::Exact->value], $evidence));
+            $binding = $this->bindingIndex[$subject] ?? null;
+            $this->add(new Relationship($binding ?? $subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], $binding !== null, ['match' => TestMatch::Exact->value], $evidence));
         }
     }
 
@@ -382,6 +393,36 @@ final class RelationshipResolver
                 'methods' => [$method],
                 'modes' => is_string($mode) ? [$mode] : [],
             ], $position);
+        }
+    }
+
+    /**
+     * What the container provides for the abstract and, when declared, the
+     * provider that registered it. A `return_type` or `attribute` concrete
+     * is read from declarations; a `class` or `instance` one from the
+     * container itself. The concrete resolves only to a collected artifact,
+     * never through the binding fallback, so a binding never resolves to
+     * itself or chains to another binding.
+     *
+     * @param  array<string, mixed>  $binding
+     */
+    private function bindingRelationships(array $binding): void
+    {
+        $concrete = $binding['concrete'] ?? null;
+
+        if (is_string($concrete) && $concrete !== '') {
+            $provenance = in_array($binding['concrete_source'] ?? null, ['return_type', 'attribute'], true) ? Provenance::Reflection : Provenance::Runtime;
+            $to = $this->classIndex[$concrete] ?? null;
+
+            $this->add(new Relationship($binding['id'], RelationshipType::ResolvedAs, $to ?? $concrete, [$provenance], $to !== null, [], [
+                new RelationshipEvidence($binding['id'], 'concrete', $concrete),
+            ]));
+        }
+
+        $provider = $binding['provider'] ?? null;
+
+        if (is_string($provider) && $provider !== '') {
+            $this->addToClass($binding['id'], RelationshipType::RegisteredBy, $provider, Provenance::Reflection, 'provider');
         }
     }
 
@@ -505,9 +546,18 @@ final class RelationshipResolver
      */
     private function addToClass(string $from, RelationshipType $type, string $class, Provenance $provenance, string $field, array $metadata = [], int $position = 0): void
     {
-        $to = $this->classIndex[$class] ?? null;
+        $to = $this->classTarget($class);
 
         $this->add(new Relationship($from, $type, $to ?? $class, [$provenance], $to !== null, $metadata, [new RelationshipEvidence($from, $field, $class, $position)]));
+    }
+
+    /**
+     * The artifact a class resolves to: a collected artifact always wins,
+     * else the binding of that abstract (ADR 0025).
+     */
+    private function classTarget(string $class): ?string
+    {
+        return $this->classIndex[$class] ?? $this->bindingIndex[$class] ?? null;
     }
 
     /**
@@ -608,6 +658,26 @@ final class RelationshipResolver
                 if (is_string($id) && $id !== '' && is_string($class) && $class !== '' && ! isset($index[$class])) {
                     $index[$class] = $id;
                 }
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifacts
+     * @return array<string, string>
+     */
+    private function buildBindingIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach ((array) ($artifacts['bindings'] ?? []) as $binding) {
+            $id = is_array($binding) ? ($binding['id'] ?? null) : null;
+            $abstract = is_array($binding) ? ($binding['abstract'] ?? null) : null;
+
+            if (is_string($id) && $id !== '' && is_string($abstract) && $abstract !== '') {
+                $index[$abstract] ??= $id;
             }
         }
 

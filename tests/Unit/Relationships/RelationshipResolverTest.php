@@ -431,3 +431,75 @@ test('an artifact dispatches each target once, merging the methods and modes of 
         ['from' => 'controllers:App\\Http\\Controllers\\OrderController', 'type' => 'dispatches', 'to' => 'Vendor\\Billing\\InvoicePaid', 'provenance' => ['source'], 'resolved' => false, 'metadata' => ['methods' => ['update'], 'modes' => []]],
     ]);
 });
+
+test('a binding is resolved_as its concrete class, with provenance from how the concrete was learned', function () {
+    $relationships = relationshipsOf([
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\Gateway', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => 'App\\Services\\StripeGateway', 'concrete_source' => 'class'],
+            ['id' => 'bindings:App\\Contracts\\Numbers', 'abstract' => 'App\\Contracts\\Numbers', 'concrete' => 'App\\Actions\\NextNumber', 'concrete_source' => 'attribute'],
+            ['id' => 'bindings:App\\Actions\\NextNumber', 'abstract' => 'App\\Actions\\NextNumber', 'concrete' => 'App\\Actions\\NextNumber', 'concrete_source' => 'class'],
+            ['id' => 'bindings:App\\Contracts\\Unknown', 'abstract' => 'App\\Contracts\\Unknown', 'concrete' => null, 'concrete_source' => null],
+        ],
+        'actions' => [['id' => 'actions:App\\Actions\\NextNumber', 'class' => 'App\\Actions\\NextNumber']],
+    ], 'resolved_as');
+
+    expect($relationships)->toBe([
+        ['from' => 'bindings:App\\Contracts\\Gateway', 'type' => 'resolved_as', 'to' => 'App\\Services\\StripeGateway', 'provenance' => ['runtime'], 'resolved' => false, 'metadata' => []],
+        ['from' => 'bindings:App\\Contracts\\Numbers', 'type' => 'resolved_as', 'to' => 'actions:App\\Actions\\NextNumber', 'provenance' => ['reflection'], 'resolved' => true, 'metadata' => []],
+        ['from' => 'bindings:App\\Actions\\NextNumber', 'type' => 'resolved_as', 'to' => 'actions:App\\Actions\\NextNumber', 'provenance' => ['runtime'], 'resolved' => true, 'metadata' => []],
+    ]);
+});
+
+test('a binding concrete never resolves through the binding fallback, so a self-binding or a bound concrete stays the raw class', function () {
+    expect(relationshipsOf([
+        'bindings' => [
+            ['id' => 'bindings:App\\Services\\Ledger', 'abstract' => 'App\\Services\\Ledger', 'concrete' => 'App\\Services\\Ledger', 'concrete_source' => 'class'],
+            ['id' => 'bindings:App\\Contracts\\Books', 'abstract' => 'App\\Contracts\\Books', 'concrete' => 'App\\Services\\Ledger', 'concrete_source' => 'class'],
+        ],
+    ], 'resolved_as'))->toBe([
+        ['from' => 'bindings:App\\Services\\Ledger', 'type' => 'resolved_as', 'to' => 'App\\Services\\Ledger', 'provenance' => ['runtime'], 'resolved' => false, 'metadata' => []],
+        ['from' => 'bindings:App\\Contracts\\Books', 'type' => 'resolved_as', 'to' => 'App\\Services\\Ledger', 'provenance' => ['runtime'], 'resolved' => false, 'metadata' => []],
+    ]);
+});
+
+test('a binding declared by a provider is registered_by that provider', function () {
+    expect(relationshipsOf([
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\Gateway', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null, 'provider' => 'App\\Providers\\PaymentServiceProvider'],
+            ['id' => 'bindings:App\\Contracts\\Other', 'abstract' => 'App\\Contracts\\Other', 'concrete' => null, 'concrete_source' => null, 'provider' => null],
+        ],
+        'service_providers' => [['id' => 'service_providers:App\\Providers\\PaymentServiceProvider', 'class' => 'App\\Providers\\PaymentServiceProvider']],
+    ], 'registered_by'))->toBe([
+        ['from' => 'bindings:App\\Contracts\\Gateway', 'type' => 'registered_by', 'to' => 'service_providers:App\\Providers\\PaymentServiceProvider', 'provenance' => ['reflection'], 'resolved' => true, 'metadata' => []],
+    ]);
+});
+
+test('a class target matching no collected artifact resolves to the binding of that abstract, and a collected artifact still wins', function () {
+    $relationships = relationshipsOf([
+        'actions' => [['id' => 'actions:App\\Actions\\Charge', 'class' => 'App\\Actions\\Charge', 'entrypoints' => [[
+            'name' => 'handle',
+            'parameters' => [
+                ['name' => 'gateway', 'type' => 'App\\Contracts\\Gateway'],
+                ['name' => 'order', 'type' => 'App\\Models\\Order'],
+            ],
+            'return_type' => 'void',
+        ]]]],
+        'models' => [['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order']],
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\Gateway', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null],
+            ['id' => 'bindings:App\\Models\\Order', 'abstract' => 'App\\Models\\Order', 'concrete' => null, 'concrete_source' => null],
+        ],
+        'tests' => [['id' => 'tests:tests/Feature/ChargeTest.php', 'file' => 'tests/Feature/ChargeTest.php', 'references' => [['kind' => 'class', 'target' => 'App\\Contracts\\Gateway']]]],
+    ]);
+
+    $targets = array_map(fn (array $r): array => [$r['type'], $r['from'], $r['to'], $r['resolved']], array_values(array_filter(
+        $relationships,
+        fn (array $r): bool => in_array($r['type'], ['operates_on', 'tested_by'], true),
+    )));
+
+    expect($targets)->toBe([
+        ['operates_on', 'actions:App\\Actions\\Charge', 'bindings:App\\Contracts\\Gateway', true],
+        ['operates_on', 'actions:App\\Actions\\Charge', 'models:App\\Models\\Order', true],
+        ['tested_by', 'bindings:App\\Contracts\\Gateway', 'tests:tests/Feature/ChargeTest.php', true],
+    ]);
+});

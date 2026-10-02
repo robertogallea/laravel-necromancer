@@ -22,6 +22,8 @@ enum RelationshipType: string
     case ListenedBy = 'listened_by';
     case OperatesOn = 'operates_on';
     case Dispatches = 'dispatches';
+    case ResolvedAs = 'resolved_as';
+    case RegisteredBy = 'registered_by';
     case TestedBy = 'tested_by';
     case BelongsToDomain = 'belongs_to_domain';
     case BelongsToFlow = 'belongs_to_flow';

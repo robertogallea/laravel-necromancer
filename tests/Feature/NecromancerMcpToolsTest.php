@@ -225,3 +225,18 @@ function writeNecromancerMcpManifest(array $artifacts): void
         'artifacts' => $artifacts,
     ], JSON_THROW_ON_ERROR));
 }
+
+test('query_artifacts and search_artifacts return bindings', function () {
+    writeNecromancerMcpManifest([
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\PaymentGateway', 'abstract' => 'App\\Contracts\\PaymentGateway', 'concrete' => 'App\\Services\\StripeGateway', 'concrete_source' => 'class', 'lifetime' => 'transient', 'provider' => null, 'deferred' => false],
+        ],
+    ]);
+
+    $queried = json_decode((new QueryArtifactsTool)->handle(app(ManifestReader::class), new Request(['type' => 'bindings']))->content()->__toString(), true);
+    $searched = json_decode((new SearchArtifactsTool)->handle(app(ManifestReader::class), new Request(['query' => 'StripeGateway', 'type' => 'bindings']))->content()->__toString(), true);
+
+    expect($queried)->toHaveCount(1)
+        ->and($queried[0]['concrete'])->toBe('App\\Services\\StripeGateway')
+        ->and($searched)->toHaveCount(1);
+});

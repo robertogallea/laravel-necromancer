@@ -61,6 +61,8 @@ final readonly class ArtifactConceptBuilder
         RelationshipType::AuthorizedBy,
         RelationshipType::Dispatches,
         RelationshipType::TestedBy,
+        RelationshipType::ResolvedAs,
+        RelationshipType::RegisteredBy,
     ];
 
     /**
@@ -138,6 +140,7 @@ final readonly class ArtifactConceptBuilder
             'gates' => (string) ($artifact['ability'] ?? ''),
             'scheduled_tasks' => (string) ($artifact['command'] ?? ''),
             'middleware' => ($artifact['class'] ?? '').' ('.($artifact['scope'] ?? '').')',
+            'bindings' => (string) ($artifact['abstract'] ?? ''),
             default => (string) ($artifact['class'] ?? $artifact['signature'] ?? $artifact['id'] ?? $type),
         };
     }
