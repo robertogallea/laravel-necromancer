@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
+use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipEvidence;
+use LaravelNecromancer\Relationships\RelationshipResolver;
 use RuntimeException;
 use Throwable;
 
@@ -28,6 +31,7 @@ final readonly class BundleExporter
         private AdrConceptBuilder $adrBuilder = new AdrConceptBuilder,
         private AtomicBundleWriter $writer = new AtomicBundleWriter,
         private BundleReadmeBuilder $readmeBuilder = new BundleReadmeBuilder,
+        private RelationshipResolver $relationships = new RelationshipResolver,
     ) {}
 
     /**
@@ -239,6 +243,26 @@ final readonly class BundleExporter
     }
 
     /**
+     * The manifest's Relationships, grouped under every artifact holding a
+     * fact that evidences them, in resolver order.
+     *
+     * @param  array<string, mixed>  $manifest
+     * @return array<string, list<Relationship>>
+     */
+    private function relationshipsByEvidencingArtifact(array $manifest): array
+    {
+        $grouped = [];
+
+        foreach ($this->relationships->resolve($manifest) as $relationship) {
+            foreach (array_unique(array_map(fn (RelationshipEvidence $evidence): string => $evidence->artifact, $relationship->evidence)) as $artifactId) {
+                $grouped[$artifactId][] = $relationship;
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
      * @param  array<string, mixed>  $manifest
      * @param  array<string, ConceptLink>  $classIndex
      * @param  array<string, ConceptLink>  $adrIndex
@@ -249,6 +273,7 @@ final readonly class BundleExporter
     private function buildArtifactConcepts(array $manifest, string $generatedAt, array $classIndex, array $adrIndex, array $groupIndex, array $enrichments): array
     {
         $concepts = [];
+        $relationshipsByArtifact = $this->relationshipsByEvidencingArtifact($manifest);
 
         foreach ((array) ($manifest['artifacts'] ?? []) as $type => $items) {
             if (! is_string($type) || ! is_array($items)) {
@@ -261,7 +286,7 @@ final readonly class BundleExporter
                 }
 
                 $id = (string) ($artifact['id'] ?? '');
-                $concepts[] = $this->builder->build($type, $artifact, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments[$id] ?? null);
+                $concepts[] = $this->builder->build($type, $artifact, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments[$id] ?? null, $relationshipsByArtifact[$id] ?? []);
             }
         }
 

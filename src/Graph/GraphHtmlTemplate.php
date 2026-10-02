@@ -164,6 +164,10 @@ final class GraphHtmlTemplate
         <h3>Architectural Context</h3>
         <dl id="inspect-context-list"></dl>
       </section>
+      <section class="inspect-section" id="inspect-relationships">
+        <h3>Relationships</h3>
+        <ul id="inspect-relationships-list"></ul>
+      </section>
       <section class="inspect-section" id="inspect-facts">
         <h3>Discovered Facts</h3>
         <dl id="inspect-facts-list"></dl>
@@ -198,6 +202,8 @@ final class GraphHtmlTemplate
   var inspectContextListEl = document.getElementById('inspect-context-list');
   var inspectFactsEl = document.getElementById('inspect-facts');
   var inspectFactsListEl = document.getElementById('inspect-facts-list');
+  var inspectRelationshipsEl = document.getElementById('inspect-relationships');
+  var inspectRelationshipsListEl = document.getElementById('inspect-relationships-list');
   var inspectMembersEl = document.getElementById('inspect-members');
   var inspectMembersTitleEl = document.getElementById('inspect-members-title');
   var inspectMembersListEl = document.getElementById('inspect-members-list');
@@ -491,6 +497,21 @@ final class GraphHtmlTemplate
       appendDlRow(dl, key, factDisplay(rawValue));
     }
 
+    // One line per relationship touching the node, in graph.json order:
+    // outgoing as "type → target", incoming as "source → type".
+    function relationshipLines(n) {
+      function labelOf(id) { var node = nodeById[id]; return node ? node.label : id; }
+
+      return edges
+        .filter(function (e) { return e.from === n.id || e.to === n.id; })
+        .map(function (e) {
+          var line = e.from === n.id
+            ? e.type + ' \u2192 ' + labelOf(e.to)
+            : labelOf(e.from) + ' \u2192 ' + e.type;
+          return e.resolved ? line : line + ' (unresolved)';
+        });
+    }
+
     function populateInspect(n) {
       inspectTitleEl.textContent = n.label;
       inspectIdEl.textContent = n.id;
@@ -499,6 +520,8 @@ final class GraphHtmlTemplate
       inspectContextListEl.innerHTML = '';
       inspectFactsListEl.innerHTML = '';
       inspectMembersListEl.innerHTML = '';
+      inspectRelationshipsListEl.innerHTML = '';
+      clearInspectSection(inspectRelationshipsEl);
       clearInspectSection(inspectContextEl);
       clearInspectSection(inspectFactsEl);
       clearInspectSection(inspectMembersEl);
@@ -538,6 +561,17 @@ final class GraphHtmlTemplate
             appendDlRow(inspectContextListEl, field, display);
           });
           inspectContextEl.classList.add('visible');
+        }
+
+        var relationships = relationshipLines(n);
+
+        if (relationships.length > 0) {
+          relationships.forEach(function (line) {
+            var li = document.createElement('li');
+            li.textContent = line;
+            inspectRelationshipsListEl.appendChild(li);
+          });
+          inspectRelationshipsEl.classList.add('visible');
         }
 
         var facts = n.facts || {};

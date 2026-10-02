@@ -4,7 +4,17 @@ use LaravelNecromancer\Graph\ArtifactGraph;
 use LaravelNecromancer\Graph\ArtifactGraphBuilder;
 use LaravelNecromancer\Graph\ArtifactGraphEdge;
 use LaravelNecromancer\Graph\ArtifactGraphNode;
-use LaravelNecromancer\Graph\EdgeKind;
+
+/**
+ * @return list<array{0: string, 1: string, 2: string, 3: string}>
+ */
+function edgeTuples(ArtifactGraph $graph): array
+{
+    return array_map(
+        fn (ArtifactGraphEdge $edge): array => [$edge->from, $edge->to, $edge->type->value, $edge->kind->value],
+        $graph->edges,
+    );
+}
 
 test('build() returns one node per collected artifact', function () {
     $manifest = ['artifacts' => [
@@ -179,7 +189,7 @@ test('build() serializes a node with annotations including the annotations key',
     ]);
 });
 
-test('build() derives a structural edge for a model\'s relationship, policy, and observers, in that order', function () {
+test('build() derives one structural edge per relationship, collapsing facts recorded on both ends', function () {
     $manifest = ['artifacts' => [
         'models' => [
             [
@@ -204,12 +214,10 @@ test('build() derives a structural edge for a model\'s relationship, policy, and
 
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
-    expect($graph->edges)->toEqual([
-        new ArtifactGraphEdge('models:App\\Models\\Order', 'models:App\\Models\\Customer', EdgeKind::Structural),
-        new ArtifactGraphEdge('models:App\\Models\\Order', 'policies:App\\Policies\\OrderPolicy', EdgeKind::Structural),
-        new ArtifactGraphEdge('models:App\\Models\\Order', 'observers:App\\Observers\\OrderObserver', EdgeKind::Structural),
-        new ArtifactGraphEdge('policies:App\\Policies\\OrderPolicy', 'models:App\\Models\\Order', EdgeKind::Structural),
-        new ArtifactGraphEdge('observers:App\\Observers\\OrderObserver', 'models:App\\Models\\Order', EdgeKind::Structural),
+    expect(edgeTuples($graph))->toBe([
+        ['models:App\\Models\\Order', 'models:App\\Models\\Customer', 'relates_to', 'structural'],
+        ['models:App\\Models\\Order', 'policies:App\\Policies\\OrderPolicy', 'authorized_by', 'structural'],
+        ['models:App\\Models\\Order', 'observers:App\\Observers\\OrderObserver', 'observed_by', 'structural'],
     ]);
 });
 
@@ -228,10 +236,9 @@ test('build() derives structural edges for events, listeners, and routes', funct
 
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
-    expect($graph->edges)->toEqual([
-        new ArtifactGraphEdge('routes:GET:orders', 'App\\Http\\Controllers\\OrderController', EdgeKind::Structural),
-        new ArtifactGraphEdge('events:App\\Events\\OrderPlaced', 'listeners:App\\Listeners\\SendOrderConfirmation', EdgeKind::Structural),
-        new ArtifactGraphEdge('listeners:App\\Listeners\\SendOrderConfirmation', 'events:App\\Events\\OrderPlaced', EdgeKind::Structural),
+    expect(edgeTuples($graph))->toBe([
+        ['routes:GET:orders', 'App\\Http\\Controllers\\OrderController', 'handled_by', 'structural'],
+        ['events:App\\Events\\OrderPlaced', 'listeners:App\\Listeners\\SendOrderConfirmation', 'listened_by', 'structural'],
     ]);
 });
 
@@ -247,8 +254,8 @@ test('build() resolves a route controller edge to the collected controller node'
 
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
-    expect($graph->edges)->toEqual([
-        new ArtifactGraphEdge('routes:GET:orders', 'controllers:App\\Http\\Controllers\\OrderController', EdgeKind::Structural),
+    expect(edgeTuples($graph))->toBe([
+        ['routes:GET:orders', 'controllers:App\\Http\\Controllers\\OrderController', 'handled_by', 'structural'],
     ]);
 });
 
@@ -266,9 +273,9 @@ test('build() derives one grouping edge per declared domain and one per declared
 
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
-    expect($graph->edges)->toEqual([
-        new ArtifactGraphEdge('jobs:App\\Jobs\\SendInvoice', 'domain:billing', EdgeKind::Grouping),
-        new ArtifactGraphEdge('jobs:App\\Jobs\\SendInvoice', 'flow:invoicing', EdgeKind::Grouping),
+    expect(edgeTuples($graph))->toBe([
+        ['jobs:App\\Jobs\\SendInvoice', 'domain:billing', 'belongs_to_domain', 'grouping'],
+        ['jobs:App\\Jobs\\SendInvoice', 'flow:invoicing', 'belongs_to_flow', 'grouping'],
     ]);
 });
 
@@ -286,8 +293,8 @@ test('build() derives one reference edge per declared local adr, skipping absolu
 
     $graph = (new ArtifactGraphBuilder)->build($manifest);
 
-    expect($graph->edges)->toEqual([
-        new ArtifactGraphEdge('jobs:App\\Jobs\\SendInvoice', 'adr:docs/adr/0004-x.md', EdgeKind::Reference),
+    expect(edgeTuples($graph))->toBe([
+        ['jobs:App\\Jobs\\SendInvoice', 'adr:docs/adr/0004-x.md', 'references_adr', 'reference'],
     ]);
 });
 
@@ -318,7 +325,7 @@ test('build() produces zero grouping and reference edges for an unannotated mani
     expect($graph->edges)->toBe([]);
 });
 
-test('build() orders edges deterministically: canonical artifact-type order, then per artifact structural, domain, flow, and reference', function () {
+test('build() orders edges deterministically: canonical artifact-type order, then per artifact structural, domain, flow, and reference, from the resolver', function () {
     $manifest = ['artifacts' => [
         'jobs' => [
             [
@@ -336,16 +343,19 @@ test('build() orders edges deterministically: canonical artifact-type order, the
     $graph1 = (new ArtifactGraphBuilder)->build($manifest);
     $graph2 = (new ArtifactGraphBuilder)->build($manifest);
 
-    expect($graph1->edges)->toEqual([
-        new ArtifactGraphEdge('jobs:App\\Jobs\\SendInvoice', 'domain:billing', EdgeKind::Grouping),
-        new ArtifactGraphEdge('jobs:App\\Jobs\\SendInvoice', 'flow:invoicing', EdgeKind::Grouping),
-        new ArtifactGraphEdge('jobs:App\\Jobs\\SendInvoice', 'adr:docs/adr/0004-x.md', EdgeKind::Reference),
-        new ArtifactGraphEdge('observers:App\\Observers\\SyncInvoice', 'App\\Models\\Order', EdgeKind::Structural),
+    expect(edgeTuples($graph1))->toBe([
+        ['jobs:App\\Jobs\\SendInvoice', 'domain:billing', 'belongs_to_domain', 'grouping'],
+        ['jobs:App\\Jobs\\SendInvoice', 'flow:invoicing', 'belongs_to_flow', 'grouping'],
+        ['jobs:App\\Jobs\\SendInvoice', 'adr:docs/adr/0004-x.md', 'references_adr', 'reference'],
+        ['App\\Models\\Order', 'observers:App\\Observers\\SyncInvoice', 'observed_by', 'structural'],
     ])->and($graph1->edges)->toEqual($graph2->edges);
 });
 
-test('build() serializes an edge with its from, to, and string kind', function () {
+test('build() serializes an edge with its from, to, type, kind, provenance, resolved flag, and metadata', function () {
     $manifest = ['artifacts' => [
+        'routes' => [
+            ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'action' => 'index', 'source' => null],
+        ],
         'jobs' => [
             [
                 'id' => 'jobs:App\\Jobs\\SendInvoice',
@@ -360,7 +370,24 @@ test('build() serializes an edge with its from, to, and string kind', function (
     $decoded = json_decode(json_encode($graph, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
 
     expect($decoded['edges'])->toBe([
-        ['from' => 'jobs:App\\Jobs\\SendInvoice', 'to' => 'domain:billing', 'kind' => 'grouping'],
+        [
+            'from' => 'routes:GET:orders',
+            'to' => 'App\\Http\\Controllers\\OrderController',
+            'type' => 'handled_by',
+            'kind' => 'structural',
+            'provenance' => ['runtime'],
+            'resolved' => false,
+            'metadata' => ['action' => 'index'],
+        ],
+        [
+            'from' => 'jobs:App\\Jobs\\SendInvoice',
+            'to' => 'domain:billing',
+            'type' => 'belongs_to_domain',
+            'kind' => 'grouping',
+            'provenance' => ['annotation'],
+            'resolved' => true,
+            'metadata' => [],
+        ],
     ]);
 });
 

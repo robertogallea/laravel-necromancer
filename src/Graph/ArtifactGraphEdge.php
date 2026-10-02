@@ -5,42 +5,68 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Graph;
 
 use JsonSerializable;
+use LaravelNecromancer\Relationships\Provenance;
+use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipType;
+use stdClass;
 
 /**
- * One relationship between two artifacts in the Artifact Graph: a
- * structural link (route→controller, model→relationships/policy/observers,
- * event→listeners, listener→handles, policy→model, observer→model), a
- * grouping link (an artifact declaring `domain`/`flow` to its group), or a
- * reference link (an artifact declaring `adrs` to a locally declared ADR).
+ * The Artifact Graph rendering of one Relationship. `kind` (structural,
+ * grouping, reference) is derived from the relationship type and drives
+ * graph.html's line styling and per-kind toggles.
  *
- * `to` is the resolved canonical id of the target — either a collected
- * artifact's own id, or the id of a synthesized domain/flow/ADR node
- * (ArtifactGraphBuilder::groupAndReferenceNodes()) for a grouping or
- * reference edge — so the edge always has a real node to draw a line to.
- * The one exception is a structural edge whose target was not collected
- * — e.g. a route's `controller` pointing at a vendor controller, or at a
- * controller outside a partial scan: no synthetic node is grown for it,
- * so that edge's `to` stays the raw class string, mirroring
- * LaravelNecromancer\Okf\ArtifactConceptBuilder's "link when resolvable,
- * plain text otherwise" convention for the same case.
+ * `from`/`to` are canonical ids — a collected artifact's own id, or a
+ * synthesized domain/flow/ADR node's id — except for an end Necromancer did
+ * not collect (e.g. a vendor controller), which keeps its raw class string
+ * and leaves the edge `resolved: false`; graph.html simply doesn't draw it.
  */
 final readonly class ArtifactGraphEdge implements JsonSerializable
 {
+    public EdgeKind $kind;
+
+    /**
+     * @param  list<Provenance>  $provenance
+     * @param  array<string, mixed>  $metadata
+     */
     public function __construct(
         public string $from,
         public string $to,
-        public EdgeKind $kind,
-    ) {}
+        public RelationshipType $type,
+        public array $provenance,
+        public bool $resolved,
+        public array $metadata = [],
+    ) {
+        $this->kind = $type->kind();
+    }
+
+    public static function fromRelationship(Relationship $relationship): self
+    {
+        return new self(
+            $relationship->from,
+            $relationship->to,
+            $relationship->type,
+            $relationship->provenance,
+            $relationship->resolved,
+            $relationship->metadata,
+        );
+    }
 
     /**
-     * @return array{from: string, to: string, kind: string}
+     * Empty metadata serializes as a JSON object, so every edge's
+     * `metadata` has the same JSON type.
+     *
+     * @return array{from: string, to: string, type: string, kind: string, provenance: list<string>, resolved: bool, metadata: array<string, mixed>|stdClass}
      */
     public function jsonSerialize(): array
     {
         return [
             'from' => $this->from,
             'to' => $this->to,
+            'type' => $this->type->value,
             'kind' => $this->kind->value,
+            'provenance' => array_map(fn (Provenance $provenance): string => $provenance->value, $this->provenance),
+            'resolved' => $this->resolved,
+            'metadata' => $this->metadata === [] ? new stdClass : $this->metadata,
         ];
     }
 }
