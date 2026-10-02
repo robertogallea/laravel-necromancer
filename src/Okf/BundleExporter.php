@@ -119,9 +119,10 @@ final readonly class BundleExporter
         [$classIndex, $identities] = $this->indexManifest($manifest);
         $adrIndex = $this->resolveAdrIndex($manifest, $basePath);
         $groupIndex = $this->buildGroupIndex($identities);
+        $idIndex = array_map(fn (array $identity): ConceptLink => $identity['link'], $identities);
 
         $assembled = [
-            'artifact' => $this->buildArtifactConcepts($manifest, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments),
+            'artifact' => $this->buildArtifactConcepts($manifest, $generatedAt, $classIndex, $adrIndex, $groupIndex, $idIndex, $enrichments),
             'group' => $this->buildGroupConcepts($identities, $generatedAt, $enrichments),
             'adr' => $this->buildAdrConcepts($adrIndex, $identities, $basePath, $generatedAt, $enrichments),
             'identities' => $identities,
@@ -244,17 +245,21 @@ final readonly class BundleExporter
 
     /**
      * The manifest's Relationships, grouped under every artifact holding a
-     * fact that evidences them, in resolver order.
+     * fact that evidences them and under the artifact each starts from, in
+     * resolver order — the concept builder renders legacy lines from the
+     * former and source-side lines from the latter (docs/adr/0021).
      *
      * @param  array<string, mixed>  $manifest
      * @return array<string, list<Relationship>>
      */
-    private function relationshipsByEvidencingArtifact(array $manifest): array
+    private function relationshipsByEvidencingOrSourceArtifact(array $manifest): array
     {
         $grouped = [];
 
         foreach ($this->relationships->resolve($manifest) as $relationship) {
-            foreach (array_unique(array_map(fn (RelationshipEvidence $evidence): string => $evidence->artifact, $relationship->evidence)) as $artifactId) {
+            $evidencing = array_map(fn (RelationshipEvidence $evidence): string => $evidence->artifact, $relationship->evidence);
+
+            foreach (array_unique([...$evidencing, $relationship->from]) as $artifactId) {
                 $grouped[$artifactId][] = $relationship;
             }
         }
@@ -267,13 +272,14 @@ final readonly class BundleExporter
      * @param  array<string, ConceptLink>  $classIndex
      * @param  array<string, ConceptLink>  $adrIndex
      * @param  array<string, ConceptLink>  $groupIndex
+     * @param  array<string, ConceptLink>  $idIndex
      * @param  array<string, ConceptEnrichment>  $enrichments
      * @return list<ArtifactConcept>
      */
-    private function buildArtifactConcepts(array $manifest, string $generatedAt, array $classIndex, array $adrIndex, array $groupIndex, array $enrichments): array
+    private function buildArtifactConcepts(array $manifest, string $generatedAt, array $classIndex, array $adrIndex, array $groupIndex, array $idIndex, array $enrichments): array
     {
         $concepts = [];
-        $relationshipsByArtifact = $this->relationshipsByEvidencingArtifact($manifest);
+        $relationshipsByArtifact = $this->relationshipsByEvidencingOrSourceArtifact($manifest);
 
         foreach ((array) ($manifest['artifacts'] ?? []) as $type => $items) {
             if (! is_string($type) || ! is_array($items)) {
@@ -286,7 +292,7 @@ final readonly class BundleExporter
                 }
 
                 $id = (string) ($artifact['id'] ?? '');
-                $concepts[] = $this->builder->build($type, $artifact, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments[$id] ?? null, $relationshipsByArtifact[$id] ?? []);
+                $concepts[] = $this->builder->build($type, $artifact, $generatedAt, $classIndex, $adrIndex, $groupIndex, $enrichments[$id] ?? null, $relationshipsByArtifact[$id] ?? [], $idIndex);
             }
         }
 
