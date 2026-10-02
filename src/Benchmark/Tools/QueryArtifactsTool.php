@@ -38,7 +38,7 @@ final class QueryArtifactsTool implements CanActAsTool, Tool
     {
         return [
             'type' => $schema->string()->required()
-                ->description('Artifact type to list: routes, models, form_requests, actions, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers'),
+                ->description('Artifact type to list: routes, controllers, models, form_requests, actions, jobs, events, listeners, commands, observers, policies, enums, tests, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers'),
             'query' => $schema->string()
                 ->description('Optional case-insensitive string to match against each artifact JSON payload'),
             'limit' => $schema->integer()

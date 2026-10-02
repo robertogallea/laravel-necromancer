@@ -36,11 +36,12 @@ Laravel Necromancer scans your bootstrapped Laravel application and builds a str
 
 ## What Necromancer Collects
 
-The manifest covers 19 artifact types across the full Laravel application structure:
+The manifest covers 20 artifact types across the full Laravel application structure:
 
 | Type | What it surfaces |
 |---|---|
 | `routes` | Name, method, URI, controller, action, middleware, authorization, route metadata (domain, flow, capability, summary, risk, external services, ADR) |
+| `controllers` | Controller Actions with parameter and return types, declared middleware, and the routes targeting each |
 | `models` | Table, fillable, casts, appends, relationships, scopes, observers, policy, factory |
 | `jobs` | Queue, connection, tries, timeout, backoff, max_exceptions |
 | `events` | Listeners, broadcastable channels |
@@ -62,7 +63,7 @@ The manifest covers 19 artifact types across the full Laravel application struct
 
 All artifact types carry a `source` field with `file`, `line`, `line_end`, and `hash` for precise citations and stale detection.
 
-Every class-backed type in the table above — `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
+Every class-backed type in the table above — `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `observers`, `livewire_components`, `mailables`, `validation_rules`, `service_providers` — plus `middleware` and route controllers/actions can also carry a declared `annotations` block (`domain`, `flow`, `capability`, `summary`, `risk`, `external_services`, `adrs`) via the `#[Necromancer]` attribute. See [Annotating class-backed artifacts, controllers, and middleware](#annotating-class-backed-artifacts-controllers-and-middleware) below. `gates`, `tests`, and `scheduled_tasks` — plus registration-specific overrides for every other type — are annotated instead through exact-ID mappings in configuration. See [Annotating non-reflectable artifacts with exact-ID mappings](#annotating-non-reflectable-artifacts-with-exact-id-mappings) below.
 
 ## Requirements
 
@@ -137,6 +138,44 @@ final class CancelOrder
 ```
 
 Classes under `app/Actions` with no entrypoint (DTOs, exceptions, helpers), abstract classes, interfaces, traits, and enums are skipped. Only a class-level `#[Necromancer]` applies to an Action — a method-level attribute on an entrypoint is ignored. The class types an Action's entrypoints accept become an `operates_on` relationship in the OKF bundle and the Artifact Graph. Only `app/Actions` is scanned: Actions living elsewhere (e.g. `app/Domain/*/Actions`) are not discovered.
+
+Controllers are collected as a `controllers` artifact type — one artifact per controller class, from `app/Http/Controllers` (including subfolders) plus any application-namespace controller a route targets from elsewhere (e.g. `app/Domain/Billing/Http/InvoiceController`). Each **Controller Action** — a public, non-static method written in the controller itself (`__invoke` counts, other magic methods don't), plus any inherited or trait method a route targets — records its parameters, return type, the middleware the controller itself declares for it, and the Artifact IDs of the routes that target it:
+
+```php
+#[Necromancer(domain: 'orders')]
+final class OrderController implements HasMiddleware
+{
+    public static function middleware(): array
+    {
+        return ['auth', new Middleware('verified', only: ['store'])];
+    }
+
+    public function store(StoreOrderRequest $request): RedirectResponse { /* ... */ }
+}
+```
+
+```json
+{
+    "id": "controllers:App\\Http\\Controllers\\OrderController",
+    "class": "App\\Http\\Controllers\\OrderController",
+    "actions": [
+        {
+            "name": "store",
+            "parameters": [{ "name": "request", "type": "App\\Http\\Requests\\StoreOrderRequest" }],
+            "return_type": "Illuminate\\Http\\RedirectResponse",
+            "middleware": ["auth", "verified"],
+            "routes": ["routes:POST:orders"]
+        }
+    ],
+    "annotations": { "domain": "orders" }
+}
+```
+
+An action no route targets has `routes: []`. Routes removed by `exclude.routes`/`exclude.route_uris` are never listed, and never pull a controller into the manifest. Vendor controllers (e.g. Laravel's `RedirectController`), abstract controllers, and classes with no Controller Action are skipped.
+
+Action middleware comes from the controller's own declarations — `HasMiddleware::middleware()` and `#[Middleware]`/`#[WithoutMiddleware]` attributes, honoring `only`/`except` — and is read without ever instantiating the controller. Middleware registered with `$this->middleware()` in a constructor is therefore not visible here; the route artifact's `middleware` list, which also carries group middleware, still includes it.
+
+A controller's `annotations` come from its class-level `#[Necromancer]` attribute (and exact-ID config mappings). A method-level `#[Necromancer]` keeps refining the annotations of the routes that target that method, as described below, and is not copied onto the controller artifact. A route's `controller` relationship resolves to the controller's concept in the OKF bundle and its node in the Artifact Graph.
 
 On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself. The `withNecromancer()` route macro declares it:
 
@@ -374,7 +413,7 @@ php artisan necromancer:generate --only=observers,scheduled_tasks
 php artisan necromancer:generate --only=gates,middleware,mailables
 ```
 
-Supported types: `routes`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`.
+Supported types: `routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`.
 
 Exclude specific sections instead of listing everything you want:
 
@@ -885,7 +924,7 @@ Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone,
 - **grouping** — an artifact declaring `domain` or `flow` connects to that group (e.g. every artifact tagged `domain: billing` links to `domain:billing`).
 - **reference** — an artifact declaring a local `adrs` entry connects to it (e.g. `adr:docs/adr/0004-x.md`); absolute-URI ADRs are skipped, the same way the OKF bundle leaves them as external links rather than copied concepts.
 
-An edge's target resolves to another node's canonical id when the target is itself a collected artifact (most structural edges, always for grouping/reference); otherwise it carries the raw declared value — a route's `controller`, for instance, almost never resolves, since controllers aren't a collected artifact type. `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an edge with an unresolved endpoint still exists in `graph.json`, just isn't drawn.
+An edge's target resolves to another node's canonical id when the target is itself a collected artifact (most structural edges, always for grouping/reference); otherwise it carries the raw declared value — a route's `controller`, for instance, resolves to the collected controller's node, but stays unresolved for a vendor controller (or one outside a `--only` scan's scope). `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an edge with an unresolved endpoint still exists in `graph.json`, just isn't drawn.
 
 `graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
 
@@ -918,7 +957,7 @@ php artisan necromancer:graph --output=dist/graph # write elsewhere
 | `necromancer:map` | Display the manifest in the terminal | `--type=TYPE` |
 | `necromancer:audit` | Run the AI-readability audit (violation list) | `--format=text\|json\|markdown`, `--output=PATH`, `--fail-on=SEVERITY` |
 | `necromancer:doctor` | Show the AI readability score (percentage dashboard) | `--json`, `--min-score=N`, `--only=KEYS` |
-| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (19 types: routes, models, actions, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
+| `necromancer:generate` | Generate the Markdown context file | `--only=TYPE,TYPE`, `--except=TYPE,TYPE` (20 types: routes, controllers, models, actions, jobs, events, listeners, commands, form_requests, policies, enums, tests, observers, scheduled_tasks, middleware, livewire_components, gates, mailables, validation_rules, service_providers), `--paths=PATH,PATH`, `--output=PATH`, `--force` |
 | `necromancer:ask` | Ask a question about your codebase via AI | `--provider=`, `--model=` |
 | `necromancer:inspect-payload` | Show the AI payload size and content for `necromancer:ask` | `--privacy` |
 | `necromancer:prompt` | Generate a source-grounded prompt for any AI tool | `--top=N`, `--no-ai`, `--output=PATH` |
@@ -1031,7 +1070,7 @@ When [Laravel MCP](https://github.com/laravel/mcp) is installed, Necromancer aut
 | `query_artifacts` | List artifacts of any current type, optionally filtered by JSON substring |
 | `search_artifacts` | Full-text search across all artifact types |
 
-Use `query_artifacts` when you already know the artifact type (`routes`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
+Use `query_artifacts` when you already know the artifact type (`routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
 
 When `laravel/mcp` is present, Necromancer also writes its entry into `.mcp.json` automatically on the first `php artisan` run after installation — no manual configuration needed. If `.mcp.json` already exists, the entry is merged without touching other servers.
 

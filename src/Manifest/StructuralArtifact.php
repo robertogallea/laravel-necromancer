@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use JsonSerializable;
 use LaravelNecromancer\Manifest\ArtifactPayloads\ActionPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\CommandPayload;
+use LaravelNecromancer\Manifest\ArtifactPayloads\ControllerPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EnumPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\EventPayload;
 use LaravelNecromancer\Manifest\ArtifactPayloads\FormRequestPayload;
@@ -402,6 +403,22 @@ final readonly class StructuralArtifact implements JsonSerializable
         return new self('actions', new ActionPayload(
             class: $class,
             entrypoints: $entrypoints,
+            source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+        ), $annotations);
+    }
+
+    /**
+     * @param  list<array{name: string, parameters: list<array{name: string, type: string|null}>, return_type: string|null, middleware: list<string>, routes: list<string>}>  $actions
+     */
+    public static function controller(
+        string $class,
+        array $actions = [],
+        ?SourceLocation $source = null,
+        ArtifactAnnotations $annotations = new ArtifactAnnotations,
+    ): self {
+        return new self('controllers', new ControllerPayload(
+            class: $class,
+            actions: $actions,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
         ), $annotations);
     }

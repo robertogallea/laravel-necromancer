@@ -145,7 +145,8 @@ final readonly class BundleExporter
      * - a class index (FQCN/controller → link) for relationship rendering.
      *   Middleware is excluded: one class can register globally, in a
      *   group, and under an alias, so a class name alone is ambiguous
-     *   there.
+     *   there. A route only stands in for its controller class when no
+     *   class-backed artifact (a collected controller) claims that name.
      * - every artifact's identity keyed by its own id, for Domain/Flow
      *   grouping and ADR "referenced by" resolution.
      *
@@ -155,6 +156,7 @@ final readonly class BundleExporter
     private function indexManifest(array $manifest): array
     {
         $classIndex = [];
+        $routeControllerIndex = [];
         $identities = [];
 
         foreach ((array) ($manifest['artifacts'] ?? []) as $type => $items) {
@@ -185,7 +187,17 @@ final readonly class BundleExporter
                     continue;
                 }
 
-                $key = $type === 'routes' ? ($artifact['controller'] ?? null) : ($artifact['class'] ?? null);
+                if ($type === 'routes') {
+                    $controller = $artifact['controller'] ?? null;
+
+                    if (is_string($controller) && $controller !== '' && ! isset($routeControllerIndex[$controller])) {
+                        $routeControllerIndex[$controller] = $link;
+                    }
+
+                    continue;
+                }
+
+                $key = $artifact['class'] ?? null;
 
                 if (is_string($key) && $key !== '' && ! isset($classIndex[$key])) {
                     $classIndex[$key] = $link;
@@ -193,7 +205,7 @@ final readonly class BundleExporter
             }
         }
 
-        return [$classIndex, $identities];
+        return [$classIndex + $routeControllerIndex, $identities];
     }
 
     /**

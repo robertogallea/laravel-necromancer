@@ -44,6 +44,14 @@ _Avoid_: Service, Livewire action, controller action
 A public method through which an Action's business operation is invoked.
 _Avoid_: Handler, action method
 
+**Controller**:
+An application class whose public methods handle HTTP requests routed to them.
+_Avoid_: Handler, endpoint
+
+**Controller Action**:
+A public controller method that handles HTTP requests routed to it. Distinct from an **Action**, which is not tied to HTTP routing.
+_Avoid_: Endpoint, route action, entrypoint
+
 **Knowledge Bundle**:
 A portable collection of interlinked knowledge documents generated to make an application's architecture understandable to people and AI systems.
 _Avoid_: OKF package, metadata dump

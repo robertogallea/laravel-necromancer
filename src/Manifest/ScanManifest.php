@@ -10,6 +10,7 @@ use JsonException;
 use JsonSerializable;
 use LaravelNecromancer\Collection\ActionCollector;
 use LaravelNecromancer\Collection\CommandCollector;
+use LaravelNecromancer\Collection\ControllerCollector;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
@@ -60,6 +61,7 @@ final class ScanManifest implements JsonSerializable
         private RuleCollector $ruleCollector,
         private ServiceProviderCollector $serviceProviderCollector,
         private ActionCollector $actionCollector,
+        private ControllerCollector $controllerCollector,
     ) {}
 
     /**
@@ -189,6 +191,8 @@ final class ScanManifest implements JsonSerializable
         $eagerModelArtifacts = $observersRequested ? $this->modelCollector->collect() : [];
         $observerModelMap = $this->buildObserverModelMap($eagerModelArtifacts);
         $observerCollector = $this->observerCollector->withModelMap($observerModelMap);
+        $routeNoiseFilter = new RouteNoiseFilter(array_values($routeExclusions), array_values($routeUriExclusions));
+        $controllerCollector = $this->controllerCollector->withRouteNoiseFilter($routeNoiseFilter);
 
         $collectors = [
             'routes' => function (): array {
@@ -202,6 +206,7 @@ final class ScanManifest implements JsonSerializable
             'models' => fn (): array => $eagerModelArtifacts !== [] ? $eagerModelArtifacts : $this->modelCollector->collect(),
             'form_requests' => fn (): array => $this->formRequestCollector->collect(),
             'actions' => fn (): array => $this->actionCollector->collect(),
+            'controllers' => fn (): array => $controllerCollector->collect(),
             'jobs' => fn (): array => $this->jobCollector->collect(),
             'events' => fn (): array => $this->eventCollector->collect(),
             'listeners' => fn (): array => $this->listenerCollector->collect(),
@@ -231,7 +236,7 @@ final class ScanManifest implements JsonSerializable
         $artifacts = $collected !== [] ? array_merge(...array_values($collected)) : [];
 
         $inventory = (new SafeInventoryCollector(
-            routeNoiseFilter: new RouteNoiseFilter(array_values($routeExclusions), array_values($routeUriExclusions)),
+            routeNoiseFilter: $routeNoiseFilter,
             modelExclusionFilter: new ModelExclusionFilter(array_values($modelExclusions)),
         ))->collect(artifacts: $artifacts);
 

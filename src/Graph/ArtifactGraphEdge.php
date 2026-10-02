@@ -17,9 +17,10 @@ use JsonSerializable;
  * artifact's own id, or the id of a synthesized domain/flow/ADR node
  * (ArtifactGraphBuilder::groupAndReferenceNodes()) for a grouping or
  * reference edge — so the edge always has a real node to draw a line to.
- * The one exception is a route's `controller`: no artifact type
- * represents controllers and no synthetic node is grown for them either,
- * so that edge's `to` stays the raw controller class string, mirroring
+ * The one exception is a structural edge whose target was not collected
+ * — e.g. a route's `controller` pointing at a vendor controller, or at a
+ * controller outside a partial scan: no synthetic node is grown for it,
+ * so that edge's `to` stays the raw class string, mirroring
  * LaravelNecromancer\Okf\ArtifactConceptBuilder's "link when resolvable,
  * plain text otherwise" convention for the same case.
  */

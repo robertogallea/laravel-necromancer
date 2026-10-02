@@ -8,6 +8,7 @@ final class ArtifactQueryService
 {
     public const SUPPORTED_TYPES = [
         'routes',
+        'controllers',
         'models',
         'form_requests',
         'actions',

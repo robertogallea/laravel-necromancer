@@ -4,12 +4,14 @@ use App\Providers\NecromancerFixtureServiceProvider;
 use Illuminate\Auth\Access\Gate;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Routing\RedirectController;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use LaravelNecromancer\Collection\ActionCollector;
 use LaravelNecromancer\Collection\CommandCollector;
+use LaravelNecromancer\Collection\ControllerCollector;
 use LaravelNecromancer\Collection\EnumCollector;
 use LaravelNecromancer\Collection\EventCollector;
 use LaravelNecromancer\Collection\FormRequestCollector;
@@ -32,6 +34,13 @@ use LaravelNecromancer\Tests\Fixtures\Enums\NecromancerStatus;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerBroadcastedEvent;
 use LaravelNecromancer\Tests\Fixtures\Events\NecromancerOrderPlaced;
 use LaravelNecromancer\Tests\Fixtures\Gates\NecromancerManageUsersGate;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\AbstractNecromancerController;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\NecromancerControllerSupport;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\NecromancerCrudController;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\NecromancerHealthController;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\NecromancerInvoiceController;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\NecromancerReportController;
+use LaravelNecromancer\Tests\Fixtures\Http\Controllers\NecromancerSecuredController;
 use LaravelNecromancer\Tests\Fixtures\InvalidJobs\NecromancerInvalidAnnotatedJob;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerAnnotatedJob;
 use LaravelNecromancer\Tests\Fixtures\Jobs\NecromancerQueuedJob;
@@ -90,7 +99,7 @@ test('the scan command records complete and partial scan scope', function () {
 
     expect($full->meta->scope->complete)->toBeTrue()
         ->and($full->meta->scope->artifact_types)->toBe([
-            'actions', 'commands', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
+            'actions', 'commands', 'controllers', 'enums', 'events', 'form_requests', 'gates', 'jobs', 'listeners',
             'livewire_components', 'mailables', 'middleware', 'models', 'observers',
             'policies', 'routes', 'scheduled_tasks', 'service_providers', 'tests', 'validation_rules',
         ])
@@ -1720,6 +1729,222 @@ test('an exact-ID mapping for an unknown action emits AN_CONFIG_UNMATCHED', func
         ->and(Artisan::output())->toContain('AN_CONFIG_UNMATCHED');
 });
 
+test('the scan command collects controllers with their controller action signatures', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-basic.json');
+
+    useNecromancerFixtureControllers();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $controller = findManifestController(expectScanManifest($path), NecromancerInvoiceController::class);
+
+    expect($controller->id)->toBe('controllers:'.NecromancerInvoiceController::class)
+        ->and($controller->actions)->toEqual([
+            (object) ['name' => 'index', 'parameters' => [], 'return_type' => 'string', 'middleware' => [], 'routes' => []],
+            (object) [
+                'name' => 'show',
+                'parameters' => [(object) ['name' => 'order', 'type' => NecromancerOrder::class]],
+                'return_type' => 'string',
+                'middleware' => [],
+                'routes' => [],
+            ],
+        ])
+        ->and($controller->source->file)->toContain('Fixtures/Http/Controllers/NecromancerInvoiceController.php')
+        ->and($controller->source->line)->toBeInt();
+});
+
+test('the scan command discovers only concrete controllers that expose a controller action', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-discovery.json');
+
+    useNecromancerFixtureControllers();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $classes = array_map(
+        fn (stdClass $controller): string => $controller->class,
+        expectScanManifest($path)->artifacts->controllers,
+    );
+
+    expect($classes)->toContain(NecromancerInvoiceController::class)
+        ->toContain(NecromancerCrudController::class)
+        ->toContain(NecromancerHealthController::class)
+        ->not->toContain(AbstractNecromancerController::class)
+        ->not->toContain(NecromancerControllerSupport::class);
+});
+
+test('controller actions are the public instance methods declared on the controller itself', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-actions.json');
+
+    useNecromancerFixtureControllers();
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+    $actionNames = fn (string $class): array => array_map(
+        fn (stdClass $action): string => $action->name,
+        findManifestController($manifest, $class)->actions,
+    );
+
+    expect($actionNames(NecromancerCrudController::class))->toBe(['edit'])
+        ->and($actionNames(NecromancerHealthController::class))->toBe(['__invoke']);
+});
+
+test('methods a controller pulls in from a trait are controller actions only when a route targets them', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-trait-methods.json');
+
+    useNecromancerFixtureControllers();
+
+    Route::get('/necromancer/reports/export', [NecromancerReportController::class, 'export']);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'controllers'])
+        ->assertSuccessful();
+
+    $actions = findManifestController(expectScanManifest($path), NecromancerReportController::class)->actions;
+
+    expect(array_map(fn (stdClass $action): string => $action->name, $actions))->toBe(['export', 'index']);
+});
+
+test('each controller action lists the artifact IDs of the routes that target it', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-routes.json');
+
+    useNecromancerFixtureControllers();
+
+    Route::get('/necromancer/invoices', [NecromancerInvoiceController::class, 'index']);
+    Route::get('/necromancer/invoices/{order}', [NecromancerInvoiceController::class, 'show']);
+    Route::get('/necromancer/orders/{order}/invoice', [NecromancerInvoiceController::class, 'show']);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'controllers'])
+        ->assertSuccessful();
+
+    $actions = findManifestController(expectScanManifest($path), NecromancerInvoiceController::class)->actions;
+
+    expect($actions[0]->routes)->toBe(['routes:GET:necromancer/invoices'])
+        ->and($actions[1]->routes)->toBe([
+            'routes:GET:necromancer/invoices/{order}',
+            'routes:GET:necromancer/orders/{order}/invoice',
+        ]);
+});
+
+test('routes removed by the route exclusion filters are not listed on controller actions', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-excluded-routes.json');
+
+    useNecromancerFixtureControllers();
+
+    config([
+        'necromancer.exclude.routes' => ['internal.*'],
+        'necromancer.exclude.route_uris' => ['necromancer/hidden/*'],
+    ]);
+
+    Route::get('/necromancer/invoices', [NecromancerInvoiceController::class, 'index']);
+    Route::get('/necromancer/internal/invoices', [NecromancerInvoiceController::class, 'index'])->name('internal.invoices');
+    Route::get('/necromancer/hidden/invoices', [NecromancerInvoiceController::class, 'index']);
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'controllers'])
+        ->assertSuccessful();
+
+    $index = findManifestController(expectScanManifest($path), NecromancerInvoiceController::class)->actions[0];
+
+    expect($index->routes)->toBe(['routes:GET:necromancer/invoices']);
+});
+
+test('an inherited method targeted by a route is a controller action', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-inherited-route.json');
+
+    useNecromancerFixtureControllers();
+
+    Route::post('/necromancer/crud', [NecromancerCrudController::class, 'store']);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $actions = findManifestController(expectScanManifest($path), NecromancerCrudController::class)->actions;
+
+    expect(array_map(fn (stdClass $action): string => $action->name, $actions))->toBe(['edit', 'store'])
+        ->and($actions[1]->routes)->toBe(['routes:POST:necromancer/crud']);
+});
+
+test('a route-targeted controller outside the discovery directory is collected only when it is in the application namespace', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-route-targeted.json');
+
+    useNecromancerFixtureControllers();
+
+    Route::get('/necromancer/route-targeted', [NecromancerRouteController::class, 'show']);
+    Route::redirect('/necromancer/old-invoices', '/necromancer/invoices');
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'controllers'])
+        ->assertSuccessful();
+
+    $classes = array_map(
+        fn (stdClass $controller): string => $controller->class,
+        expectScanManifest($path)->artifacts->controllers,
+    );
+
+    expect($classes)->toContain(NecromancerRouteController::class)
+        ->not->toContain(RedirectController::class);
+});
+
+test('controller action middleware is read from the controller declarations without instantiating it', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-middleware.json');
+
+    useNecromancerFixtureControllers();
+
+    $this->artisan('necromancer:scan', ['--output' => $path, '--only' => 'controllers'])
+        ->assertSuccessful();
+
+    $actions = findManifestController(expectScanManifest($path), NecromancerSecuredController::class)->actions;
+
+    expect($actions[0]->name)->toBe('index')
+        ->and($actions[0]->middleware)->toBe(['throttle:60,1'])
+        ->and($actions[1]->name)->toBe('update')
+        ->and($actions[1]->middleware)->toBe(['auth', 'verified', 'log', 'throttle:60,1', 'signed', 'can:update']);
+});
+
+test('controller annotations come from the class-level attribute and exact-ID mappings only', function () {
+    $path = necromancerScanTestPath('necromancer-controllers-annotations.json');
+
+    useNecromancerFixtureControllers();
+
+    config(['necromancer.annotations' => [
+        'controllers:'.NecromancerAnnotatedRouteController::class => ['flow' => 'billing-overview'],
+    ]]);
+
+    Route::get('/necromancer/annotated/charge', [NecromancerAnnotatedRouteController::class, 'charge']);
+
+    $this->artisan('necromancer:scan', ['--output' => $path])
+        ->assertSuccessful();
+
+    $manifest = expectScanManifest($path);
+
+    expect(findManifestController($manifest, NecromancerAnnotatedRouteController::class)->annotations)->toEqual((object) [
+        'domain' => 'billing',
+        'flow' => 'billing-overview',
+        'risk' => 'low',
+    ])
+        ->and(findManifestRouteByUri($manifest, 'necromancer/annotated/charge')->annotations->capability)->toBe('billing.charge')
+        ->and(findManifestController($manifest, NecromancerInvoiceController::class))->not->toHaveProperty('annotations');
+});
+
+test('the --only=controllers scan restricts to controller artifacts with a stable content hash', function () {
+    $first = necromancerScanTestPath('necromancer-only-controllers-first.json');
+    $second = necromancerScanTestPath('necromancer-only-controllers-second.json');
+
+    useNecromancerFixtureControllers();
+
+    Route::get('/necromancer/invoices', [NecromancerInvoiceController::class, 'index']);
+
+    $this->artisan('necromancer:scan', ['--output' => $first, '--only' => 'controllers'])->assertSuccessful();
+    $this->artisan('necromancer:scan', ['--output' => $second, '--only' => 'controllers'])->assertSuccessful();
+
+    $firstManifest = json_decode((string) File::get($first), false, 512, JSON_THROW_ON_ERROR);
+    $secondManifest = json_decode((string) File::get($second), false, 512, JSON_THROW_ON_ERROR);
+
+    expect(array_keys((array) $firstManifest->artifacts))->toBe(['controllers'])
+        ->and($firstManifest->meta->content_hash)->toBe($secondManifest->meta->content_hash);
+});
+
 test('the --only=actions scan restricts to action artifacts', function () {
     $path = necromancerScanTestPath('necromancer-only-actions.json');
 
@@ -2045,6 +2270,7 @@ function expectScanManifest(string $path): stdClass
     expect(array_keys((array) $manifest->artifacts))->each->toBeIn([
         'actions',
         'commands',
+        'controllers',
         'enums',
         'events',
         'form_requests',
@@ -2395,6 +2621,33 @@ function findManifestMailable(stdClass $manifest, string $class): stdClass
     }
 
     Assert::fail("Expected mailable artifact [{$class}] was not found.");
+}
+
+function useNecromancerFixtureControllers(): void
+{
+    app()->bind(
+        ControllerCollector::class,
+        fn ($app): ControllerCollector => new ControllerCollector(
+            $app,
+            $app->make(Router::class),
+            [[
+                'path' => base_path('tests/Fixtures/Http/Controllers'),
+                'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Http\\Controllers\\',
+            ]],
+            'LaravelNecromancer\\Tests\\Fixtures\\',
+        ),
+    );
+}
+
+function findManifestController(stdClass $manifest, string $class): stdClass
+{
+    foreach ($manifest->artifacts->controllers ?? [] as $controller) {
+        if ($controller->class === $class) {
+            return $controller;
+        }
+    }
+
+    Assert::fail("Expected controller artifact [{$class}] was not found.");
 }
 
 function useNecromancerFixtureActions(): void
