@@ -17,7 +17,7 @@ use LaravelNecromancer\Relationships\ImpactAnalyzer;
  * (docs/adr/0023); every other failure is an MCP error whose body is
  * {"error": <code>, "message": <string>}.
  */
-trait AnswersFromArtifactGraph
+trait AnswersGraphQueries
 {
     /**
      * The configured manifest, or a manifest_not_found error when it is
@@ -30,7 +30,7 @@ trait AnswersFromArtifactGraph
         $path = (string) config('necromancer.output.manifest', base_path('necromancer.json'));
 
         try {
-            return $reader->read(preg_match('~^([/\\\\]|[A-Za-z]:[/\\\\])~', $path) === 1 ? $path : base_path($path));
+            return $reader->read($path);
         } catch (ManifestNotFoundException) {
             return $this->error('manifest_not_found', 'No current Necromancer manifest was found (it is missing or predates schema v1). Run `php artisan necromancer:scan` to generate it.');
         }

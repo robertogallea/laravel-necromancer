@@ -9,7 +9,7 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 use LaravelNecromancer\Manifest\ManifestReader;
-use LaravelNecromancer\Mcp\Tools\Concerns\AnswersFromArtifactGraph;
+use LaravelNecromancer\Mcp\Tools\Concerns\AnswersGraphQueries;
 use LaravelNecromancer\Relationships\ImpactAnalyzer;
 use LaravelNecromancer\Relationships\ImpactDirection;
 use LaravelNecromancer\Relationships\Relationship;
@@ -18,7 +18,7 @@ use stdClass;
 
 final class GetRelationshipsTool extends Tool
 {
-    use AnswersFromArtifactGraph;
+    use AnswersGraphQueries;
 
     public function name(): string
     {

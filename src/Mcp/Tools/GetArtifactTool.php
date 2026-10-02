@@ -10,12 +10,12 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\ManifestReader;
-use LaravelNecromancer\Mcp\Tools\Concerns\AnswersFromArtifactGraph;
+use LaravelNecromancer\Mcp\Tools\Concerns\AnswersGraphQueries;
 use LaravelNecromancer\Relationships\ImpactAnalyzer;
 
 final class GetArtifactTool extends Tool
 {
-    use AnswersFromArtifactGraph;
+    use AnswersGraphQueries;
 
     public function name(): string
     {
