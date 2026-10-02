@@ -18,6 +18,9 @@ final class GoldenAnswerResolver
     /** @var list<Relationship>|null */
     private ?array $relationships = null;
 
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $artifactsById = null;
+
     /** @param array<string, mixed> $manifest */
     public function __construct(private readonly array $manifest) {}
 
@@ -288,15 +291,19 @@ final class GoldenAnswerResolver
     /** @return array<string, mixed>|null */
     private function artifactById(string $id): ?array
     {
-        foreach ((array) ($this->manifest['artifacts'] ?? []) as $items) {
-            foreach ((array) $items as $item) {
-                if (is_array($item) && ($item['id'] ?? null) === $id) {
-                    return $item;
+        if ($this->artifactsById === null) {
+            $this->artifactsById = [];
+
+            foreach ((array) ($this->manifest['artifacts'] ?? []) as $items) {
+                foreach ((array) $items as $item) {
+                    if (is_array($item) && isset($item['id'])) {
+                        $this->artifactsById[(string) $item['id']] ??= $item;
+                    }
                 }
             }
         }
 
-        return null;
+        return $this->artifactsById[$id] ?? null;
     }
 
     /**
