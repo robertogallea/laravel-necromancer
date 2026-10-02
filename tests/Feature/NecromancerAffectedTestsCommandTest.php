@@ -244,6 +244,16 @@ test('--paths writes only test paths to stdout, and unmapped paths to stderr', f
         ->and($stderr)->toBe("Unmapped: routes/web.php\n");
 });
 
+test('--paths sends errors to stderr, keeping stdout clean for a pipe', function () {
+    writeAffectedTestsManifest(affectedTestsCommandArtifacts(), complete: false);
+
+    [$status, $stdout, $stderr] = affectedTestsFromStdin("app/Models/Order.php\n", ['--paths' => true]);
+
+    expect($status)->toBe(1)
+        ->and($stdout)->toBe('')
+        ->and($stderr)->toContain('scope is partial');
+});
+
 test('--json with --paths fails', function () {
     writeAffectedTestsManifest(affectedTestsCommandArtifacts());
 

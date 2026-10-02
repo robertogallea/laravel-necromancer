@@ -175,3 +175,13 @@ test('an AffectedTest serializes its file, id, distance, match, start, and the I
         ],
     ]);
 });
+
+test('a test brought closer by a later start takes that start\'s canonical position', function () {
+    $starts = ['routes:GET:orders', 'models:App\\Models\\Order', 'policies:App\\Policies\\OrderPolicy'];
+    $tests = (new AffectedTestFinder)->find(affectedTestsManifest(), $starts, 2);
+
+    expect(affectedRows($tests))->toBe([
+        ['tests/Unit/OrderTest.php', 1, 'exact', 'models:App\\Models\\Order', 'App\\Models\\Order'],
+        ['tests/Unit/OrderPolicyTest.php', 1, 'exact', 'policies:App\\Policies\\OrderPolicy', 'App\\Policies\\OrderPolicy'],
+    ]);
+});

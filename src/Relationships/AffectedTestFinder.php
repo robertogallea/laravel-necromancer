@@ -82,8 +82,8 @@ final readonly class AffectedTestFinder
 
     /**
      * Every Affected Test of the starts, each once at its smallest
-     * distance, sorted by distance; ties keep the first start's canonical
-     * Impact order. A start that is itself a test is affected at distance
+     * distance, sorted by distance, then by start, then by canonical Impact
+     * order. A start that is itself a test is affected at distance
      * 0 and is not walked from.
      *
      * @param  array<string, mixed>  $manifest
@@ -120,6 +120,8 @@ final readonly class AffectedTestFinder
                 if (isset($found[$node->id]) && $found[$node->id]->distance <= $node->distance) {
                     continue;
                 }
+
+                unset($found[$node->id]);
 
                 $found[$node->id] = new AffectedTest(
                     $node->id,

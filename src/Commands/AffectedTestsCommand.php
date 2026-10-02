@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
+use LaravelNecromancer\Commands\Concerns\ResolvesImpactStart;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ManifestScopeGuard;
@@ -14,10 +15,12 @@ use LaravelNecromancer\Relationships\AffectedTestFinder;
 use LaravelNecromancer\Relationships\ImpactAnalyzer;
 use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 final class AffectedTestsCommand extends Command
 {
     use ReadsManifest;
+    use ResolvesImpactStart;
 
     protected $signature = 'necromancer:affected-tests
         {artifact?       : An exact Artifact ID, a fully-qualified class name, or a domain:/flow:/adr: ID}
@@ -47,7 +50,7 @@ final class AffectedTestsCommand extends Command
             return self::FAILURE;
         }
 
-        $depth = $this->depth();
+        $depth = $this->impactDepth();
 
         if ($depth === null) {
             return self::FAILURE;
@@ -81,13 +84,14 @@ final class AffectedTestsCommand extends Command
             ['starts' => $starts, 'unmapped' => $unmapped] = $finder->startsForPaths($manifest, $this->stdinLines(), app()->basePath());
             $subject = count($starts).' changed artifact(s)';
         } else {
-            $starts = $this->resolveStart($analyzer, $manifest, (string) $artifact);
+            $start = $this->resolveImpactStart($analyzer, $manifest, (string) $artifact);
 
-            if ($starts === null) {
+            if ($start === null) {
                 return self::FAILURE;
             }
 
-            $subject = $starts[0];
+            $starts = [$start];
+            $subject = $start;
         }
 
         $tests = $finder->find($manifest, $starts, $depth);
@@ -121,36 +125,6 @@ final class AffectedTestsCommand extends Command
         $this->renderSection('Unmapped', $unmapped);
 
         return self::SUCCESS;
-    }
-
-    /**
-     * The single start an artifact argument denotes, or null after
-     * reporting an unknown or ambiguous one in necromancer:impact's words.
-     *
-     * @param  array<string, mixed>  $manifest
-     * @return list<string>|null
-     */
-    private function resolveStart(ImpactAnalyzer $analyzer, array $manifest, string $input): ?array
-    {
-        $candidates = $analyzer->startCandidates($manifest, $input);
-
-        if ($candidates === []) {
-            $this->error("No artifact matches '{$input}'. Pass an exact Artifact ID, a fully-qualified class name, or a referenced domain:/flow:/adr: ID.");
-
-            return null;
-        }
-
-        if (count($candidates) > 1) {
-            $this->error("'{$input}' matches several artifacts. Pass one of these Artifact IDs instead:");
-
-            foreach ($candidates as $candidate) {
-                $this->line("  {$candidate}");
-            }
-
-            return null;
-        }
-
-        return $candidates;
     }
 
     private function testLine(AffectedTest $test): string
@@ -192,12 +166,34 @@ final class AffectedTestsCommand extends Command
             $this->output->writeln($file);
         }
 
-        $output = $this->output->getOutput();
-        $stderr = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
-
         foreach ($unmapped as $path) {
-            $stderr->writeln("Unmapped: {$path}");
+            $this->stderr()->writeln("Unmapped: {$path}");
         }
+    }
+
+    /**
+     * Under --paths, errors go to stderr so nothing but test paths can
+     * reach a pipe.
+     *
+     * @param  string  $string
+     * @param  int|string|null  $verbosity
+     */
+    public function error($string, $verbosity = null): void
+    {
+        if ($this->option('paths')) {
+            $this->stderr()->writeln("<error>{$string}</error>");
+
+            return;
+        }
+
+        parent::error($string, $verbosity);
+    }
+
+    private function stderr(): OutputInterface
+    {
+        $output = $this->output->getOutput();
+
+        return $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
     }
 
     /**
@@ -209,18 +205,5 @@ final class AffectedTestsCommand extends Command
         $contents = stream_get_contents($stream ?? STDIN);
 
         return $contents === false ? [] : (preg_split('/\R/', $contents) ?: []);
-    }
-
-    private function depth(): ?int
-    {
-        $depth = (string) $this->option('depth');
-
-        if (! ctype_digit($depth) || (int) $depth < 1) {
-            $this->error('The --depth option must be an integer of at least 1.');
-
-            return null;
-        }
-
-        return (int) $depth;
     }
 }
