@@ -25,7 +25,7 @@ final class PromptRelevanceScorer
     public function score(array $artifacts, string $query, int $top): array
     {
         $keywords = array_filter(
-            array_map('trim', str_getcsv($query, ' ')),
+            array_map('trim', str_getcsv($query, ' ', '"', '')),
             fn ($k) => $k !== ''
         );
 
