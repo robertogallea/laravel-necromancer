@@ -410,7 +410,11 @@ final readonly class ArtifactConceptBuilder
             RelationshipType::UsesMiddleware => ($relationship->metadata['groups'] ?? []) !== [] ? 'via '.implode(', ', $relationship->metadata['groups']) : '',
             RelationshipType::AuthorizedBy => (string) ($relationship->metadata['ability'] ?? ''),
             RelationshipType::Dispatches => implode(', ', $relationship->metadata['modes'] ?? []),
-            RelationshipType::TestedBy => ($relationship->metadata['match'] ?? null) === 'namespace' ? 'namespace match' : '',
+            RelationshipType::TestedBy => match ($relationship->metadata['match'] ?? null) {
+                'namespace' => 'namespace match',
+                'reference' => 'reference',
+                default => '',
+            },
             default => '',
         };
     }

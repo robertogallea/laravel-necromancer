@@ -34,8 +34,8 @@ final readonly class AffectedTest implements JsonSerializable
     }
 
     /**
-     * The reaching tested_by Relationship's `exact`/`namespace` match, or
-     * null for a changed test.
+     * The reaching tested_by Relationship's `exact`/`namespace`/`reference`
+     * match, or null for a changed test.
      */
     public function match(): ?string
     {

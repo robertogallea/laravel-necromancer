@@ -133,7 +133,11 @@ final class AffectedTestsCommand extends Command
             return "{$test->file}  (changed)";
         }
 
-        return "{$test->file}  ← via {$test->viaLabel}".($test->match() === 'namespace' ? '  (namespace match)' : '');
+        return "{$test->file}  ← via {$test->viaLabel}".match ($test->match()) {
+            'namespace' => '  (namespace match)',
+            'reference' => '  (reference)',
+            default => '',
+        };
     }
 
     /**

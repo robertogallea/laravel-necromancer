@@ -32,6 +32,7 @@ use LaravelNecromancer\Collection\SafeInventoryCollector;
 use LaravelNecromancer\Collection\ScheduledTaskCollector;
 use LaravelNecromancer\Collection\ServiceProviderCollector;
 use LaravelNecromancer\Collection\TestCollector;
+use LaravelNecromancer\Collection\TestReferenceFactResolver;
 use LaravelNecromancer\Metadata\AnnotationConfigurationResolver;
 use stdClass;
 use Throwable;
@@ -259,6 +260,11 @@ final class ScanManifest implements JsonSerializable
         // source of the artifacts this scan already collected (ADR 0020).
         [$identifiedArtifacts, $dispatchDiagnostics] = (new DispatchFactResolver)->apply($identifiedArtifacts);
         $this->diagnostics = [...$this->diagnostics, ...$dispatchDiagnostics];
+
+        // A test's source is the only record of what it exercises beyond its
+        // single subject (ADR 0024).
+        [$identifiedArtifacts, $referenceDiagnostics] = (new TestReferenceFactResolver($this->app->getNamespace()))->apply($identifiedArtifacts);
+        $this->diagnostics = [...$this->diagnostics, ...$referenceDiagnostics];
 
         return $identifiedArtifacts;
     }
