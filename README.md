@@ -1285,20 +1285,22 @@ When [Laravel MCP](https://github.com/laravel/mcp) is installed, Necromancer aut
 | `get_artifact` | Return one artifact's full manifest payload, by Artifact ID or fully-qualified class name |
 | `get_relationships` | List every [Relationship](#relationships) an artifact, Domain, Flow, or ADR takes part in, outgoing and incoming |
 | `get_impact` | List everything reachable from an artifact, Domain, Flow, or ADR, like [`necromancer:impact --json`](#step-3l--analyze-an-artifacts-impact) |
+| `get_affected_tests` | List the tests affected by a changed artifact or by changed file paths, like [`necromancer:affected-tests --json`](#step-3m--find-the-tests-affected-by-a-change) |
 
 Use `query_artifacts` when you already know the artifact type (`routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
 
 #### Graph tools
 
-`get_artifact`, `get_relationships`, and `get_impact` follow [Relationships](#relationships), so an agent can ask for a model's policy, observers, or flow in one call instead of fetching several artifacts and working out the links itself. They're deterministic and involve no LLM.
+`get_artifact`, `get_relationships`, `get_impact`, and `get_affected_tests` follow [Relationships](#relationships), so an agent can ask for a model's policy, observers, or flow in one call instead of fetching several artifacts and working out the links itself. They're deterministic and involve no LLM.
 
 - **`get_artifact(artifact)`** returns `{"artifact": <payload>, "warnings": []}`. A `domain:`/`flow:`/`adr:` ID isn't a collected artifact, so it returns a `not_an_artifact` error pointing to `get_relationships`.
 - **`get_relationships(artifact)`** returns `{"artifact": <id>, "relationships": [...], "warnings": []}`, listing every Relationship the start takes part in, in canonical order. Each entry is the Relationship as it appears in `graph.json` plus `"direction": "out"` (the start is `from`) or `"in"`. Nothing is deduplicated: a model whose `author` and `assignee` both relate to `User` yields two entries. `get_relationships("flow:checkout")` lists the flow's members, all incoming.
 - **`get_impact(artifact, depth?, types?)`** returns exactly the `necromancer:impact --json` shape plus `warnings`. `depth` defaults to 1 and is clamped to 1–3, with a warning when it's clamped. `types` filters the returned nodes, as a comma-separated string or an array, with the same values as `--type`.
+- **`get_affected_tests(artifact? | paths?, depth?)`** returns `{"directly_affected", "indirectly_affected", "unmapped", "depth", "warnings"}`. The three sections are exactly what `necromancer:affected-tests --json` gives for the same input, and `depth` is the depth actually used. Pass exactly one of `artifact` or `paths` (a list of changed files, relative, `./`-prefixed, or absolute under the project); both or neither returns an `invalid_input` error. An empty `paths` list is valid and returns empty sections, and `unmapped` is always empty for `artifact`. `depth` defaults to 2, as in the command, and is clamped to 1–3 with a warning. The server's instructions tell agents to call it with the paths they changed after editing files.
 
-`artifact` is an exact Artifact ID or a fully-qualified class name. `get_relationships` and `get_impact` also accept a `domain:<v>`, `flow:<v>`, or `adr:<path>` ID that at least one artifact declares.
+`artifact` is an exact Artifact ID or a fully-qualified class name. `get_relationships`, `get_impact`, and `get_affected_tests` also accept a `domain:<v>`, `flow:<v>`, or `adr:<path>` ID that at least one artifact declares.
 
-Unlike `necromancer:impact`, these tools don't refuse a stale or partial-scope manifest: an agent makes the manifest stale with its first edit, and has no `--allow-stale` to pass. They answer anyway and report it in `warnings`: one entry when source files have changed since the scan, and one when the scan didn't cover every artifact type (naming the types it did cover).
+Unlike `necromancer:impact`, these tools don't refuse a stale or partial-scope manifest: an agent makes the manifest stale with its first edit, and has no `--allow-stale` to pass. They answer anyway and report it in `warnings`: one entry when source files have changed since the scan, and one when the scan didn't cover every artifact type (naming the types it did cover). On a stale manifest, `get_affected_tests` adds one more when some paths are unmapped: they may be files created or moved since the scan, which `php artisan necromancer:scan` would map.
 
 Other failures return an MCP error whose text is `{"error": <code>, "message": <string>}`:
 
@@ -1308,6 +1310,7 @@ Other failures return an MCP error whose text is `{"error": <code>, "message": <
 | `not_found` | Nothing matches the input |
 | `not_an_artifact` | `get_artifact` was given a Domain, Flow, or ADR ID |
 | `invalid_type` | `get_impact`'s `types` names an unknown type |
+| `invalid_input` | `get_affected_tests` was given both `artifact` and `paths`, or neither |
 | `manifest_not_found` | The manifest is missing or predates schema v1; run `php artisan necromancer:scan` |
 
 The four query tools return an empty list when the manifest is missing, as before.

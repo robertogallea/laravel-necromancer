@@ -12,13 +12,19 @@ use LaravelNecromancer\Relationships\ImpactAnalyzer;
 
 /**
  * Manifest loading, start resolution, warnings, and errors shared by the
- * MCP graph tools (get_artifact, get_relationships, get_impact). A stale or
- * partial manifest is answered with warnings rather than refused
- * (docs/adr/0023); every other failure is an MCP error whose body is
- * {"error": <code>, "message": <string>}.
+ * MCP graph tools (get_artifact, get_relationships, get_impact,
+ * get_affected_tests). A stale or partial manifest is answered with
+ * warnings rather than refused (docs/adr/0023); every other failure is an
+ * MCP error whose body is {"error": <code>, "message": <string>}.
  */
 trait AnswersGraphQueries
 {
+    /**
+     * The deepest walk returned over MCP: the answer lands in the agent's
+     * context window (docs/adr/0023).
+     */
+    private const MAX_DEPTH = 3;
+
     /**
      * The configured manifest, or a manifest_not_found error when it is
      * missing or predates schema v1.
@@ -58,17 +64,44 @@ trait AnswersGraphQueries
     }
 
     /**
+     * The requested depth (or $default) clamped to 1–MAX_DEPTH, adding a
+     * warning to $warnings when it was clamped.
+     *
+     * @param  list<string>  $warnings
+     */
+    private function clampDepth(mixed $requested, int $default, array &$warnings): int
+    {
+        $depth = (int) ($requested ?? $default);
+        $clamped = max(1, min(self::MAX_DEPTH, $depth));
+
+        if ($clamped !== $depth) {
+            $warnings[] = "Requested depth {$depth} was clamped to {$clamped}; {$this->name()} accepts a depth from 1 to ".self::MAX_DEPTH.'.';
+        }
+
+        return $clamped;
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     */
+    private function isManifestStale(array $manifest): bool
+    {
+        return (new ManifestStaleness(app()->basePath()))->isStale($manifest);
+    }
+
+    /**
      * One warning when the manifest appears stale, and one when its scope
-     * is not complete.
+     * is not complete. Pass $stale when it is already known, so the source
+     * files are not hashed twice.
      *
      * @param  array<string, mixed>  $manifest
      * @return list<string>
      */
-    private function manifestWarnings(array $manifest): array
+    private function manifestWarnings(array $manifest, ?bool $stale = null): array
     {
         $warnings = [];
 
-        if ((new ManifestStaleness(app()->basePath()))->isStale($manifest)) {
+        if ($stale ?? $this->isManifestStale($manifest)) {
             $warnings[] = 'Manifest may be stale — source files have changed since it was generated, so recent edits may be missing. Run `php artisan necromancer:scan` to refresh.';
         }
 

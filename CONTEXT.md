@@ -96,6 +96,10 @@ _Avoid_: Hub, leaf
 A test reached by the Impact of a changed artifact, or a changed test itself. It is **directly affected** when it tests the changed artifact (distance 1), and **indirectly affected** when it tests something the change reaches further out.
 _Avoid_: Impacted test, related test, application-level test
 
+**Unmapped Path**:
+A changed file that is not the source of any artifact in the Manifest, such as a route file, migration, config file, view, or a file created since the last Scan. It contributes no Affected Tests.
+_Avoid_: Unknown file, orphan path
+
 **Knowledge Bundle**:
 A portable collection of interlinked knowledge documents generated to make an application's architecture understandable to people and AI systems.
 _Avoid_: OKF package, metadata dump
