@@ -212,12 +212,14 @@ final class PlaceOrder
 | `Mail::send(new X)`, `Mail::to(...)->send(new X)` | `sync` |
 | `Mail::to(...)->queue(new X)`, `Mail::to(...)->later(..., new X)` | `queued` |
 
-Entries are sorted by method then target, deduplicated, and carry no line numbers; an artifact that dispatches nothing has no `dispatches` key. Each dispatched target becomes a `dispatches` [Relationship](#relationships).
+Entries are sorted by method then target, deduplicated, and carry no line numbers; an artifact that dispatches nothing has no `dispatches` key. Each dispatched target becomes a `dispatches` [Relationship](#relationships). In the OKF bundle the field appears among an Artifact Concept's Discovered Facts like any other fact; it isn't yet rendered as a link in its `## Relationships` section.
 
 Limitations:
 
 - Only targets written as a class name (`new X(...)` or `X::...`) are seen. Dynamic targets (`dispatch($job)`, container-resolved classes), string events (`event('order.placed')`, Livewire's `$this->dispatch('browser-event')`), and queued closures are skipped.
 - Only methods written in the artifact's own file are read: a dispatch in a parent class or a trait is not attributed to the child.
+- A dispatch written inside a closure or an anonymous class is credited to the method that contains it — this is how `static::created(fn () => event(new OrderPlaced))` in a model's `booted()` is recorded.
+- Only the shapes in the table are recognized: a dispatch through an injected dispatcher (`$this->bus->dispatch(new X)`), `Mail::queue(new X)` called directly on the facade, or a custom facade wrapping the bus is not seen. A custom facade's `MyBus::dispatch(...)` reads as a dispatch of `MyBus` itself.
 - Closure-based dispatchers (closure routes, scheduled closures, closure gates) have no class to read and are not covered. Notifications are not tracked.
 - If an artifact's file can't be parsed, the scan still succeeds, that artifact gets no `dispatches`, and a non-fatal `DS_PARSE_FAILED` diagnostic names it.
 

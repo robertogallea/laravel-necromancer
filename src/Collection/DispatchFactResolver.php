@@ -153,8 +153,10 @@ final class DispatchFactResolver
      */
     private function dispatchedBy(CallLike $call): array
     {
-        if ($call instanceof FuncCall && $call->name instanceof Name) {
-            $mode = match ($call->name->getLast()) {
+        // Only a single-part name is Laravel's global helper: a namespaced
+        // function (or one imported with `use function`) merely shares its name.
+        if ($call instanceof FuncCall && $call->name instanceof Name && count($call->name->getParts()) === 1) {
+            $mode = match ($call->name->toString()) {
                 'dispatch' => self::QUEUED,
                 'dispatch_sync' => self::SYNC,
                 'event', 'broadcast' => null,

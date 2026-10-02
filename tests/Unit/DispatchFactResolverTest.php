@@ -146,3 +146,32 @@ test('artifact types that are not class-backed never gain dispatches, even when 
 
     expect($artifact)->not->toHaveKey('dispatches');
 });
+
+test('a namespaced function that merely shares a dispatch helper name is not a dispatch', function () {
+    $file = sys_get_temp_dir().'/necromancer-dispatch-'.uniqid().'.php';
+    file_put_contents($file, <<<'PHP'
+        <?php
+
+        namespace App\Actions;
+
+        final class Lookalike
+        {
+            public function handle(): void
+            {
+                \Vendor\Pkg\dispatch(new \App\Jobs\SendInvoice);
+                \Vendor\Pkg\event(new \App\Events\OrderPlaced);
+                \dispatch(new \App\Jobs\ShipOrder);
+            }
+        }
+        PHP);
+
+    try {
+        [$artifact] = resolveDispatches(dispatchingArtifact('App\\Actions\\Lookalike', $file));
+    } finally {
+        unlink($file);
+    }
+
+    expect($artifact['dispatches'])->toBe([
+        ['target' => 'App\\Jobs\\ShipOrder', 'method' => 'handle', 'mode' => 'queued'],
+    ]);
+});
