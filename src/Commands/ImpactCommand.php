@@ -6,7 +6,6 @@ namespace LaravelNecromancer\Commands;
 
 use Illuminate\Console\Command;
 use LaravelNecromancer\Commands\Concerns\ReadsManifest;
-use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Manifest\ManifestNotFoundException;
 use LaravelNecromancer\Manifest\ManifestReader;
 use LaravelNecromancer\Manifest\ManifestScopeGuard;
@@ -20,7 +19,7 @@ final class ImpactCommand extends Command
     use ReadsManifest;
 
     protected $signature = 'necromancer:impact
-        {artifact        : An exact Artifact ID or a fully-qualified class name}
+        {artifact        : An exact Artifact ID, a fully-qualified class name, or a domain:/flow:/adr: ID}
         {--depth=1       : How many Relationships away to walk (at least 1)}
         {--type=         : Only display these node types (comma-separated artifact types, domain, flow, adr)}
         {--json          : Output the Impact as JSON}
@@ -64,7 +63,7 @@ final class ImpactCommand extends Command
         $candidates = $analyzer->startCandidates($manifest, $input);
 
         if ($candidates === []) {
-            $this->error("No artifact matches '{$input}'. Pass an exact Artifact ID or a fully-qualified class name.");
+            $this->error("No artifact matches '{$input}'. Pass an exact Artifact ID, a fully-qualified class name, or a referenced domain:/flow:/adr: ID.");
 
             return self::FAILURE;
         }
@@ -80,10 +79,7 @@ final class ImpactCommand extends Command
         }
 
         $impact = $analyzer->analyze($manifest, $candidates[0], $depth);
-        $nodes = $types === [] ? $impact->nodes : array_values(array_filter(
-            $impact->nodes,
-            fn (ImpactNode $node): bool => in_array($node->type, $types, true),
-        ));
+        $nodes = $impact->nodesOfTypes($types);
 
         if ($this->option('json')) {
             $this->line(json_encode(
@@ -115,7 +111,7 @@ final class ImpactCommand extends Command
      */
     private function renderNodes(Impact $impact, array $nodes): void
     {
-        $groupOrder = array_flip([...ArtifactId::supportedTypes(), ...ImpactAnalyzer::CONCEPT_TYPES, 'unresolved']);
+        $groupOrder = array_flip([...ImpactAnalyzer::nodeTypes(), 'unresolved']);
         $byDistance = [];
 
         foreach ($nodes as $node) {
@@ -173,7 +169,7 @@ final class ImpactCommand extends Command
         }
 
         $types = array_values(array_filter(array_map('trim', explode(',', $option)), fn (string $type): bool => $type !== ''));
-        $known = [...ArtifactId::supportedTypes(), ...ImpactAnalyzer::CONCEPT_TYPES];
+        $known = ImpactAnalyzer::nodeTypes();
         $unknown = array_diff($types, $known);
 
         if ($unknown !== []) {

@@ -1074,9 +1074,11 @@ Domains, Flows, ADRs, middleware, and tests are **Boundary Nodes**: they appear 
 
 That's why a route reaches a model at depth 2 and not 1: no Relationship links them directly, only `route → authorized_by → policy ← authorized_by ← model`.
 
+A Domain, Flow, or ADR can be the start too. `necromancer:impact flow:checkout` lists every artifact in the `checkout` flow (`← belongs_to_flow`), and from depth 2 what those artifacts connect to.
+
 | Option | Description |
 |---|---|
-| `artifact` | An exact Artifact ID (`models:App\Models\Order`) or a fully-qualified class name. A class matching several artifacts (e.g. a middleware registered as an alias and in a group) fails and lists the candidate IDs. |
+| `artifact` | An exact Artifact ID (`models:App\Models\Order`), a fully-qualified class name, or a `domain:<v>`, `flow:<v>`, or `adr:<path>` ID. A class matching several artifacts (e.g. a middleware registered as an alias and in a group) fails and lists the candidate IDs. A Domain, Flow, or ADR ID works only when at least one artifact declares it, so `flow:nope` fails like an unknown class. |
 | `--depth=N` | How many Relationships away to walk. Defaults to 1, must be at least 1. |
 | `--type=TYPES` | Only display these node types: comma-separated artifact types plus `domain`, `flow`, `adr`. The walk itself is unchanged, so `--type=tests --depth=2` still finds tests reached through other nodes. Unresolved nodes have no type, so any `--type` filter hides them. When the filter hides every reachable node, the command says how many were reachable instead of "No relationships found". |
 | `--json` | Output `{"start", "depth", "nodes": [{"id", "type", "distance", "resolved", "via": {"from", "relationship", "direction"}}]}`, nodes sorted by distance then canonical order, with `--type` applied. An unresolved node has `type: null`. A Relationship with no metadata serializes `metadata` as `{}`, as in `graph.json`. |
@@ -1102,7 +1104,7 @@ That's why a route reaches a model at depth 2 and not 1: no Relationship links t
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
 | `necromancer:graph` | Build a deterministic Artifact Graph (artifacts and their Relationships) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
-| `necromancer:impact` | List the artifacts, Domains, Flows, and ADRs connected to an artifact through its Relationships | `--depth=N`, `--type=TYPES`, `--json`, `--allow-stale`, `--allow-partial` |
+| `necromancer:impact` | List the artifacts, Domains, Flows, and ADRs connected to an artifact, Domain, Flow, or ADR through its Relationships | `--depth=N`, `--type=TYPES`, `--json`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 
@@ -1205,8 +1207,35 @@ When [Laravel MCP](https://github.com/laravel/mcp) is installed, Necromancer aut
 | `query_models` | List Eloquent models, optionally filtered by class name |
 | `query_artifacts` | List artifacts of any current type, optionally filtered by JSON substring |
 | `search_artifacts` | Full-text search across all artifact types |
+| `get_artifact` | Return one artifact's full manifest payload, by Artifact ID or fully-qualified class name |
+| `get_relationships` | List every [Relationship](#relationships) an artifact, Domain, Flow, or ADR takes part in, outgoing and incoming |
+| `get_impact` | List everything reachable from an artifact, Domain, Flow, or ADR, like [`necromancer:impact --json`](#step-3l--analyze-an-artifacts-impact) |
 
 Use `query_artifacts` when you already know the artifact type (`routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `observers`, `policies`, `enums`, `tests`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, or `service_providers`). Use `search_artifacts` when you need to search across types.
+
+#### Graph tools
+
+`get_artifact`, `get_relationships`, and `get_impact` follow [Relationships](#relationships), so an agent can ask for a model's policy, observers, or flow in one call instead of fetching several artifacts and working out the links itself. They're deterministic and involve no LLM.
+
+- **`get_artifact(artifact)`** returns `{"artifact": <payload>, "warnings": []}`. A `domain:`/`flow:`/`adr:` ID isn't a collected artifact, so it returns a `not_an_artifact` error pointing to `get_relationships`.
+- **`get_relationships(artifact)`** returns `{"artifact": <id>, "relationships": [...], "warnings": []}`, listing every Relationship the start takes part in, in canonical order. Each entry is the Relationship as it appears in `graph.json` plus `"direction": "out"` (the start is `from`) or `"in"`. Nothing is deduplicated: a model whose `author` and `assignee` both relate to `User` yields two entries. `get_relationships("flow:checkout")` lists the flow's members, all incoming.
+- **`get_impact(artifact, depth?, types?)`** returns exactly the `necromancer:impact --json` shape plus `warnings`. `depth` defaults to 1 and is clamped to 1–3, with a warning when it's clamped. `types` filters the returned nodes, as a comma-separated string or an array, with the same values as `--type`.
+
+`artifact` is an exact Artifact ID or a fully-qualified class name. `get_relationships` and `get_impact` also accept a `domain:<v>`, `flow:<v>`, or `adr:<path>` ID that at least one artifact declares.
+
+Unlike `necromancer:impact`, these tools don't refuse a stale or partial-scope manifest: an agent makes the manifest stale with its first edit, and has no `--allow-stale` to pass. They answer anyway and report it in `warnings`: one entry when source files have changed since the scan, and one when the scan didn't cover every artifact type (naming the types it did cover).
+
+Other failures return an MCP error whose text is `{"error": <code>, "message": <string>}`:
+
+| Code | When |
+|---|---|
+| `ambiguous` | A class matches several artifacts; the body also lists their IDs under `candidates` |
+| `not_found` | Nothing matches the input |
+| `not_an_artifact` | `get_artifact` was given a Domain, Flow, or ADR ID |
+| `invalid_type` | `get_impact`'s `types` names an unknown type |
+| `manifest_not_found` | The manifest is missing or predates schema v1; run `php artisan necromancer:scan` |
+
+The four query tools return an empty list when the manifest is missing, as before.
 
 When `laravel/mcp` is present, Necromancer also writes its entry into `.mcp.json` automatically on the first `php artisan` run after installation — no manual configuration needed. If `.mcp.json` already exists, the entry is merged without touching other servers.
 

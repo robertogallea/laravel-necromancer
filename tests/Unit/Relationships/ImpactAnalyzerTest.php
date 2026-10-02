@@ -184,3 +184,22 @@ test('an unchanged manifest yields an identical Impact', function () {
     expect(json_encode($analyzer->analyze($manifest, 'models:App\\Models\\Order', 5)->nodes))
         ->toBe(json_encode($analyzer->analyze($manifest, 'models:App\\Models\\Order', 5)->nodes));
 });
+
+test('a Domain, Flow, or ADR ID is a start candidate when a Relationship targets it', function () {
+    $analyzer = new ImpactAnalyzer;
+    $manifest = ['artifacts' => boundaryArtifacts()];
+
+    expect($analyzer->startCandidates($manifest, 'domain:billing'))->toBe(['domain:billing'])
+        ->and($analyzer->startCandidates($manifest, 'flow:invoicing'))->toBe(['flow:invoicing'])
+        ->and($analyzer->startCandidates($manifest, 'adr:docs/adr/0004-x.md'))->toBe(['adr:docs/adr/0004-x.md'])
+        ->and($analyzer->startCandidates($manifest, 'flow:nope'))->toBe([]);
+});
+
+test('a Flow as the start reaches its members, incoming', function () {
+    $impact = impactOf(boundaryArtifacts(), 'flow:invoicing');
+
+    expect(array_map(fn (array $node): array => [$node['id'], $node['direction'], $node['relationship']], $impact))->toBe([
+        ['jobs:App\\Jobs\\SendInvoice', 'in', 'belongs_to_flow'],
+        ['jobs:App\\Jobs\\VoidInvoice', 'in', 'belongs_to_flow'],
+    ]);
+});
