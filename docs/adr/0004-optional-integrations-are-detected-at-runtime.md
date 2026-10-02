@@ -1,6 +1,6 @@
 # Optional integrations are detected at runtime, never required
 
-The only hard dependency is `illuminate/support`. `laravel/ai`, `laravel/mcp`, Laravel Boost and Livewire are detected with `class_exists()` at the point of use (`AiDetector`, `BoostDetector`, the MCP guard in `NecromancerServiceProvider`, `LivewireCollector`), and are listed under `suggest` in `composer.json`, not `require`. Necromancer is a `require-dev` tool that has to install into any Laravel 13 application, and its core (scan, generate, audit, doctor) needs no AI provider and no network.
+The only hard dependency is `illuminate/support`. `laravel/ai`, `laravel/mcp`, Laravel Boost and Livewire are detected with `class_exists()` at the point of use (`AiDetector`, `BoostDetector`, the MCP guard in `NecromancerServiceProvider`, `LivewireCollector`), and none of them is in `require` (`laravel/ai` and `laravel/mcp` are listed under `suggest`). Necromancer is a `require-dev` tool that has to install into any Laravel 13 application, and its core (scan, generate, audit, doctor) needs no AI provider and no network.
 
 ## Consequences
 

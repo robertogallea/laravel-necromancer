@@ -6,7 +6,7 @@
 - **The AI judge should be a different model from the one generating answers** (`benchmark.judge_model`/`judge_provider` are configured separately). A model judging its own output may favour its own style.
 - **Q&A tasks don't run under the static `necromancer` condition.** Their answers are facts that the generated context file contains word for word, so that condition would score 100% by construction. Each bundled Q&A task lists the conditions it runs under (`none`, `manual`, `necromancer-mcp`). `necromancer-mcp` keeps them, because the model still has to pick the right tool and interpret what it returns.
 
-Golden answers are resolved from the manifest and then checked against the framework runtime, so a task can't pass just because the manifest agrees with itself.
+To make the manifest less circular as a source of truth, golden answers resolved from it are cross-checked against the framework runtime where a check exists (`GoldenAnswerResolver::verifyAgainstRuntime()`: named routes against the router, model classes by `class_exists()`). Other fact keys are currently trusted as-is.
 
 ## Consequences
 

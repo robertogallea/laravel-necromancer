@@ -4,7 +4,7 @@ The manifest records configuration *keys* only (`ConfigurationSummary`), never t
 
 ## Considered Options
 
-- **Collect values and redact secrets** — would surface more useful context (queue drivers, cache stores), but redaction depends on recognising what a secret looks like, and one miss leaks it into a committed file. Rejected.
+- **Collect values and redact secrets** — would surface more useful context (queue drivers, cache stores), but it needs secret detection, which is explicitly out of scope, and a value it fails to recognise ends up in a committed file. Rejected: sensitive data is avoided, not masked.
 
 ## Consequences
 

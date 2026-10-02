@@ -5,5 +5,5 @@ When Boost is detected, `necromancer:generate` writes its compact context to `bo
 ## Consequences
 
 - The user's agent files only change after `boost:update`. Running `necromancer:generate` alone doesn't change them.
-- The skill output has to match what Boost's `SkillComposer` discovers: a directory containing `SKILL.md`, not a flat file. A flat file was silently ignored, which was fixed in 1.7.2.
+- The skill output has to match what Boost's `SkillComposer` discovers: a directory containing `SKILL.md`, not a flat file.
 - An explicit `--output` overrides the full-context path. Detection is automatic, so there is no `--boost`/`--no-boost` flag.

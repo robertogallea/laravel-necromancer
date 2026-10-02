@@ -5,7 +5,7 @@
 ## Considered Options
 
 - **Compare `generated_at` or file modification times** — cheap, but a re-scan with no changes would look like drift, and a change outside the watched paths would be missed. Kept only as a staleness *warning* for commands that can't afford a rescan.
-- **Compare artifact IDs only** — what 2.0 did. It missed changes to existing artifacts, which 2.1 fixed.
+- **Compare artifact IDs only** — misses changes to existing artifacts. Rejected.
 
 ## Consequences
 
