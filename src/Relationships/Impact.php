@@ -23,6 +23,26 @@ final readonly class Impact
     ) {}
 
     /**
+     * The nodes of the given types, in order; every node when $types is
+     * empty. A display filter only: unresolved nodes have no type, so any
+     * filter hides them.
+     *
+     * @param  list<string>  $types
+     * @return list<ImpactNode>
+     */
+    public function nodesOfTypes(array $types): array
+    {
+        if ($types === []) {
+            return $this->nodes;
+        }
+
+        return array_values(array_filter(
+            $this->nodes,
+            fn (ImpactNode $node): bool => in_array($node->type, $types, true),
+        ));
+    }
+
+    /**
      * The display label of the start or a reached node. Domain/Flow/ADR
      * ids and unresolved ends are their own label.
      */

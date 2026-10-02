@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Commands\Concerns;
 
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
+use LaravelNecromancer\Manifest\ManifestStaleness;
 
 trait ReadsManifest
 {
@@ -24,77 +23,7 @@ trait ReadsManifest
      */
     private function isStale(array $manifest): bool
     {
-        return $this->isStaleByHash($manifest) || $this->isStaleByMtime($manifest);
-    }
-
-    /**
-     * Returns true when any artifact carries a stored hash that differs from the current file hash.
-     *
-     * @param  array<string, mixed>  $manifest
-     */
-    private function isStaleByHash(array $manifest): bool
-    {
-        foreach ((array) ($manifest['artifacts'] ?? []) as $items) {
-            foreach ((array) $items as $item) {
-                $source = is_array($item['source'] ?? null) ? $item['source'] : null;
-
-                if ($source === null || ! array_key_exists('hash', $source) || $source['hash'] === null) {
-                    continue;
-                }
-
-                $absolutePath = $this->isAbsolutePath((string) $source['file'])
-                    ? (string) $source['file']
-                    : app()->basePath((string) $source['file']);
-
-                if (! is_file($absolutePath)) {
-                    return true;
-                }
-
-                if (md5_file($absolutePath) !== $source['hash']) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param  array<string, mixed>  $manifest
-     */
-    private function isStaleByMtime(array $manifest): bool
-    {
-        $generatedAt = $manifest['meta']['generated_at'] ?? null;
-
-        if (! is_string($generatedAt)) {
-            return false;
-        }
-
-        $threshold = strtotime($generatedAt);
-
-        $sourcePaths = array_filter([
-            app()->basePath('app'),
-            app()->basePath('routes'),
-            app()->basePath('database'),
-        ], 'is_dir');
-
-        foreach ($sourcePaths as $dir) {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
-            );
-
-            foreach ($iterator as $file) {
-                if (! $file->isFile() || $file->getExtension() !== 'php') {
-                    continue;
-                }
-
-                if ($file->getMTime() > $threshold) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return (new ManifestStaleness(app()->basePath()))->isStale($manifest);
     }
 
     private function resolveManifestPath(): string

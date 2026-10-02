@@ -230,3 +230,22 @@ test('a --type filter that hides every reachable node says so', function () {
         ->toContain('1 node(s) reachable, none of type jobs.')
         ->not->toContain('No relationships found.');
 });
+
+test('a Flow ID as the start lists the flow members, and an unreferenced one still fails', function () {
+    writeImpactManifest(['jobs' => [
+        ['id' => 'jobs:App\\Jobs\\Checkout', 'class' => 'App\\Jobs\\Checkout', 'annotations' => ['flow' => 'checkout']],
+    ]]);
+
+    expect(impactOutput(['artifact' => 'flow:checkout']))->toBe(<<<'TEXT'
+        Impact of flow:checkout (flow:checkout), depth 1
+
+        Depth 1
+          jobs
+            App\Jobs\Checkout  ← belongs_to_flow
+
+        TEXT);
+
+    $this->artisan('necromancer:impact', ['artifact' => 'flow:nope'])
+        ->expectsOutputToContain("No artifact matches 'flow:nope'")
+        ->assertFailed();
+});

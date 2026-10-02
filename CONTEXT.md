@@ -85,7 +85,7 @@ How Necromancer obtained the evidence for a relationship: from the application's
 _Avoid_: Confidence, origin
 
 **Impact**:
-The artifacts, Domains, Flows, and ADRs reachable from a starting artifact by following relationships in either direction, each at its shortest distance from the start.
+The artifacts, Domains, Flows, and ADRs reachable from a start (an artifact, or a Domain, Flow, or ADR some artifact declares) by following relationships in either direction, each at its shortest distance from the start.
 _Avoid_: Blast radius, dependents
 
 **Boundary Node**:

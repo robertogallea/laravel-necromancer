@@ -30,6 +30,27 @@ final readonly class ImpactAnalyzer
     private const BOUNDARY_TYPES = [...self::CONCEPT_TYPES, 'middleware', 'tests'];
 
     /**
+     * Every node type an Impact can report, in display order: the
+     * supported artifact types, then the synthesized concept types. The
+     * allowed values of necromancer:impact --type and get_impact's types.
+     *
+     * @return list<string>
+     */
+    public static function nodeTypes(): array
+    {
+        return [...ArtifactId::supportedTypes(), ...self::CONCEPT_TYPES];
+    }
+
+    /**
+     * Whether an ID names a synthesized Domain/Flow/ADR rather than a
+     * collected artifact.
+     */
+    public static function isConceptId(string $id): bool
+    {
+        return in_array(strstr($id, ':', true), self::CONCEPT_TYPES, true);
+    }
+
+    /**
      * ArtifactConceptBuilder::identify() is the package's one per-type
      * display-label convention, reused as ArtifactGraphBuilder reuses it.
      */
@@ -92,14 +113,25 @@ final readonly class ImpactAnalyzer
     /**
      * The Artifact IDs a start input can denote: the exact Artifact ID when
      * one matches, otherwise every artifact whose class is that FQCN (a
-     * middleware registered under several scopes yields several). Empty
-     * when nothing matches.
+     * middleware registered under several scopes yields several). A
+     * Domain/Flow/ADR ID denotes itself when at least one Relationship
+     * targets it. Empty when nothing matches.
      *
      * @param  array<string, mixed>  $manifest
      * @return list<string>
      */
     public function startCandidates(array $manifest, string $input): array
     {
+        if (self::isConceptId($input)) {
+            foreach ($this->relationships->resolve($manifest) as $relationship) {
+                if ($relationship->to === $input) {
+                    return [$input];
+                }
+            }
+
+            return [];
+        }
+
         $class = ltrim($input, '\\');
         $candidates = [];
 
