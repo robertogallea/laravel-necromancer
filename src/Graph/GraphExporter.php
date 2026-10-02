@@ -18,7 +18,7 @@ use Throwable;
  * the manifest passed in is the sole input. Mirrors
  * LaravelNecromancer\Okf\BundleExporter's stale/partial gating so both
  * commands refuse the same unsafe input, though the two are otherwise
- * fully independent per ADR-0001.
+ * fully independent per ADR-0015.
  */
 final readonly class GraphExporter
 {

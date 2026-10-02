@@ -9,5 +9,5 @@ The scan runs inside Artisan against a fully booted application. Collectors read
 ## Consequences
 
 - A scan needs an application that boots. Anything that runs at boot (service providers, macros) runs during a scan.
-- Some introspection would trigger side effects, and the collectors are built to avoid them: [0006](0006-relationship-introspection-uses-an-in-memory-database.md), [0008](0008-service-provider-bindings-are-not-collected.md), [0017](0017-controller-middleware-is-read-without-instantiating-controllers.md).
+- Some introspection would trigger side effects, and the collectors are built to avoid them: [0006](0006-relationship-introspection-uses-an-in-memory-database.md), [0008](0008-service-provider-bindings-are-not-collected.md), [0017](0018-controller-middleware-is-read-without-instantiating-controllers.md).
 - Things that only happen inside a method body (`Model::observe()` in a provider, `$this->middleware()` in a constructor) cannot be seen and are documented as limitations.

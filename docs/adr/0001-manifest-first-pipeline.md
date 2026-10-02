@@ -5,4 +5,4 @@
 ## Consequences
 
 - Every downstream output is only as fresh as the last scan. Commands warn when the manifest looks stale, and `necromancer:okf`/`necromancer:graph` refuse a stale manifest unless `--allow-stale` is passed.
-- The manifest schema is a public contract between the scan and every renderer, so changing its shape is a breaking change (see the schema versioning in [0015](0015-pre-schema-v1-manifests-are-rejected.md)).
+- The manifest schema is a public contract between the scan and every renderer, so changing its shape is a breaking change (see the schema versioning in [0015](0016-pre-schema-v1-manifests-are-rejected.md)).

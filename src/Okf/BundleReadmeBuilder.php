@@ -13,7 +13,7 @@ namespace LaravelNecromancer\Okf;
  * documentation, mirroring the package README's own OKF section.
  *
  * The mention of `necromancer:okf-enrich` is deliberately static prose, not
- * an existence check against `okf-enriched/` — see ADR 0001: this bundle's
+ * an existence check against `okf-enriched/` — see ADR 0015: this bundle's
  * own atomic swap only runs when `necromancer:okf` runs, so it has no way
  * to know whether the enriched sibling currently exists.
  */
