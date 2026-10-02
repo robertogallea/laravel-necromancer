@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Graph;
 
+use LaravelNecromancer\Manifest\ManifestScopeGuard;
 use LaravelNecromancer\Okf\BundleSwap;
 use LaravelNecromancer\Support\RecursivePathRemover;
 use RuntimeException;
@@ -31,7 +32,7 @@ final readonly class GraphExporter
      */
     public function export(array $manifest, string $outputPath, bool $stale, bool $allowStale, bool $allowPartial): GraphExportResult
     {
-        $scopeError = $this->validateScope($manifest, $stale, $allowStale, $allowPartial);
+        $scopeError = ManifestScopeGuard::refusal($manifest, $stale, $allowStale, $allowPartial, 'build the graph anyway');
 
         if ($scopeError !== null) {
             return GraphExportResult::failure($scopeError);
@@ -46,25 +47,6 @@ final readonly class GraphExporter
         }
 
         return GraphExportResult::success($outputPath, count($graph->nodes));
-    }
-
-    /**
-     * @param  array<string, mixed>  $manifest
-     */
-    private function validateScope(array $manifest, bool $stale, bool $allowStale, bool $allowPartial): ?string
-    {
-        if ($stale && ! $allowStale) {
-            return 'Manifest may be stale — source files have changed since it was generated. Run necromancer:scan to refresh, or pass --allow-stale to build the graph anyway.';
-        }
-
-        $scope = is_array($manifest['meta']['scope'] ?? null) ? $manifest['meta']['scope'] : [];
-        $complete = (bool) ($scope['complete'] ?? false);
-
-        if (! $complete && ! $allowPartial) {
-            return 'Manifest scope is partial — it was produced by a scan that did not cover every artifact type. Run a full necromancer:scan, or pass --allow-partial to build the graph anyway.';
-        }
-
-        return null;
     }
 
     private function writeAtomically(string $outputPath, ArtifactGraph $graph): void
