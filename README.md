@@ -284,12 +284,45 @@ The ID is `bindings:` plus the raw container key, which can be a non-class strin
 
 `#[Bind]`, `#[Singleton]`, and `#[Scoped]` are resolved lazily by Laravel, so they are looked for on the application types the same scan's Action entrypoint parameters, controller action parameters, and test class references reach. `--only=bindings` alone finds none of them.
 
-Add `Str::is()` patterns to `exclude.bindings` to drop bindings by abstract. Bindings are annotated only through exact-ID mappings. Each binding is `resolved_as` its concrete and `registered_by` its provider, and a class that matches no collected artifact resolves to the binding of that abstract (see [Relationships](#relationships)).
+Add `Str::is()` patterns to `exclude.bindings` to drop bindings by abstract. Bindings are annotated only through exact-ID mappings. Each binding is `resolved_as` its concrete and `registered_by` its provider, and a class that matches no collected artifact resolves to the global binding of that abstract (see [Relationships](#relationships)).
+
+##### Contextual bindings
+
+A contextual binding changes what one class, its **consumer**, receives. The scan reads the container's contextual map and records one `bindings` artifact per consumer and abstract, with a `consumer` field and the ID `bindings:<abstract>@<consumer>`:
+
+```php
+$this->app->when(ReportController::class)
+    ->needs(PaymentGateway::class)
+    ->give(FakePaymentGateway::class);
+```
+
+```json
+{
+    "id": "bindings:App\\Contracts\\PaymentGateway@App\\Http\\Controllers\\ReportController",
+    "abstract": "App\\Contracts\\PaymentGateway",
+    "concrete": "App\\Services\\FakePaymentGateway",
+    "concrete_source": "class",
+    "lifetime": null,
+    "provider": null,
+    "deferred": false,
+    "consumer": "App\\Http\\Controllers\\ReportController",
+    "source": { "file": "app/Services/FakePaymentGateway.php", "line": 7, "line_end": 12, "hash": "..." }
+}
+```
+
+`when([A, B])` records one artifact per consumer. A class-string `give()` is the concrete (`class`). A closure is never called: its declared class return type is the concrete (`return_type`), else both are `null`. `giveTagged()` and `giveConfig()` store closures, so they record `null` too. `lifetime` is always `null`, since the container builds the concrete through that class's own binding. A global binding has no `consumer` key at all, so an application without contextual bindings gets the same manifest as before.
+
+A contextual binding is kept when its consumer, abstract, or concrete is in the application namespace, and `exclude.bindings` still matches its abstract. A need for a primitive parameter (`needs('$timeout')`) is skipped without reading what was given, since a plain `give()` stores the value itself, which may come from configuration.
+
+Each contextual binding is `consumed_by` its consumer and `takes_precedence_over` the global binding of the same abstract, so `necromancer:impact` from a global binding reaches its contextual bindings at depth 1 and their consumers at depth 2. A class end of any other Relationship only ever resolves to a global binding.
+
+`necromancer:map --type=bindings` shows a contextual binding as `PaymentGateway @ ReportController  FakePaymentGateway`, and its Knowledge Bundle concept, titled `<abstract> @ <consumer>`, lists both Relationships after `resolved_as` and `registered_by`.
 
 Limitations:
 
 - A binding reflects the environment the scan ran in: `environment('production') ? Live::class : Fake::class` records whichever the scanning environment chose.
-- Contextual bindings (`when()->needs()->give()`, `#[Give]`), aliases, `extend()` decorators, and `#[BindWhen]` are not represented.
+- `#[Give]` and the other contextual parameter attributes (`#[Config]`, `#[Storage]`, …), primitive needs, aliases, `extend()` decorators, and `#[BindWhen]` are not represented. No tag or config key is extracted from `giveTagged()`/`giveConfig()`.
+- A consumer's tests are three Relationships away from a changed concrete (concrete ← binding → consumer → test), beyond `necromancer:affected-tests`' default `--depth=2`.
 - `#[Bind]` on a type reached only through a job's, listener's, or other class's constructor is not found.
 
 On Laravel 13.17+, routes using the native [`Route::metadata()`](https://laravel.com/docs/routing#route-metadata) API are scanned too. Necromancer reads a reserved `necromancer` namespace within that metadata as a compact, declared-by-the-developer semantic signal — separate from anything Necromancer infers itself. The `withNecromancer()` route macro declares it:
@@ -530,7 +563,7 @@ php artisan necromancer:generate --only=gates,middleware,mailables
 
 Supported types: `routes`, `controllers`, `models`, `form_requests`, `actions`, `jobs`, `events`, `listeners`, `commands`, `policies`, `enums`, `tests`, `observers`, `scheduled_tasks`, `middleware`, `livewire_components`, `gates`, `mailables`, `validation_rules`, `service_providers`, `bindings`.
 
-The Bindings section starts with the environment the scan ran in (for example, "As resolved in `local`."), since a binding can differ between environments.
+The Bindings section starts with the environment the scan ran in (for example, "As resolved in `local`."), since a binding can differ between environments. When at least one contextual binding exists, it adds a `Consumer` column after `Abstract`, showing `—` for global bindings.
 
 Exclude specific sections instead of listing everything you want:
 
@@ -1075,10 +1108,12 @@ A Relationship is a directed, typed link derived from facts and annotations the 
 | `references_adr` | artifact → `adr:<path>` | each local `adrs` annotation entry (absolute URIs skipped) | annotation | — |
 | `resolved_as` | binding → concrete class | the binding's `concrete` (no Relationship when it's `null`) | runtime for a `class`/`instance` concrete, reflection for `return_type`/`attribute` | — |
 | `registered_by` | binding → service provider | the binding's `provider` | reflection | — |
+| `consumed_by` | contextual binding → consumer | the binding's `consumer` | runtime | — |
+| `takes_precedence_over` | contextual binding → global binding of the same abstract | the binding's `abstract` (unresolved under the raw abstract when no global binding exists) | runtime | — |
 
 **Provenance** records how the evidence was obtained — `runtime` (the application's runtime state, e.g. the router or event dispatcher), `reflection` (declared code structure), `source` (source text, e.g. test files), or `annotation` (an Artifact Annotation). A Relationship supported by several facts carries each of their provenances.
 
-A class end that matches no collected artifact but matches a binding's `abstract` resolves to that binding, so an Action's `operates_on App\Contracts\PaymentGateway` reaches `bindings:App\Contracts\PaymentGateway`, and through `resolved_as` the concrete. A collected artifact always wins. A Relationship whose end isn't a collected artifact — a vendor controller, a listener handling a framework event, a test subject that matches nothing — keeps the raw class or name for that end and is marked `resolved: false`.
+A class end that matches no collected artifact but matches a global binding's `abstract` resolves to that binding (never to a contextual one), so an Action's `operates_on App\Contracts\PaymentGateway` reaches `bindings:App\Contracts\PaymentGateway`, and through `resolved_as` the concrete. A collected artifact always wins. A Relationship whose end isn't a collected artifact — a vendor controller, a listener handling a framework event, a test subject that matches nothing — keeps the raw class or name for that end and is marked `resolved: false`.
 
 Each `graph.json` edge carries the full Relationship plus the `kind` its type renders as:
 

@@ -12,6 +12,7 @@ final readonly class BindingPayload implements JsonSerializable
      * @param  'class'|'return_type'|'instance'|'attribute'|null  $concreteSource
      * @param  'transient'|'singleton'|'scoped'|'instance'|null  $lifetime
      * @param  array<string, mixed>|null  $source
+     * @param  string|null  $consumer  set only for a Contextual Binding (ADR 0026); a Global Binding omits the key
      */
     public function __construct(
         public string $abstract,
@@ -21,6 +22,7 @@ final readonly class BindingPayload implements JsonSerializable
         public ?string $provider,
         public bool $deferred,
         public ?array $source,
+        public ?string $consumer = null,
     ) {}
 
     /**
@@ -36,6 +38,10 @@ final readonly class BindingPayload implements JsonSerializable
             'provider' => $this->provider,
             'deferred' => $this->deferred,
         ];
+
+        if ($this->consumer !== null) {
+            $data['consumer'] = $this->consumer;
+        }
 
         if ($this->source !== null) {
             $data['source'] = $this->source;

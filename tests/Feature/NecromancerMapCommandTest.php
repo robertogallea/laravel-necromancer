@@ -159,6 +159,22 @@ test('the map command displays binding artifacts with their concrete and lifetim
         ->assertSuccessful();
 });
 
+test('the map command displays a contextual binding with its consumer', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1],
+        'artifacts' => [
+            'bindings' => [
+                ['abstract' => 'App\\Contracts\\PaymentGateway', 'concrete' => 'App\\Services\\FakeGateway', 'concrete_source' => 'class', 'lifetime' => null, 'provider' => null, 'deferred' => false, 'consumer' => 'App\\Http\\Controllers\\ReportController'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:map', ['--type' => 'bindings'])
+        ->expectsOutputToContain('PaymentGateway @ ReportController  FakeGateway')
+        ->doesntExpectOutputToContain('FakeGateway (')
+        ->assertSuccessful();
+});
+
 test('the map command displays event artifacts with short class and short listener names', function () {
     $manifest = json_encode([
         'meta' => ['manifest_schema_version' => 1],

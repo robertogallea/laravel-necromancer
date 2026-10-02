@@ -1672,7 +1672,8 @@ final class GenerateCommand extends Command
 
     /**
      * A Binding reflects the environment the scan ran in (ADR 0025), so the
-     * section names it.
+     * section names it. The Consumer column appears only when a Contextual
+     * Binding exists (ADR 0026).
      *
      * @param  array<int, array<string, mixed>>  $bindings
      */
@@ -1685,9 +1686,10 @@ final class GenerateCommand extends Command
         $count = count($bindings);
         $hasSources = $this->hasSources($bindings);
         $hasAnnotations = $this->hasAnnotations($bindings);
+        $hasConsumers = array_filter($bindings, static fn (array $binding): bool => is_string($binding['consumer'] ?? null)) !== [];
 
-        $header = '| Abstract | Concrete | Lifetime | Provider';
-        $divider = '|---|---|---|---';
+        $header = '| Abstract'.($hasConsumers ? ' | Consumer' : '').' | Concrete | Lifetime | Provider';
+        $divider = '|---'.($hasConsumers ? '|---' : '').'|---|---|---';
 
         if ($hasAnnotations) {
             $header .= ' | Architectural Context';
@@ -1717,7 +1719,8 @@ final class GenerateCommand extends Command
             }
 
             $provider = is_string($binding['provider'] ?? null) ? class_basename($binding['provider']) : '';
-            $row = '| '.($binding['abstract'] ?? '').' | '.($binding['concrete'] ?? '')." | {$lifetime} | {$provider}";
+            $consumer = $hasConsumers ? ' | '.(is_string($binding['consumer'] ?? null) ? $binding['consumer'] : '—') : '';
+            $row = '| '.($binding['abstract'] ?? '').$consumer.' | '.($binding['concrete'] ?? '')." | {$lifetime} | {$provider}";
 
             if ($hasAnnotations) {
                 $row .= ' | '.$this->architecturalContextCell($binding);

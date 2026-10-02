@@ -73,8 +73,19 @@ A public controller method that handles HTTP requests routed to it. Distinct fro
 _Avoid_: Endpoint, route action, entrypoint
 
 **Binding**:
-The service container's answer to which concrete implementation Laravel provides when an abstract is requested, and for how long that instance is reused (its lifetime). Only bindings whose abstract or concrete belongs to the application count, and they reflect the environment the scan ran in.
+The service container's answer to which concrete implementation Laravel provides when an abstract is requested, and for how long that instance is reused (its lifetime). Only bindings whose abstract or concrete belongs to the application count, and they reflect the environment the scan ran in. A binding is global unless it is a **Contextual Binding**.
 _Avoid_: Registration, service, dependency
+
+**Global Binding**:
+A **Binding** that applies whichever class requests the abstract. Used only when the contrast with a **Contextual Binding** matters.
+
+**Contextual Binding**:
+A **Binding** that applies only while the container is building one specific **Consumer**, and that takes precedence over any **Global Binding** of the same abstract for that Consumer. It counts as the application's when its Consumer, abstract, or concrete belongs to the application.
+_Avoid_: Override, context binding
+
+**Consumer**:
+The class whose construction a **Contextual Binding** applies to.
+_Avoid_: Context, dependent, client
 
 **Relationship**:
 A directed, typed link from an artifact to another artifact, a Domain, a Flow, or an ADR, derived from the artifact's discovered facts and annotations rather than recorded separately. A relationship whose target is not a collected artifact is still a relationship, marked unresolved.
