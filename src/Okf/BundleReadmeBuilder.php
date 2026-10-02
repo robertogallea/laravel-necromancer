@@ -40,7 +40,7 @@ final class BundleReadmeBuilder
             '- **Domain Concepts** and **Flow Concepts** — synthesized for every distinct `domain`/`flow` value declared anywhere in the manifest, linking their member artifacts.',
             '- **ADR Concepts** — copied, with provenance, from every locally declared ADR reference.',
             '',
-            "Resolvable cross-artifact relationships (a route's controller, a model's relationships/policy/observers, event/listener pairings) render as Markdown links between concept files; unresolved targets stay plain text.",
+            "Resolvable cross-artifact relationships (a route's controller, a model's relationships/policy/observers, event/listener pairings) render as Markdown links between concept files; unresolved targets stay plain text. Each concept also lists, after those, the `uses_middleware`, `validates_with`, `authorized_by`, `dispatches`, `tested_by` Relationships it is the source of — a route's form request and an artifact's tests appear on the route and the artifact, even though the test or the controller records the fact.",
             '',
             '## Regenerating',
             '',

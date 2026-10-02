@@ -4,8 +4,11 @@ use LaravelNecromancer\Okf\ArtifactConcept;
 use LaravelNecromancer\Okf\ArtifactConceptBuilder;
 use LaravelNecromancer\Okf\ConceptEnrichment;
 use LaravelNecromancer\Okf\ConceptLink;
+use LaravelNecromancer\Relationships\Provenance;
 use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipEvidence;
 use LaravelNecromancer\Relationships\RelationshipResolver;
+use LaravelNecromancer\Relationships\RelationshipType;
 
 /**
  * Builds a concept for one artifact with the Relationships resolved from a
@@ -350,4 +353,135 @@ test('build() keeps a value repeated in a relationship fact, as the fact declare
     $concept = buildConceptWithRelationships('events', $event);
 
     expect($concept->content)->toContain('- **listeners**: App\\Listeners\\Audit, App\\Listeners\\Audit');
+});
+
+/**
+ * Builds a concept from hand-built Relationships and an Artifact-ID index.
+ *
+ * @param  array<string, mixed>  $artifact
+ * @param  list<Relationship>  $relationships
+ * @param  array<string, ConceptLink>  $idIndex
+ */
+function buildConceptFromRelationships(string $type, array $artifact, array $relationships, array $idIndex = []): ArtifactConcept
+{
+    return (new ArtifactConceptBuilder)->build($type, $artifact, '2026-08-07T12:00:00+02:00', relationships: $relationships, idIndex: $idIndex);
+}
+
+test('build() renders a route\'s middleware on one uses_middleware line, linked by Artifact ID and qualified by group', function () {
+    $route = ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'source' => null];
+    $relationships = [
+        new Relationship('routes:GET:orders', RelationshipType::UsesMiddleware, 'middleware:group:web:App\\Http\\Middleware\\EncryptCookies', [Provenance::Runtime], true, ['groups' => ['web'], 'direct' => false]),
+        new Relationship('routes:GET:orders', RelationshipType::UsesMiddleware, 'middleware:alias:auth:App\\Http\\Middleware\\Authenticate', [Provenance::Runtime], true, ['groups' => [], 'direct' => true]),
+        new Relationship('routes:GET:orders', RelationshipType::UsesMiddleware, 'throttle', [Provenance::Runtime], false, ['groups' => ['api', 'web'], 'direct' => false]),
+    ];
+    $idIndex = [
+        'middleware:group:web:App\\Http\\Middleware\\EncryptCookies' => new ConceptLink('App\\Http\\Middleware\\EncryptCookies (group)', '/artifacts/encrypt.md'),
+        'middleware:alias:auth:App\\Http\\Middleware\\Authenticate' => new ConceptLink('App\\Http\\Middleware\\Authenticate (alias)', '/artifacts/auth.md'),
+    ];
+
+    $concept = buildConceptFromRelationships('routes', $route, $relationships, $idIndex);
+
+    expect($concept->content)->toContain("## Relationships\n\n- **uses_middleware**: [App\\Http\\Middleware\\EncryptCookies (group)](/artifacts/encrypt.md) (via web), [App\\Http\\Middleware\\Authenticate (alias)](/artifacts/auth.md), throttle (via api, web)\n");
+});
+
+test('build() renders a route\'s authorized_by targets qualified by ability, raw ability when unresolved', function () {
+    $route = ['id' => 'routes:PUT:orders/{order}', 'method' => 'PUT', 'uri' => 'orders/{order}', 'source' => null];
+    $relationships = [
+        new Relationship('routes:PUT:orders/{order}', RelationshipType::AuthorizedBy, 'policies:App\\Policies\\OrderPolicy', [Provenance::Reflection], true, ['ability' => 'update', 'models' => ['App\\Models\\Order']]),
+        new Relationship('routes:PUT:orders/{order}', RelationshipType::AuthorizedBy, 'gates:ability:edit-orders', [Provenance::Reflection], true, ['ability' => 'edit-orders', 'models' => []]),
+        new Relationship('routes:PUT:orders/{order}', RelationshipType::AuthorizedBy, 'publish', [Provenance::Reflection], false, ['ability' => 'publish', 'models' => []]),
+    ];
+    $idIndex = [
+        'policies:App\\Policies\\OrderPolicy' => new ConceptLink('App\\Policies\\OrderPolicy', '/artifacts/order-policy.md'),
+        'gates:ability:edit-orders' => new ConceptLink('edit-orders', '/artifacts/edit-orders.md'),
+    ];
+
+    $concept = buildConceptFromRelationships('routes', $route, $relationships, $idIndex);
+
+    expect($concept->content)->toContain('- **authorized_by**: [App\\Policies\\OrderPolicy](/artifacts/order-policy.md) (update), [edit-orders](/artifacts/edit-orders.md) (edit-orders), publish (publish)'."\n");
+});
+
+test('build() keeps a model\'s policy as its legacy policy line, never an authorized_by line', function () {
+    $model = ['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order', 'policy' => 'App\\Policies\\OrderPolicy', 'source' => null];
+    $relationships = (new RelationshipResolver)->resolve(['artifacts' => [
+        'models' => [$model],
+        'policies' => [['id' => 'policies:App\\Policies\\OrderPolicy', 'class' => 'App\\Policies\\OrderPolicy', 'source' => null]],
+    ]]);
+    $idIndex = ['policies:App\\Policies\\OrderPolicy' => new ConceptLink('App\\Policies\\OrderPolicy', '/artifacts/order-policy.md')];
+
+    $concept = buildConceptFromRelationships('models', $model, $relationships, $idIndex);
+
+    expect($concept->content)->toContain('- **policy**: App\\Policies\\OrderPolicy')
+        ->and($concept->content)->not->toContain('authorized_by');
+});
+
+test('build() renders dispatched targets on one dispatches line, qualified by their modes', function () {
+    $action = ['id' => 'actions:App\\Actions\\PlaceOrder', 'class' => 'App\\Actions\\PlaceOrder', 'source' => null];
+    $relationships = [
+        new Relationship('actions:App\\Actions\\PlaceOrder', RelationshipType::Dispatches, 'events:App\\Events\\OrderPlaced', [Provenance::Source], true, ['methods' => ['handle'], 'modes' => []]),
+        new Relationship('actions:App\\Actions\\PlaceOrder', RelationshipType::Dispatches, 'jobs:App\\Jobs\\SendInvoice', [Provenance::Source], true, ['methods' => ['handle'], 'modes' => ['queued', 'sync']]),
+        new Relationship('actions:App\\Actions\\PlaceOrder', RelationshipType::Dispatches, 'App\\Jobs\\Unknown', [Provenance::Source], false, ['methods' => ['handle'], 'modes' => ['queued']]),
+    ];
+    $idIndex = [
+        'events:App\\Events\\OrderPlaced' => new ConceptLink('App\\Events\\OrderPlaced', '/artifacts/order-placed.md'),
+        'jobs:App\\Jobs\\SendInvoice' => new ConceptLink('App\\Jobs\\SendInvoice', '/artifacts/send-invoice.md'),
+    ];
+
+    $concept = buildConceptFromRelationships('actions', $action, $relationships, $idIndex);
+
+    expect($concept->content)->toContain('- **dispatches**: [App\\Events\\OrderPlaced](/artifacts/order-placed.md), [App\\Jobs\\SendInvoice](/artifacts/send-invoice.md) (queued, sync), App\\Jobs\\Unknown (queued)'."\n");
+});
+
+test('build() renders tests on one tested_by line, marking namespace matches', function () {
+    $model = ['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order', 'source' => null];
+    $relationships = [
+        new Relationship('models:App\\Models\\Order', RelationshipType::TestedBy, 'tests:tests/Unit/Models/OrderTest.php', [Provenance::Source], true, ['match' => 'exact']),
+        new Relationship('models:App\\Models\\Order', RelationshipType::TestedBy, 'tests:tests/Feature/ModelsTest.php', [Provenance::Source], true, ['match' => 'namespace']),
+    ];
+    $idIndex = [
+        'tests:tests/Unit/Models/OrderTest.php' => new ConceptLink('tests/Unit/Models/OrderTest.php', '/artifacts/order-test.md'),
+        'tests:tests/Feature/ModelsTest.php' => new ConceptLink('tests/Feature/ModelsTest.php', '/artifacts/models-test.md'),
+    ];
+
+    $concept = buildConceptFromRelationships('models', $model, $relationships, $idIndex);
+
+    expect($concept->content)->toContain('- **tested_by**: [tests/Unit/Models/OrderTest.php](/artifacts/order-test.md), [tests/Feature/ModelsTest.php](/artifacts/models-test.md) (namespace match)'."\n");
+});
+
+test('build() renders source-side lines after every legacy line, in uses_middleware, validates_with, authorized_by, dispatches, tested_by order', function () {
+    $route = ['id' => 'routes:POST:orders', 'method' => 'POST', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null];
+    $relationships = [
+        new Relationship('routes:POST:orders', RelationshipType::TestedBy, 'tests:tests/Feature/OrderTest.php', [Provenance::Source], true, ['match' => 'exact']),
+        new Relationship('routes:POST:orders', RelationshipType::AuthorizedBy, 'create', [Provenance::Reflection], false, ['ability' => 'create', 'models' => []]),
+        new Relationship('routes:POST:orders', RelationshipType::ValidatesWith, 'form_requests:App\\Http\\Requests\\StoreOrderRequest', [Provenance::Reflection], true),
+        new Relationship('routes:POST:orders', RelationshipType::UsesMiddleware, 'auth', [Provenance::Runtime], false, ['groups' => [], 'direct' => true]),
+        new Relationship('routes:POST:orders', RelationshipType::HandledBy, 'App\\Http\\Controllers\\OrderController', [Provenance::Runtime], false, ['action' => 'store'], [
+            new RelationshipEvidence('routes:POST:orders', 'controller', 'App\\Http\\Controllers\\OrderController'),
+        ]),
+    ];
+    $idIndex = ['form_requests:App\\Http\\Requests\\StoreOrderRequest' => new ConceptLink('App\\Http\\Requests\\StoreOrderRequest', '/artifacts/store-order-request.md')];
+
+    $concept = buildConceptFromRelationships('routes', $route, $relationships, $idIndex);
+
+    expect($concept->content)->toContain(implode("\n", [
+        '## Relationships',
+        '',
+        '- **controller**: App\\Http\\Controllers\\OrderController',
+        '- **uses_middleware**: auth',
+        '- **validates_with**: [App\\Http\\Requests\\StoreOrderRequest](/artifacts/store-order-request.md)',
+        '- **authorized_by**: create (create)',
+        '- **tested_by**: tests:tests/Feature/OrderTest.php',
+        '',
+    ]));
+});
+
+test('build() ignores Relationships of in-scope types that start from another artifact', function () {
+    $route = ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'source' => null];
+    $relationships = [
+        new Relationship('routes:GET:other', RelationshipType::UsesMiddleware, 'auth', [Provenance::Runtime], false, ['groups' => [], 'direct' => true]),
+    ];
+
+    $concept = buildConceptFromRelationships('routes', $route, $relationships);
+
+    expect($concept->content)->not->toContain('## Relationships');
 });

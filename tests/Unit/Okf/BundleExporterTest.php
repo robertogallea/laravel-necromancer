@@ -242,6 +242,7 @@ test('export() writes a README.md documenting necromancer:okf and mentioning nec
         ->toContain('Domain Concept')
         ->toContain('Flow Concept')
         ->toContain('ADR Concept')
+        ->toContain('`uses_middleware`, `validates_with`, `authorized_by`, `dispatches`, `tested_by`')
         ->toContain('necromancer.okf.output')
         ->toContain('necromancer.okf.enrichment.output');
 });
@@ -554,4 +555,84 @@ test('export() renders the relationship fixture byte-identically to the pre-#55 
 
     expect($result->successful)->toBeTrue()
         ->and($files)->toBe($expected);
+});
+
+/**
+ * @param  array<string, mixed>  $assembled
+ */
+function assembledConcept(array $assembled, string $id): string
+{
+    foreach ($assembled['artifact'] as $concept) {
+        if ($concept->id === $id) {
+            return $concept->content;
+        }
+    }
+
+    throw new RuntimeException("No concept for {$id}");
+}
+
+test('assemble() renders validates_with on the route, not on the controller holding the evidence', function () {
+    $manifest = completeManifest([
+        'routes' => [['id' => 'routes:POST:orders', 'method' => 'POST', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'action' => 'store', 'source' => null]],
+        'controllers' => [['id' => 'controllers:App\\Http\\Controllers\\OrderController', 'class' => 'App\\Http\\Controllers\\OrderController', 'actions' => [
+            ['name' => 'store', 'parameters' => [['name' => 'request', 'type' => 'App\\Http\\Requests\\StoreOrderRequest']], 'return_type' => null, 'middleware' => [], 'routes' => ['routes:POST:orders']],
+        ], 'source' => null]],
+        'form_requests' => [['id' => 'form_requests:App\\Http\\Requests\\StoreOrderRequest', 'class' => 'App\\Http\\Requests\\StoreOrderRequest', 'source' => null]],
+    ]);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+    $requestPath = $assembled['identities']['form_requests:App\\Http\\Requests\\StoreOrderRequest']['link']->path;
+
+    expect(assembledConcept($assembled, 'routes:POST:orders'))->toContain("- **validates_with**: [App\\Http\\Requests\\StoreOrderRequest]({$requestPath})\n")
+        ->and(assembledConcept($assembled, 'controllers:App\\Http\\Controllers\\OrderController'))->not->toContain('validates_with');
+});
+
+test('assemble() renders tested_by on every artifact a test subject covers, not on the test', function () {
+    $manifest = completeManifest([
+        'models' => [
+            ['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order', 'source' => null],
+            ['id' => 'models:App\\Models\\User', 'class' => 'App\\Models\\User', 'source' => null],
+        ],
+        'tests' => [
+            ['id' => 'tests:tests/Unit/OrderTest.php', 'file' => 'tests/Unit/OrderTest.php', 'subject' => 'App\\Models\\Order', 'source' => null],
+            ['id' => 'tests:tests/Unit/ModelsTest.php', 'file' => 'tests/Unit/ModelsTest.php', 'subject' => 'App\\Models', 'source' => null],
+        ],
+    ]);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+    $orderTest = $assembled['identities']['tests:tests/Unit/OrderTest.php']['link']->path;
+    $modelsTest = $assembled['identities']['tests:tests/Unit/ModelsTest.php']['link']->path;
+
+    expect(assembledConcept($assembled, 'models:App\\Models\\Order'))->toContain("- **tested_by**: [tests/Unit/OrderTest.php]({$orderTest}), [tests/Unit/ModelsTest.php]({$modelsTest}) (namespace match)\n")
+        ->and(assembledConcept($assembled, 'models:App\\Models\\User'))->toContain("- **tested_by**: [tests/Unit/ModelsTest.php]({$modelsTest}) (namespace match)\n")
+        ->and(assembledConcept($assembled, 'tests:tests/Unit/OrderTest.php'))->not->toContain('## Relationships');
+});
+
+test('assemble() links a route\'s group middleware to each member registration concept', function () {
+    $manifest = completeManifest([
+        'routes' => [['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'middleware' => ['web'], 'source' => null]],
+        'middleware' => [['id' => 'middleware:group:web:App\\Http\\Middleware\\EncryptCookies', 'alias' => 'web', 'class' => 'App\\Http\\Middleware\\EncryptCookies', 'scope' => 'group', 'group' => 'web', 'source' => null]],
+    ]);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+    $middlewarePath = $assembled['identities']['middleware:group:web:App\\Http\\Middleware\\EncryptCookies']['link']->path;
+
+    expect(assembledConcept($assembled, 'routes:GET:orders'))->toContain("- **uses_middleware**: [App\\Http\\Middleware\\EncryptCookies (group)]({$middlewarePath}) (via web)\n");
+});
+
+test('assemble() renders an artifact\'s dispatched targets linked to their concepts and qualified by mode', function () {
+    $manifest = completeManifest([
+        'actions' => [['id' => 'actions:App\\Actions\\PlaceOrder', 'class' => 'App\\Actions\\PlaceOrder', 'entrypoints' => [], 'dispatches' => [
+            ['target' => 'App\\Events\\OrderPlaced', 'method' => 'handle', 'mode' => null],
+            ['target' => 'App\\Jobs\\SendInvoice', 'method' => 'handle', 'mode' => 'queued'],
+        ], 'source' => null]],
+        'events' => [['id' => 'events:App\\Events\\OrderPlaced', 'class' => 'App\\Events\\OrderPlaced', 'listeners' => [], 'source' => null]],
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+    $eventPath = $assembled['identities']['events:App\\Events\\OrderPlaced']['link']->path;
+    $jobPath = $assembled['identities']['jobs:App\\Jobs\\SendInvoice']['link']->path;
+
+    expect(assembledConcept($assembled, 'actions:App\\Actions\\PlaceOrder'))->toContain("- **dispatches**: [App\\Events\\OrderPlaced]({$eventPath}), [App\\Jobs\\SendInvoice]({$jobPath}) (queued)\n");
 });

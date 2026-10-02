@@ -853,7 +853,21 @@ When an artifact's already-collected fields name another artifact by class — a
 - **controller**: [App\Http\Controllers\OrderController](/artifacts/order-controller-9f21ab34.md)
 ```
 
-These lines are drawn from the same [Relationships](#relationships) the Artifact Graph uses, labelled by the fact that declares them. A concept only lists facts the artifact itself records — a model shows `policy` only when it declares one with `#[UsePolicy]`, even though the policy's own `model` also supports that Relationship. Relationship types beyond these (`uses_middleware`, `validates_with`, `tested_by`, `dispatches`, a route's `authorized_by`) are in the graph but not yet rendered in the bundle.
+These lines are drawn from the same [Relationships](#relationships) the Artifact Graph uses, labelled by the fact that declares them. A concept only lists facts the artifact itself records — a model shows `policy` only when it declares one with `#[UsePolicy]`, even though the policy's own `model` also supports that Relationship.
+
+After those lines, a concept lists five more Relationship types, one line per type in this order: `uses_middleware`, `validates_with`, a route's `authorized_by`, `dispatches`, and `tested_by`. These appear on the artifact the Relationship starts from, even when another artifact records the fact: a route lists the form request its controller action accepts, and a model lists the tests whose `subject` covers it. Each line is labelled by its type name. Each target links to its concept by Artifact ID, or stays plain text when it wasn't collected, and may carry a short qualifier: the group a middleware was reached through, the ability a route authorizes, the dispatch modes, or a namespace-matched test:
+
+```markdown
+## Relationships
+
+- **controller**: [App\Http\Controllers\OrderController](/artifacts/order-controller-9f21ab34.md)
+- **uses_middleware**: [App\Http\Middleware\EncryptCookies (group)](/artifacts/app-http-middleware-encryptcookies-group-d3c9f7aa.md) (via web), auth
+- **validates_with**: [App\Http\Requests\StoreOrderRequest](/artifacts/app-http-requests-storeorderrequest-e2e0761e.md)
+- **authorized_by**: [App\Policies\OrderPolicy](/artifacts/app-policies-orderpolicy-520cd950.md) (create)
+- **tested_by**: [tests/Feature/OrderTest.php](/artifacts/testsfeatureordertestphp-34e9a532.md), [tests/Unit/ModelsTest.php](/artifacts/testsunitmodelstestphp-aa2fdc7e.md) (namespace match)
+```
+
+A concept doesn't list the Relationships that point to it: a form request doesn't list the routes it validates. Domain, flow, and ADR Relationships stay in `## Architectural Context`. Enrichment prompts don't include any of these lines.
 
 Every artifact tagged with the same `domain` or `flow` annotation value is also made navigable through a synthesized **Domain Concept** or **Flow Concept** — one file per distinct value, linking every member artifact:
 

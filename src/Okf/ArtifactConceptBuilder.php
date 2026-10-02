@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelNecromancer\Okf;
 
 use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipType;
 
 /**
  * Projects one serialized manifest artifact into a portable OKF 0.2 Artifact
@@ -47,6 +48,21 @@ final readonly class ArtifactConceptBuilder
     ];
 
     /**
+     * The Relationship types rendered on their `from` artifact's concept,
+     * labelled by type name, after every RENDERED_FIELDS line (see
+     * docs/adr/0021). Entries are in render order.
+     *
+     * @var list<RelationshipType>
+     */
+    private const SOURCE_SIDE_TYPES = [
+        RelationshipType::UsesMiddleware,
+        RelationshipType::ValidatesWith,
+        RelationshipType::AuthorizedBy,
+        RelationshipType::Dispatches,
+        RelationshipType::TestedBy,
+    ];
+
+    /**
      * Identity only — no facts/annotations rendering. Cheap enough to call
      * for every artifact up front, so BundleExporter can build a class index
      * and member links before any concept body is rendered.
@@ -67,9 +83,10 @@ final readonly class ArtifactConceptBuilder
      * @param  array<string, ConceptLink>  $classIndex  FQCN/controller → link, for rendering relationship fields
      * @param  array<string, ConceptLink>  $adrIndex  local ADR path → link, for rendering declared adrs
      * @param  array<string, ConceptLink>  $groupIndex  "domain:value"/"flow:value" → link, for linking back to the synthesized group concept
-     * @param  list<Relationship>  $relationships  the manifest's Relationships (any not evidenced by this artifact are ignored)
+     * @param  list<Relationship>  $relationships  the manifest's Relationships (any neither evidenced by this artifact nor starting from it are ignored)
+     * @param  array<string, ConceptLink>  $idIndex  Artifact ID → link, for rendering source-side Relationship targets
      */
-    public function build(string $type, array $artifact, string $manifestGeneratedAt, array $classIndex = [], array $adrIndex = [], array $groupIndex = [], ?ConceptEnrichment $enrichment = null, array $relationships = []): ArtifactConcept
+    public function build(string $type, array $artifact, string $manifestGeneratedAt, array $classIndex = [], array $adrIndex = [], array $groupIndex = [], ?ConceptEnrichment $enrichment = null, array $relationships = [], array $idIndex = []): ArtifactConcept
     {
         $identity = $this->identify($type, $artifact);
         $id = $identity['id'];
@@ -103,7 +120,8 @@ final readonly class ArtifactConceptBuilder
             ],
         ];
 
-        $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".$this->body($title, $type, $facts, $annotations, $this->relationshipLines($id, $relationships, $classIndex), $adrIndex, $groupIndex, $enrichment);
+        $relationshipLines = [...$this->relationshipLines($id, $relationships, $classIndex), ...$this->sourceSideLines($type, $id, $relationships, $idIndex)];
+        $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".$this->body($title, $type, $facts, $annotations, $relationshipLines, $adrIndex, $groupIndex, $enrichment);
 
         return new ArtifactConcept($id, $identity['filename'], $content);
     }
@@ -338,5 +356,62 @@ final readonly class ArtifactConceptBuilder
     private function linkOrText(string $value, array $classIndex): string
     {
         return isset($classIndex[$value]) ? "[{$value}]({$classIndex[$value]->path})" : $value;
+    }
+
+    /**
+     * One line per SOURCE_SIDE_TYPES type this artifact is the `from` of,
+     * listing every target in resolver order — linked by Artifact ID when
+     * the target has a concept, plain text otherwise — each followed by its
+     * qualifier, if any. A model's authorized_by stays its legacy `policy`
+     * line, so only a route renders authorized_by here.
+     *
+     * @param  list<Relationship>  $relationships
+     * @param  array<string, ConceptLink>  $idIndex
+     * @return list<string>
+     */
+    private function sourceSideLines(string $artifactType, string $id, array $relationships, array $idIndex): array
+    {
+        if ($id === '') {
+            return [];
+        }
+
+        $lines = [];
+
+        foreach (self::SOURCE_SIDE_TYPES as $relationshipType) {
+            if ($relationshipType === RelationshipType::AuthorizedBy && $artifactType !== 'routes') {
+                continue;
+            }
+
+            $targets = [];
+
+            foreach ($relationships as $relationship) {
+                if ($relationship->from !== $id || $relationship->type !== $relationshipType) {
+                    continue;
+                }
+
+                $link = $idIndex[$relationship->to] ?? null;
+                $target = $link !== null ? "[{$link->title}]({$link->path})" : $relationship->to;
+                $qualifier = $this->qualifier($relationship);
+
+                $targets[] = $qualifier !== '' ? "{$target} ({$qualifier})" : $target;
+            }
+
+            if ($targets !== []) {
+                $lines[] = "- **{$relationshipType->value}**: ".implode(', ', $targets);
+            }
+        }
+
+        return $lines;
+    }
+
+    private function qualifier(Relationship $relationship): string
+    {
+        return match ($relationship->type) {
+            RelationshipType::UsesMiddleware => ($relationship->metadata['groups'] ?? []) !== [] ? 'via '.implode(', ', $relationship->metadata['groups']) : '',
+            RelationshipType::AuthorizedBy => (string) ($relationship->metadata['ability'] ?? ''),
+            RelationshipType::Dispatches => implode(', ', $relationship->metadata['modes'] ?? []),
+            RelationshipType::TestedBy => ($relationship->metadata['match'] ?? null) === 'namespace' ? 'namespace match' : '',
+            default => '',
+        };
     }
 }
