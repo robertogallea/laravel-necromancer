@@ -503,3 +503,46 @@ test('a class target matching no collected artifact resolves to the binding of t
         ['tested_by', 'bindings:App\\Contracts\\Gateway', 'tests:tests/Feature/ChargeTest.php', true],
     ]);
 });
+
+test('a contextual binding is consumed_by its consumer and takes_precedence_over the global binding of its abstract', function () {
+    $relationships = relationshipsOf([
+        'controllers' => [['id' => 'controllers:App\\Http\\Controllers\\ReportController', 'class' => 'App\\Http\\Controllers\\ReportController']],
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\Gateway', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null],
+            ['id' => 'bindings:App\\Contracts\\Gateway@App\\Http\\Controllers\\ReportController', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null, 'consumer' => 'App\\Http\\Controllers\\ReportController'],
+            ['id' => 'bindings:App\\Contracts\\Mailer@App\\Services\\Reporter', 'abstract' => 'App\\Contracts\\Mailer', 'concrete' => null, 'concrete_source' => null, 'consumer' => 'App\\Services\\Reporter'],
+        ],
+    ]);
+
+    expect(array_values(array_filter($relationships, fn (array $r): bool => in_array($r['type'], ['consumed_by', 'takes_precedence_over'], true))))->toBe([
+        ['from' => 'bindings:App\\Contracts\\Gateway@App\\Http\\Controllers\\ReportController', 'type' => 'consumed_by', 'to' => 'controllers:App\\Http\\Controllers\\ReportController', 'provenance' => ['runtime'], 'resolved' => true, 'metadata' => []],
+        ['from' => 'bindings:App\\Contracts\\Gateway@App\\Http\\Controllers\\ReportController', 'type' => 'takes_precedence_over', 'to' => 'bindings:App\\Contracts\\Gateway', 'provenance' => ['runtime'], 'resolved' => true, 'metadata' => []],
+        ['from' => 'bindings:App\\Contracts\\Mailer@App\\Services\\Reporter', 'type' => 'consumed_by', 'to' => 'App\\Services\\Reporter', 'provenance' => ['runtime'], 'resolved' => false, 'metadata' => []],
+        ['from' => 'bindings:App\\Contracts\\Mailer@App\\Services\\Reporter', 'type' => 'takes_precedence_over', 'to' => 'App\\Contracts\\Mailer', 'provenance' => ['runtime'], 'resolved' => false, 'metadata' => []],
+    ]);
+});
+
+test('a class target resolves only to the global binding of its abstract, never to a contextual one', function () {
+    $action = fn (string $class, string $type): array => ['id' => "actions:{$class}", 'class' => $class, 'entrypoints' => [[
+        'name' => 'handle',
+        'parameters' => [['name' => 'dependency', 'type' => $type]],
+        'return_type' => 'void',
+    ]]];
+
+    $relationships = relationshipsOf([
+        'actions' => [
+            $action('App\\Actions\\Charge', 'App\\Contracts\\Gateway'),
+            $action('App\\Actions\\Notify', 'App\\Contracts\\Mailer'),
+        ],
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\Gateway', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null],
+            ['id' => 'bindings:App\\Contracts\\Gateway@App\\Actions\\Charge', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null, 'consumer' => 'App\\Actions\\Charge'],
+            ['id' => 'bindings:App\\Contracts\\Mailer@App\\Actions\\Notify', 'abstract' => 'App\\Contracts\\Mailer', 'concrete' => null, 'concrete_source' => null, 'consumer' => 'App\\Actions\\Notify'],
+        ],
+    ], 'operates_on');
+
+    expect(array_map(fn (array $r): array => [$r['from'], $r['to'], $r['resolved']], $relationships))->toBe([
+        ['actions:App\\Actions\\Charge', 'bindings:App\\Contracts\\Gateway', true],
+        ['actions:App\\Actions\\Notify', 'App\\Contracts\\Mailer', false],
+    ]);
+});

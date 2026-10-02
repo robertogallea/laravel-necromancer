@@ -63,6 +63,8 @@ final readonly class ArtifactConceptBuilder
         RelationshipType::TestedBy,
         RelationshipType::ResolvedAs,
         RelationshipType::RegisteredBy,
+        RelationshipType::ConsumedBy,
+        RelationshipType::TakesPrecedenceOver,
     ];
 
     /**
@@ -140,7 +142,7 @@ final readonly class ArtifactConceptBuilder
             'gates' => (string) ($artifact['ability'] ?? ''),
             'scheduled_tasks' => (string) ($artifact['command'] ?? ''),
             'middleware' => ($artifact['class'] ?? '').' ('.($artifact['scope'] ?? '').')',
-            'bindings' => (string) ($artifact['abstract'] ?? ''),
+            'bindings' => ($artifact['abstract'] ?? '').(is_string($artifact['consumer'] ?? null) ? ' @ '.$artifact['consumer'] : ''),
             default => (string) ($artifact['class'] ?? $artifact['signature'] ?? $artifact['id'] ?? $type),
         };
     }

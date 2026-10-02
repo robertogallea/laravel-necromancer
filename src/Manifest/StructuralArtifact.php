@@ -507,6 +507,7 @@ final readonly class StructuralArtifact implements JsonSerializable
         ?string $provider = null,
         bool $deferred = false,
         ?SourceLocation $source = null,
+        ?string $consumer = null,
     ): self {
         return new self('bindings', new BindingPayload(
             abstract: $abstract,
@@ -516,6 +517,7 @@ final readonly class StructuralArtifact implements JsonSerializable
             provider: $provider,
             deferred: $deferred,
             source: $source instanceof SourceLocation ? $source->jsonSerialize() : null,
+            consumer: $consumer,
         ));
     }
 

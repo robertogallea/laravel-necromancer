@@ -2856,6 +2856,25 @@ test('a manifest with bindings produces a bindings section labelled with the sca
         ->toContain('| payments |  | transient |  |  |');
 });
 
+test('the bindings section adds a Consumer column only when a contextual binding exists', function () {
+    File::put(base_path('necromancer.json'), json_encode([
+        'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'app_env' => 'local'],
+        'artifacts' => [
+            'bindings' => [
+                ['id' => 'bindings:App\\Contracts\\PaymentGateway', 'abstract' => 'App\\Contracts\\PaymentGateway', 'concrete' => 'App\\Services\\StripeGateway', 'concrete_source' => 'class', 'lifetime' => 'transient', 'provider' => null, 'deferred' => false],
+                ['id' => 'bindings:App\\Contracts\\PaymentGateway@App\\Http\\Controllers\\ReportController', 'abstract' => 'App\\Contracts\\PaymentGateway', 'concrete' => 'App\\Services\\FakeGateway', 'concrete_source' => 'class', 'lifetime' => null, 'provider' => null, 'deferred' => false, 'consumer' => 'App\\Http\\Controllers\\ReportController'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    $this->artisan('necromancer:generate')->assertSuccessful();
+
+    expect(File::get(base_path('NECROMANCER.md')))
+        ->toContain("| Abstract | Consumer | Concrete | Lifetime | Provider |\n|---|---|---|---|---|\n")
+        ->toContain('| App\\Contracts\\PaymentGateway | — | App\\Services\\StripeGateway | transient |  |')
+        ->toContain('| App\\Contracts\\PaymentGateway | App\\Http\\Controllers\\ReportController | App\\Services\\FakeGateway |  |  |');
+});
+
 test('the bindings section takes part in --except', function () {
     File::put(base_path('necromancer.json'), json_encode([
         'meta' => ['manifest_schema_version' => 1, 'app_name' => 'TestApp', 'app_env' => 'local'],

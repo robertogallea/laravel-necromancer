@@ -107,6 +107,52 @@ final readonly class BindingCollector
             );
         }
 
+        return [...$collected, ...$this->contextualBindings()];
+    }
+
+    /**
+     * Each (Consumer, abstract) pair of the container's contextual map is a
+     * Contextual Binding (ADR 0026). A primitive need (`$timeout`) is skipped
+     * before its implementation is read: a plain give() stores the resolved
+     * value, which may be configuration (ADR 0003).
+     *
+     * @return list<StructuralArtifact>
+     */
+    private function contextualBindings(): array
+    {
+        $collected = [];
+
+        foreach ($this->app instanceof Container ? $this->app->contextual : [] as $consumer => $needs) {
+            $consumer = (string) $consumer;
+
+            foreach ($needs as $abstract => $implementation) {
+                $abstract = (string) $abstract;
+
+                if (str_starts_with($abstract, '$')) {
+                    continue;
+                }
+
+                [$concrete, $concreteSource] = match (true) {
+                    is_string($implementation) => [ltrim($implementation, '\\'), 'class'],
+                    $implementation instanceof Closure => $this->returnTypeOf($implementation),
+                    default => [null, null],
+                };
+
+                if ((! $this->isApplicationClass($consumer) && ! $this->isApplicationBinding($abstract, $concrete)) || Str::is($this->exclusions, $abstract)) {
+                    continue;
+                }
+
+                $collected[] = StructuralArtifact::binding(
+                    abstract: $abstract,
+                    concrete: $concrete,
+                    concreteSource: $concreteSource,
+                    lifetime: null,
+                    source: $this->sourceOf($concrete),
+                    consumer: $consumer,
+                );
+            }
+        }
+
         return $collected;
     }
 
@@ -115,7 +161,9 @@ final readonly class BindingCollector
      * requested, so these bindings exist only as attributes. They are looked
      * for on the application types the scan's collected facts reach (Action
      * entrypoint and controller action parameters, test class references),
-     * by reflection alone: no candidate is instantiated or resolved.
+     * by reflection alone: no candidate is instantiated or resolved. Only a
+     * Global Binding makes an attribute binding redundant, since a
+     * Contextual Binding applies to its Consumer alone (ADR 0026).
      *
      * @param  array<string, list<array<string, mixed>>>  $artifacts  the scan's identified artifacts
      * @return list<StructuralArtifact>
@@ -124,7 +172,7 @@ final readonly class BindingCollector
     {
         $known = array_flip(array_map(
             static fn (array $binding): string => (string) ($binding['abstract'] ?? ''),
-            $artifacts['bindings'] ?? [],
+            array_filter($artifacts['bindings'] ?? [], static fn (array $binding): bool => ! is_string($binding['consumer'] ?? null)),
         ));
         $collected = [];
 
@@ -324,7 +372,17 @@ final readonly class BindingCollector
             return [ltrim($captured, '\\'), 'class'];
         }
 
-        $returnType = $function->getReturnType();
+        return $this->returnTypeOf($concrete);
+    }
+
+    /**
+     * A closure's declared non-builtin return type, without calling it.
+     *
+     * @return array{0: string|null, 1: 'return_type'|null}
+     */
+    private function returnTypeOf(Closure $closure): array
+    {
+        $returnType = (new ReflectionFunction($closure))->getReturnType();
 
         if ($returnType instanceof ReflectionNamedType && ! $returnType->isBuiltin() && ! in_array(strtolower($returnType->getName()), ['self', 'static'], true)) {
             return [ltrim($returnType->getName(), '\\'), 'return_type'];

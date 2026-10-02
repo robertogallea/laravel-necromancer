@@ -6,13 +6,17 @@ use LaravelNecromancer\Manifest\ScanManifest;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Contracts\NecromancerInvoiceNumbers;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Contracts\NecromancerPaymentGateway;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Contracts\NecromancerRefundGateway;
+use LaravelNecromancer\Tests\Fixtures\Bindings\Http\NecromancerRefundController;
+use LaravelNecromancer\Tests\Fixtures\Bindings\Http\NecromancerReportController;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Logging\NecromancerAuditLogger;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Providers\NecromancerCodeServiceProvider;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Providers\NecromancerDeferredServiceProvider;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Providers\NecromancerPaymentServiceProvider;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Providers\NecromancerUnloadedDeferredServiceProvider;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Services\NecromancerFakeInvoiceNumbers;
+use LaravelNecromancer\Tests\Fixtures\Bindings\Services\NecromancerFakePaymentGateway;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Services\NecromancerLedger;
+use LaravelNecromancer\Tests\Fixtures\Bindings\Services\NecromancerSequentialInvoiceNumbers;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Services\NecromancerStripeGateway;
 use LaravelNecromancer\Tests\Fixtures\Bindings\Services\NecromancerStripeRefunds;
 use Psr\Log\LoggerInterface;
@@ -251,4 +255,96 @@ test('outside the console kernel, an unloaded deferred provider\'s abstracts com
         'provider' => NecromancerUnloadedDeferredServiceProvider::class,
         'deferred' => true,
     ])->and(app()->providerIsLoaded(NecromancerUnloadedDeferredServiceProvider::class))->toBeFalse();
+});
+
+test('a contextual binding is recorded per consumer with its class-string concrete', function () {
+    app()->when(NecromancerReportController::class)->needs(NecromancerPaymentGateway::class)->give(NecromancerFakePaymentGateway::class);
+
+    $binding = scanBindings($this)['bindings:'.NecromancerPaymentGateway::class.'@'.NecromancerReportController::class];
+
+    expect($binding)->toMatchArray([
+        'abstract' => NecromancerPaymentGateway::class,
+        'concrete' => NecromancerFakePaymentGateway::class,
+        'concrete_source' => 'class',
+        'lifetime' => null,
+        'provider' => null,
+        'deferred' => false,
+        'consumer' => NecromancerReportController::class,
+    ])->and($binding['source']['file'])->toEndWith('tests/Fixtures/Bindings/Services/NecromancerFakePaymentGateway.php');
+});
+
+test('a contextual closure records its declared class return type, or no concrete without one', function () {
+    app()->when(NecromancerReportController::class)->needs(NecromancerPaymentGateway::class)->give(fn (): NecromancerFakePaymentGateway => new NecromancerFakePaymentGateway);
+    app()->when(NecromancerRefundController::class)->needs(NecromancerPaymentGateway::class)->give(fn () => new NecromancerFakePaymentGateway);
+
+    $bindings = scanBindings($this);
+
+    expect($bindings['bindings:'.NecromancerPaymentGateway::class.'@'.NecromancerReportController::class])->toMatchArray([
+        'concrete' => NecromancerFakePaymentGateway::class,
+        'concrete_source' => 'return_type',
+    ])->and($bindings['bindings:'.NecromancerPaymentGateway::class.'@'.NecromancerRefundController::class])->toMatchArray([
+        'concrete' => null,
+        'concrete_source' => null,
+    ]);
+});
+
+test('a primitive need is never collected and its value never reaches the manifest', function () {
+    app()->when(NecromancerReportController::class)->needs('$apiKey')->give('sk_live_never_in_the_manifest');
+    app()->when(NecromancerReportController::class)->needs('$timeout')->give(fn (): NecromancerFakePaymentGateway => throw new RuntimeException('A primitive need was read.'));
+
+    $this->artisan('necromancer:scan', ['--output' => $this->manifestPath, '--only' => 'bindings'])->assertSuccessful();
+
+    expect(File::get($this->manifestPath))->not->toContain('sk_live_never_in_the_manifest')
+        ->not->toContain('$apiKey')
+        ->not->toContain('$timeout');
+});
+
+test('a contextual binding for several consumers yields one artifact per consumer', function () {
+    app()->when([NecromancerReportController::class, NecromancerRefundController::class])->needs(NecromancerPaymentGateway::class)->give(NecromancerFakePaymentGateway::class);
+
+    expect(array_keys(scanBindings($this)))->toBe([
+        'bindings:'.NecromancerPaymentGateway::class.'@'.NecromancerRefundController::class,
+        'bindings:'.NecromancerPaymentGateway::class.'@'.NecromancerReportController::class,
+    ]);
+});
+
+test('a global binding has no consumer key and sorts before its contextual bindings', function () {
+    app()->bind(NecromancerPaymentGateway::class, NecromancerStripeGateway::class);
+    app()->when(NecromancerReportController::class)->needs(NecromancerPaymentGateway::class)->give(NecromancerFakePaymentGateway::class);
+
+    $bindings = scanBindings($this);
+
+    expect(array_keys($bindings))->toBe([
+        'bindings:'.NecromancerPaymentGateway::class,
+        'bindings:'.NecromancerPaymentGateway::class.'@'.NecromancerReportController::class,
+    ])->and($bindings['bindings:'.NecromancerPaymentGateway::class])->not->toHaveKey('consumer');
+});
+
+test('a contextual binding is kept when only its consumer is in the application namespace', function () {
+    app()->when(NecromancerReportController::class)->needs(Countable::class)->give(ArrayObject::class);
+    app()->when(ArrayObject::class)->needs(Countable::class)->give(ArrayIterator::class);
+
+    expect(array_keys(scanBindings($this)))->toBe([
+        'bindings:'.Countable::class.'@'.NecromancerReportController::class,
+    ]);
+});
+
+test('exclude.bindings drops a contextual binding whose abstract matches', function () {
+    config()->set('necromancer.exclude.bindings', ['*\\Contracts\\*']);
+    app()->when(NecromancerReportController::class)->needs(NecromancerPaymentGateway::class)->give(NecromancerFakePaymentGateway::class);
+
+    expect(scanBindings($this))->toBe([]);
+});
+
+test('a contextual binding of an abstract does not hide its #[Bind] global binding', function () {
+    app()->bind(ActionCollector::class, fn ($app): ActionCollector => new ActionCollector($app, [[
+        'path' => base_path('tests/Fixtures/Bindings/Actions'),
+        'namespace' => 'LaravelNecromancer\\Tests\\Fixtures\\Bindings\\Actions\\',
+    ]]));
+    app()->when(NecromancerReportController::class)->needs(NecromancerInvoiceNumbers::class)->give(NecromancerSequentialInvoiceNumbers::class);
+
+    expect(array_keys(scanBindings($this, ['--only' => 'actions,bindings'])))->toBe([
+        'bindings:'.NecromancerInvoiceNumbers::class,
+        'bindings:'.NecromancerInvoiceNumbers::class.'@'.NecromancerReportController::class,
+    ]);
 });

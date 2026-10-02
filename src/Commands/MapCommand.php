@@ -242,6 +242,11 @@ final class MapCommand extends Command
     private function formatBinding(array $item): string
     {
         $concrete = is_string($item['concrete'] ?? null) ? class_basename($item['concrete']) : '?';
+
+        if (is_string($item['consumer'] ?? null)) {
+            return class_basename((string) ($item['abstract'] ?? '')).' @ '.class_basename($item['consumer']).'  '.$concrete;
+        }
+
         $lifetime = is_string($item['lifetime'] ?? null) ? $item['lifetime'] : '?';
 
         return class_basename((string) ($item['abstract'] ?? '')).'  '.$concrete.' ('.$lifetime.')';

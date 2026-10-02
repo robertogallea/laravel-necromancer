@@ -31,7 +31,7 @@ final class RelationshipResolver
     private array $classIndex = [];
 
     /**
-     * Binding abstract → its Artifact ID, the fallback for a class no
+     * Global Binding abstract → its Artifact ID, the fallback for a class no
      * collected artifact has (ADR 0025).
      *
      * @var array<string, string>
@@ -402,7 +402,9 @@ final class RelationshipResolver
      * is read from declarations; a `class` or `instance` one from the
      * container itself. The concrete resolves only to a collected artifact,
      * never through the binding fallback, so a binding never resolves to
-     * itself or chains to another binding.
+     * itself or chains to another binding. A Contextual Binding is also
+     * consumed_by its Consumer and takes_precedence_over the Global Binding
+     * of its abstract (ADR 0026).
      *
      * @param  array<string, mixed>  $binding
      */
@@ -423,6 +425,21 @@ final class RelationshipResolver
 
         if (is_string($provider) && $provider !== '') {
             $this->addToClass($binding['id'], RelationshipType::RegisteredBy, $provider, Provenance::Reflection, 'provider');
+        }
+
+        $consumer = $binding['consumer'] ?? null;
+        $abstract = $binding['abstract'] ?? null;
+
+        if (is_string($consumer) && $consumer !== '') {
+            $this->addToClass($binding['id'], RelationshipType::ConsumedBy, $consumer, Provenance::Runtime, 'consumer');
+
+            if (is_string($abstract) && $abstract !== '') {
+                $global = $this->bindingIndex[$abstract] ?? null;
+
+                $this->add(new Relationship($binding['id'], RelationshipType::TakesPrecedenceOver, $global ?? $abstract, [Provenance::Runtime], $global !== null, [], [
+                    new RelationshipEvidence($binding['id'], 'abstract', $abstract),
+                ]));
+            }
         }
     }
 
@@ -553,7 +570,8 @@ final class RelationshipResolver
 
     /**
      * The artifact a class resolves to: a collected artifact always wins,
-     * else the binding of that abstract (ADR 0025).
+     * else the Global Binding of that abstract (ADR 0025), never a
+     * Contextual Binding (ADR 0026).
      */
     private function classTarget(string $class): ?string
     {
@@ -676,7 +694,7 @@ final class RelationshipResolver
             $id = is_array($binding) ? ($binding['id'] ?? null) : null;
             $abstract = is_array($binding) ? ($binding['abstract'] ?? null) : null;
 
-            if (is_string($id) && $id !== '' && is_string($abstract) && $abstract !== '') {
+            if (is_string($id) && $id !== '' && is_string($abstract) && $abstract !== '' && ! is_string($binding['consumer'] ?? null)) {
                 $index[$abstract] ??= $id;
             }
         }

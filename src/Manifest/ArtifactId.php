@@ -81,7 +81,7 @@ final class ArtifactId
             'routes' => sprintf('routes:%s:%s', $this->routeMethods($artifact), $this->required($artifact, 'uri', $type)),
             'tests' => 'tests:'.$this->repositoryPath($this->required($artifact, 'file', $type)),
             'middleware' => $this->middlewareId($artifact),
-            'bindings' => 'bindings:'.$this->required($artifact, 'abstract', $type),
+            'bindings' => 'bindings:'.$this->required($artifact, 'abstract', $type).(is_string($artifact['consumer'] ?? null) ? '@'.$artifact['consumer'] : ''),
             'gates', 'scheduled_tasks' => throw new InvalidArgumentException("{$type} Artifact IDs require collection context."),
             'models', 'form_requests', 'actions', 'controllers', 'jobs', 'events', 'listeners', 'commands', 'policies', 'enums', 'observers', 'livewire_components', 'mailables', 'validation_rules', 'service_providers' => $type.':'.$this->className($artifact, $type),
             default => throw new InvalidArgumentException("Unsupported artifact type '{$type}'."),

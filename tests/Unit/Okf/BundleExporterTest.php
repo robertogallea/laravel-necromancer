@@ -636,3 +636,22 @@ test('assemble() renders an artifact\'s dispatched targets linked to their conce
 
     expect(assembledConcept($assembled, 'actions:App\\Actions\\PlaceOrder'))->toContain("- **dispatches**: [App\\Events\\OrderPlaced]({$eventPath}), [App\\Jobs\\SendInvoice]({$jobPath}) (queued)\n");
 });
+
+test('assemble() renders a contextual binding\'s consumer and the global binding it takes precedence over', function () {
+    $manifest = completeManifest([
+        'controllers' => [['id' => 'controllers:App\\Http\\Controllers\\ReportController', 'class' => 'App\\Http\\Controllers\\ReportController', 'actions' => [], 'source' => null]],
+        'bindings' => [
+            ['id' => 'bindings:App\\Contracts\\Gateway', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => null, 'concrete_source' => null, 'lifetime' => 'transient', 'provider' => null, 'deferred' => false],
+            ['id' => 'bindings:App\\Contracts\\Gateway@App\\Http\\Controllers\\ReportController', 'abstract' => 'App\\Contracts\\Gateway', 'concrete' => 'App\\Services\\FakeGateway', 'concrete_source' => 'class', 'lifetime' => null, 'provider' => null, 'deferred' => false, 'consumer' => 'App\\Http\\Controllers\\ReportController'],
+        ],
+    ]);
+
+    $assembled = (new BundleExporter)->assemble($manifest, '2026-08-07T12:00:00+02:00', '');
+    $controllerPath = $assembled['identities']['controllers:App\\Http\\Controllers\\ReportController']['link']->path;
+    $globalPath = $assembled['identities']['bindings:App\\Contracts\\Gateway']['link']->path;
+
+    expect(assembledConcept($assembled, 'bindings:App\\Contracts\\Gateway@App\\Http\\Controllers\\ReportController'))
+        ->toContain('# App\\Contracts\\Gateway @ App\\Http\\Controllers\\ReportController')
+        ->toContain("- **resolved_as**: App\\Services\\FakeGateway\n- **consumed_by**: [App\\Http\\Controllers\\ReportController]({$controllerPath})\n- **takes_precedence_over**: [App\\Contracts\\Gateway]({$globalPath})\n")
+        ->and(assembledConcept($assembled, 'bindings:App\\Contracts\\Gateway'))->not->toContain('takes_precedence_over');
+});

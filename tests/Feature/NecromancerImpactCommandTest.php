@@ -284,3 +284,43 @@ test('the impact command walks through a binding to the concrete class the conta
 
         TEXT);
 });
+
+test('the impact command reaches a global binding\'s contextual bindings at depth 1 and their consumers at depth 2', function () {
+    writeImpactManifest([
+        'controllers' => [['id' => 'controllers:App\\Http\\Controllers\\ReportController', 'class' => 'App\\Http\\Controllers\\ReportController', 'actions' => []]],
+        'bindings' => [
+            [
+                'id' => 'bindings:App\\Contracts\\PaymentGateway',
+                'abstract' => 'App\\Contracts\\PaymentGateway',
+                'concrete' => null,
+                'concrete_source' => null,
+                'lifetime' => 'transient',
+                'provider' => null,
+                'deferred' => false,
+            ],
+            [
+                'id' => 'bindings:App\\Contracts\\PaymentGateway@App\\Http\\Controllers\\ReportController',
+                'abstract' => 'App\\Contracts\\PaymentGateway',
+                'concrete' => null,
+                'concrete_source' => null,
+                'lifetime' => null,
+                'provider' => null,
+                'deferred' => false,
+                'consumer' => 'App\\Http\\Controllers\\ReportController',
+            ],
+        ],
+    ]);
+
+    expect(impactOutput(['artifact' => 'bindings:App\\Contracts\\PaymentGateway', '--depth' => 2]))->toBe(<<<'TEXT'
+        Impact of App\Contracts\PaymentGateway (bindings:App\Contracts\PaymentGateway), depth 2
+
+        Depth 1
+          bindings
+            App\Contracts\PaymentGateway @ App\Http\Controllers\ReportController  ← takes_precedence_over
+
+        Depth 2
+          controllers
+            App\Http\Controllers\ReportController  consumed_by →  via App\Contracts\PaymentGateway @ App\Http\Controllers\ReportController
+
+        TEXT);
+});
