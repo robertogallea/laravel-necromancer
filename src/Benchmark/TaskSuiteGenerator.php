@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Benchmark;
 
+use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipResolver;
+
 final class TaskSuiteGenerator
 {
+    /** Q&A tasks never run under static necromancer: its context file holds the answers. */
+    private const QA_CONDITIONS = ['none', 'manual', 'necromancer-mcp', 'necromancer-mcp-graph'];
+
     /** @param array<string, mixed> $manifest */
     public function __construct(private readonly array $manifest) {}
 
@@ -22,13 +28,16 @@ final class TaskSuiteGenerator
         $jobs = $this->jobNames($artifacts);
         $firstJob = $jobs[0] ?? null;
         $firstEvent = $this->firstEventName($artifacts);
+        $mostConnectedModel = $this->mostConnectedModel($artifacts);
 
-        return [
+        return array_values(array_filter([
             $this->qa001(),
             $this->qa002($observedModel),
             $this->qa003($jobs, $firstJob),
             $this->qa004($castModel),
             $this->qa005(),
+            ...$this->bundledRelationshipTasks(),
+            $mostConnectedModel !== null ? $this->qa008($mostConnectedModel) : null,
             $this->codegen001(),
             $this->codegen002($castModel),
             $this->codegen003($fillableModel),
@@ -36,7 +45,7 @@ final class TaskSuiteGenerator
             $this->mini001(),
             $this->mini002($firstEvent),
             $this->mini003(),
-        ];
+        ]));
     }
 
     /** @return array<string, mixed> */
@@ -47,7 +56,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => 'What routes in this application require authentication? List their names and HTTP methods.',
             'required_key' => 'routes.auth_required',
-            'conditions' => ['none', 'manual', 'necromancer-mcp'],
+            'conditions' => self::QA_CONDITIONS,
             'assertions' => [
                 'must_recall_from' => 'routes.auth_required',
                 'fact_keys' => ['routes.auth_required'],
@@ -64,7 +73,7 @@ final class TaskSuiteGenerator
                 'type' => 'qa',
                 'prompt' => 'Which Eloquent models in this application have observers attached? List the observer class names.',
                 'required_key' => 'models.with_observers',
-                'conditions' => ['none', 'manual', 'necromancer-mcp'],
+                'conditions' => self::QA_CONDITIONS,
                 'assertions' => [
                     'must_recall_from' => 'models.with_observers',
                     'must_not_contain' => ['no observer', 'does not have', 'observer does not exist'],
@@ -78,7 +87,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => "What does the {$model} model observer do, and which lifecycle events does it handle?",
             'required_key' => "models.observer_short_names.{$model}",
-            'conditions' => ['none', 'manual', 'necromancer-mcp'],
+            'conditions' => self::QA_CONDITIONS,
             'assertions' => [
                 'must_recall_from' => "models.observer_short_names.{$model}",
                 'must_not_contain' => ['no observer', 'does not have an observer', 'observer does not exist'],
@@ -104,7 +113,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => 'What jobs exist in this application, and what are their queue names and retry settings?',
             'required_key' => 'jobs.named',
-            'conditions' => ['none', 'manual', 'necromancer-mcp'],
+            'conditions' => self::QA_CONDITIONS,
             'assertions' => [
                 'must_recall_from' => 'jobs.named',
                 'must_not_contain' => ['no jobs', 'no queue'],
@@ -122,7 +131,7 @@ final class TaskSuiteGenerator
                 'type' => 'qa',
                 'prompt' => 'Which Eloquent models in this application declare casts? List the model names.',
                 'required_key' => 'models.with_casts',
-                'conditions' => ['none', 'manual', 'necromancer-mcp'],
+                'conditions' => self::QA_CONDITIONS,
                 'assertions' => [
                     'must_recall_from' => 'models.with_casts',
                     'must_not_contain' => ['no casts', 'no models'],
@@ -136,7 +145,7 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => "What Eloquent casts are declared on the {$model} model?",
             'required_key' => "models.cast_keys.{$model}",
-            'conditions' => ['none', 'manual', 'necromancer-mcp'],
+            'conditions' => self::QA_CONDITIONS,
             'assertions' => [
                 'must_recall_from' => "models.cast_keys.{$model}",
                 'must_not_contain' => ['no casts', "{$model} model does not exist"],
@@ -153,11 +162,46 @@ final class TaskSuiteGenerator
             'type' => 'qa',
             'prompt' => 'Which Eloquent models have a corresponding policy registered in this application?',
             'required_key' => 'policies.models',
-            'conditions' => ['none', 'manual', 'necromancer-mcp'],
+            'conditions' => self::QA_CONDITIONS,
             'assertions' => [
                 'must_recall_from' => 'policies.models',
                 'must_not_contain' => ['no policies'],
                 'fact_keys' => ['policies.models'],
+            ],
+        ];
+    }
+
+    /**
+     * qa-006 (listeners) and qa-007 (dispatches), exactly as bundled: they
+     * name no artifact, so there is nothing to ground.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function bundledRelationshipTasks(): array
+    {
+        return array_values(array_filter(
+            (new TaskSuite)->tasks(['qa']),
+            fn (array $task): bool => in_array($task['id'], ['qa-006', 'qa-007'], true),
+        ));
+    }
+
+    /**
+     * @param  array{id: string, class: string}  $model
+     * @return array<string, mixed>
+     */
+    private function qa008(array $model): array
+    {
+        $key = "impact.labels.{$model['id']}";
+
+        return [
+            'id' => 'qa-008',
+            'type' => 'qa',
+            'prompt' => "What is directly connected to the {$this->shortName($model['class'])} model?",
+            'required_key' => $key,
+            'conditions' => self::QA_CONDITIONS,
+            'assertions' => [
+                'must_recall_from' => $key,
+                'fact_keys' => [$key],
             ],
         ];
     }
@@ -396,6 +440,39 @@ final class TaskSuiteGenerator
         $events = (array) ($artifacts['events'] ?? []);
 
         return isset($events[0]['class']) ? $this->shortName((string) $events[0]['class']) : null;
+    }
+
+    /**
+     * The model taking part in the most Relationships, the earliest in
+     * manifest order on a tie; null when no model takes part in any.
+     *
+     * @return array{id: string, class: string}|null
+     */
+    private function mostConnectedModel(array $artifacts): ?array
+    {
+        $relationships = (new RelationshipResolver)->resolve($this->manifest);
+        $best = null;
+        $bestCount = 0;
+
+        foreach ((array) ($artifacts['models'] ?? []) as $model) {
+            $id = (string) ($model['id'] ?? '');
+
+            if ($id === '') {
+                continue;
+            }
+
+            $count = count(array_filter(
+                $relationships,
+                fn (Relationship $relationship): bool => $relationship->from === $id || $relationship->to === $id,
+            ));
+
+            if ($count > $bestCount) {
+                $best = ['id' => $id, 'class' => (string) ($model['class'] ?? '')];
+                $bestCount = $count;
+            }
+        }
+
+        return $best;
     }
 
     private function shortName(string $class): string

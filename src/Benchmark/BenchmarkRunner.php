@@ -7,6 +7,9 @@ namespace LaravelNecromancer\Benchmark;
 use Illuminate\Http\Client\ConnectionException;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\TextDelta;
+use LaravelNecromancer\Benchmark\Tools\GetArtifactTool;
+use LaravelNecromancer\Benchmark\Tools\GetImpactTool;
+use LaravelNecromancer\Benchmark\Tools\GetRelationshipsTool;
 use LaravelNecromancer\Benchmark\Tools\QueryArtifactsTool;
 use LaravelNecromancer\Benchmark\Tools\QueryModelsTool;
 use LaravelNecromancer\Benchmark\Tools\QueryRoutesTool;
@@ -122,7 +125,11 @@ final class BenchmarkRunner
 
         $context = $this->loadContext($condition, $options['contextPaths']);
         $instructions = $this->buildInstructions($context);
-        $tools = $condition === 'necromancer-mcp' ? $this->mcpTools() : [];
+        $tools = match ($condition) {
+            'necromancer-mcp' => $this->mcpTools(),
+            'necromancer-mcp-graph' => [...$this->mcpTools(), ...$this->graphTools()],
+            default => [],
+        };
 
         $agent = new GenerationAgent($instructions, [], $tools);
 
@@ -222,6 +229,22 @@ final class BenchmarkRunner
             new QueryModelsTool,
             new QueryArtifactsTool,
             new SearchArtifactsTool,
+        ];
+    }
+
+    /**
+     * The MCP graph tools added by the necromancer-mcp-graph condition.
+     * get_affected_tests is not mirrored: no task asks which tests to run
+     * (docs/adr/0009).
+     *
+     * @return list<GetArtifactTool|GetRelationshipsTool|GetImpactTool>
+     */
+    private function graphTools(): array
+    {
+        return [
+            new GetArtifactTool,
+            new GetRelationshipsTool,
+            new GetImpactTool,
         ];
     }
 

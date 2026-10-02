@@ -4,11 +4,20 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Benchmark;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
+use LaravelNecromancer\Relationships\ImpactAnalyzer;
+use LaravelNecromancer\Relationships\ImpactNode;
+use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipResolver;
+use LaravelNecromancer\Relationships\RelationshipType;
 use ReflectionClass;
 
 final class GoldenAnswerResolver
 {
+    /** @var list<Relationship>|null */
+    private ?array $relationships = null;
+
     /** @param array<string, mixed> $manifest */
     public function __construct(private readonly array $manifest) {}
 
@@ -49,6 +58,9 @@ final class GoldenAnswerResolver
             $type === 'jobs' && $field === 'named' => $this->namedArtifacts('jobs', $artifacts),
             $type === 'jobs' && $field !== null && $identifier !== null => $this->artifactField('jobs', $artifacts, $field, $identifier),
             $type === 'events' && $field === 'named' => $this->namedArtifacts('events', $artifacts),
+            $type === 'events' && $field === 'listeners' => $this->relationshipTargetShortNames(RelationshipType::ListenedBy),
+            $type === 'dispatches' && $field === 'targets' => $this->relationshipTargetShortNames(RelationshipType::Dispatches),
+            $type === 'impact' && $field === 'labels' && $identifier !== null => $this->impactLabels($identifier),
             $type === 'policies' && $field === 'models' => $this->policyModelNames($artifacts),
             default => null,
         };
@@ -68,6 +80,14 @@ final class GoldenAnswerResolver
             }
         }
 
+        if ($segments[0] === 'events' && ($segments[1] ?? null) === 'listeners') {
+            try {
+                return $this->dispatcherRegistersEveryListener();
+            } catch (\Exception) {
+                return true;
+            }
+        }
+
         if ($segments[0] === 'models' && isset($segments[2])) {
             $artifacts = (array) ($this->manifest['artifacts']['models'] ?? []);
 
@@ -79,6 +99,45 @@ final class GoldenAnswerResolver
         }
 
         return true;
+    }
+
+    /**
+     * Whether the event dispatcher registers the listener of every
+     * listened_by Relationship for its event.
+     */
+    private function dispatcherRegistersEveryListener(): bool
+    {
+        $rawListeners = Event::getRawListeners();
+
+        foreach ($this->relationshipsOfType(RelationshipType::ListenedBy) as $relationship) {
+            $registered = array_map(
+                $this->listenerClass(...),
+                (array) ($rawListeners[$this->endClass($relationship->from)] ?? []),
+            );
+
+            if (! in_array($this->endClass($relationship->to), $registered, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * The class of a raw dispatcher listener ('Class', 'Class@method', or
+     * [class, method]); null for a closure.
+     */
+    private function listenerClass(mixed $listener): ?string
+    {
+        if (is_string($listener)) {
+            return explode('@', $listener, 2)[0];
+        }
+
+        if (is_array($listener) && isset($listener[0])) {
+            return is_object($listener[0]) ? $listener[0]::class : (string) $listener[0];
+        }
+
+        return null;
     }
 
     /** @return string[] */
@@ -183,6 +242,70 @@ final class GoldenAnswerResolver
                 (array) ($artifacts['policies'] ?? [])
             )
         ));
+    }
+
+    /**
+     * The short class names of every target of the given Relationship type,
+     * once each, in canonical Relationship order.
+     *
+     * @return string[]
+     */
+    private function relationshipTargetShortNames(RelationshipType $type): array
+    {
+        return array_values(array_unique(array_map(
+            fn (Relationship $relationship): string => $this->shortName($this->endClass($relationship->to)),
+            $this->relationshipsOfType($type),
+        )));
+    }
+
+    /** @return list<Relationship> */
+    private function relationshipsOfType(RelationshipType $type): array
+    {
+        $this->relationships ??= (new RelationshipResolver)->resolve($this->manifest);
+
+        return array_values(array_filter(
+            $this->relationships,
+            fn (Relationship $relationship): bool => $relationship->type === $type,
+        ));
+    }
+
+    /**
+     * The label of every node the Impact of an artifact reaches at depth 1.
+     *
+     * @return string[]|null null when no collected artifact has that ID
+     */
+    private function impactLabels(string $id): ?array
+    {
+        if ($this->artifactById($id) === null) {
+            return null;
+        }
+
+        $impact = (new ImpactAnalyzer)->analyze($this->manifest, $id, 1);
+
+        return array_map(fn (ImpactNode $node): string => $impact->label($node->id), $impact->nodes);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function artifactById(string $id): ?array
+    {
+        foreach ((array) ($this->manifest['artifacts'] ?? []) as $items) {
+            foreach ((array) $items as $item) {
+                if (is_array($item) && ($item['id'] ?? null) === $id) {
+                    return $item;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The class of the artifact a Relationship end names, or the end itself
+     * when it is an unresolved raw class.
+     */
+    private function endClass(string $end): string
+    {
+        return (string) ($this->artifactById($end)['class'] ?? $end);
     }
 
     private function artifactField(string $type, array $artifacts, string $field, string $identifier): mixed

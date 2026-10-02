@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace LaravelNecromancer\Mcp\Tools;
+namespace LaravelNecromancer\Benchmark\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Mcp\Request;
-use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Tool;
-use LaravelNecromancer\Mcp\Tools\Concerns\AnswersGraphQueries;
+use Laravel\Ai\Contracts\CanActAsTool;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+use LaravelNecromancer\Manifest\Concerns\QueriesArtifactGraph;
 
-final class GetRelationshipsTool extends Tool
+final class GetRelationshipsTool implements CanActAsTool, Tool
 {
-    use AnswersGraphQueries;
+    use QueriesArtifactGraph;
 
     public function name(): string
     {
@@ -35,8 +35,8 @@ final class GetRelationshipsTool extends Tool
         ];
     }
 
-    public function handle(Request $request): Response
+    public function handle(Request $request): string
     {
-        return $this->respond($this->graphQueries()->relationships((string) $request->get('artifact', '')));
+        return $this->graphQueries()->relationships((string) ($request['artifact'] ?? ''))->toJson();
     }
 }

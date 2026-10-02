@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace LaravelNecromancer\Mcp\Tools;
+namespace LaravelNecromancer\Benchmark\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Mcp\Request;
-use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Tool;
+use Laravel\Ai\Contracts\CanActAsTool;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+use LaravelNecromancer\Manifest\Concerns\QueriesArtifactGraph;
 use LaravelNecromancer\Manifest\GraphQueryService;
-use LaravelNecromancer\Mcp\Tools\Concerns\AnswersGraphQueries;
 use LaravelNecromancer\Relationships\ImpactAnalyzer;
 
-final class GetImpactTool extends Tool
+final class GetImpactTool implements CanActAsTool, Tool
 {
-    use AnswersGraphQueries;
+    use QueriesArtifactGraph;
 
     public function name(): string
     {
@@ -41,12 +41,12 @@ final class GetImpactTool extends Tool
         ];
     }
 
-    public function handle(Request $request): Response
+    public function handle(Request $request): string
     {
-        return $this->respond($this->graphQueries()->impact(
-            (string) $request->get('artifact', ''),
-            $request->get('depth'),
-            $request->get('types'),
-        ));
+        return $this->graphQueries()->impact(
+            (string) ($request['artifact'] ?? ''),
+            $request['depth'] ?? null,
+            $request['types'] ?? null,
+        )->toJson();
     }
 }

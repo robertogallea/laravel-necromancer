@@ -30,7 +30,7 @@ final class BenchmarkCommand extends Command
     use ResolvesSkillPath;
 
     protected $signature = 'necromancer:benchmark
-        {--condition=*    : Conditions to run: none,manual,necromancer,necromancer-mcp. Default: none,manual,necromancer.}
+        {--condition=*    : Conditions to run: none,manual,necromancer,necromancer-mcp,necromancer-mcp-graph. Default: none,manual,necromancer.}
         {--type=*         : Task types to run: qa,codegen,mini. Default: all.}
         {--no-judge       : Skip the AI-as-judge pass (automated checks only)}
         {--no-dump        : Skip writing the per-run benchmark dump}
@@ -85,6 +85,7 @@ final class BenchmarkCommand extends Command
             'manual' => (string) config('necromancer.benchmark.manual_context_path', base_path('AGENTS.md')),
             'necromancer' => $this->resolveNecromancerContextPath($boostDetector),
             'necromancer-mcp' => '',
+            'necromancer-mcp-graph' => '',
         ];
 
         $allTasks = (new TaskSuite($taskOverride ?: null))->tasks($types);
@@ -243,7 +244,7 @@ final class BenchmarkCommand extends Command
         // Conditions + context files
         $this->line(sprintf('  %-*s', $w, 'Conditions'));
 
-        $conditionLabels = ['none' => 'No context', 'manual' => 'Manual', 'necromancer' => 'Necromancer', 'necromancer-mcp' => 'Necromancer (MCP)'];
+        $conditionLabels = ['none' => 'No context', 'manual' => 'Manual', 'necromancer' => 'Necromancer', 'necromancer-mcp' => 'Necromancer (MCP)', 'necromancer-mcp-graph' => 'Necromancer (MCP graph)'];
 
         foreach ($conditions as $i => $condition) {
             $prefix = $i < count($conditions) - 1 ? '├─' : '└─';
@@ -350,7 +351,7 @@ final class BenchmarkCommand extends Command
         $option = $this->option('condition');
         $conditions = is_array($option) && ! empty($option) ? $option : ['none', 'manual', 'necromancer'];
 
-        return array_values(array_filter($conditions, fn (string $c): bool => in_array($c, ['none', 'manual', 'necromancer', 'necromancer-mcp'], true)));
+        return array_values(array_filter($conditions, fn (string $c): bool => in_array($c, ['none', 'manual', 'necromancer', 'necromancer-mcp', 'necromancer-mcp-graph'], true)));
     }
 
     /** @return string[]|null */
