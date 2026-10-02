@@ -317,7 +317,7 @@ final class RelationshipResolver
 
             $from = $kind === TestReferenceFactResolver::CLASS_REFERENCE ? ($this->classIndex[$target] ?? null) : ($this->routeNames[$target] ?? null);
 
-            $this->add(new Relationship($from ?? $target, RelationshipType::TestedBy, $test['id'], [Provenance::Source], $from !== null, ['match' => 'reference'], [
+            $this->add(new Relationship($from ?? $target, RelationshipType::TestedBy, $test['id'], [Provenance::Source], $from !== null, ['match' => TestMatch::Reference->value], [
                 new RelationshipEvidence($test['id'], 'references', $target, $position),
             ]));
         }
@@ -344,8 +344,8 @@ final class RelationshipResolver
 
         foreach ($this->classIndex as $class => $id) {
             $match = match (true) {
-                $class === $subject => 'exact',
-                str_starts_with($class, $subject.'\\') => 'namespace',
+                $class === $subject => TestMatch::Exact->value,
+                str_starts_with($class, $subject.'\\') => TestMatch::Namespace->value,
                 default => null,
             };
 
@@ -356,7 +356,7 @@ final class RelationshipResolver
         }
 
         if (! $matched) {
-            $this->add(new Relationship($subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], false, ['match' => 'exact'], $evidence));
+            $this->add(new Relationship($subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], false, ['match' => TestMatch::Exact->value], $evidence));
         }
     }
 

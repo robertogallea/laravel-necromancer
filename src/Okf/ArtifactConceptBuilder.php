@@ -6,6 +6,7 @@ namespace LaravelNecromancer\Okf;
 
 use LaravelNecromancer\Relationships\Relationship;
 use LaravelNecromancer\Relationships\RelationshipType;
+use LaravelNecromancer\Relationships\TestMatch;
 
 /**
  * Projects one serialized manifest artifact into a portable OKF 0.2 Artifact
@@ -410,11 +411,7 @@ final readonly class ArtifactConceptBuilder
             RelationshipType::UsesMiddleware => ($relationship->metadata['groups'] ?? []) !== [] ? 'via '.implode(', ', $relationship->metadata['groups']) : '',
             RelationshipType::AuthorizedBy => (string) ($relationship->metadata['ability'] ?? ''),
             RelationshipType::Dispatches => implode(', ', $relationship->metadata['modes'] ?? []),
-            RelationshipType::TestedBy => match ($relationship->metadata['match'] ?? null) {
-                'namespace' => 'namespace match',
-                'reference' => 'reference',
-                default => '',
-            },
+            RelationshipType::TestedBy => TestMatch::qualifierFor($relationship->metadata['match'] ?? null),
             default => '',
         };
     }

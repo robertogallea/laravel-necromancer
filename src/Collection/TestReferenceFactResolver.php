@@ -14,10 +14,6 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\Parser;
-use PhpParser\ParserFactory;
 
 /**
  * Adds the `references` Discovered Fact to already-collected test
@@ -31,15 +27,13 @@ final class TestReferenceFactResolver
 
     public const ROUTE_REFERENCE = 'route';
 
-    private Parser $parser;
-
     /**
      * @param  string  $appNamespace  the application namespace (e.g. `App\`); only classes under it are recorded
      */
-    public function __construct(private readonly string $appNamespace)
-    {
-        $this->parser = (new ParserFactory)->createForHostVersion();
-    }
+    public function __construct(
+        private readonly string $appNamespace,
+        private readonly SourceFileParser $sources = new SourceFileParser,
+    ) {}
 
     /**
      * @param  array<string, list<array<string, mixed>>>  $artifacts
@@ -56,20 +50,17 @@ final class TestReferenceFactResolver
                 continue;
             }
 
-            $path = str_starts_with($file, DIRECTORY_SEPARATOR) ? $file : base_path($file);
-            $source = is_file($path) ? file_get_contents($path) : false;
-
-            if ($source === false) {
-                continue;
-            }
-
             try {
-                $statements = (new NodeTraverser(new NameResolver))->traverse($this->parser->parse($source) ?? []);
+                $statements = $this->sources->parse($file);
             } catch (Error $error) {
                 $label = $test['id'] ?? $file;
                 $diagnostics[] = "TR_PARSE_FAILED: {$label} source '{$file}' could not be parsed "
                     ."({$error->getMessage()}); its references were not collected.";
 
+                continue;
+            }
+
+            if ($statements === null) {
                 continue;
             }
 
