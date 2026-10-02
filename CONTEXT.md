@@ -76,6 +76,10 @@ _Avoid_: Endpoint, route action, entrypoint
 A directed, typed link from an artifact to another artifact, a Domain, a Flow, or an ADR, derived from the artifact's discovered facts and annotations rather than recorded separately. A relationship whose target is not a collected artifact is still a relationship, marked unresolved.
 _Avoid_: Edge (a graph rendering of a relationship), dependency
 
+**Dispatch**:
+An artifact handing a job, an event, or a mailable to Laravel's bus, event dispatcher, or mailer for handling. Firing an event and sending a mailable are dispatches too.
+_Avoid_: Fire, emit, send, trigger
+
 **Provenance**:
 How Necromancer obtained the evidence for a relationship: from the application's runtime state, by reflecting on declared code structure, by reading source text, or from an artifact annotation. A relationship supported by several pieces of evidence carries each of their provenances.
 _Avoid_: Confidence, origin
