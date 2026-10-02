@@ -92,6 +92,10 @@ _Avoid_: Blast radius, dependents
 A Domain, Flow, ADR, middleware, or test reached while computing an Impact: it belongs to the Impact, but the relationships beyond it don't.
 _Avoid_: Hub, leaf
 
+**Affected Test**:
+A test reached by the Impact of a changed artifact, or a changed test itself. It is **directly affected** when it tests the changed artifact (distance 1), and **indirectly affected** when it tests something the change reaches further out.
+_Avoid_: Impacted test, related test, application-level test
+
 **Knowledge Bundle**:
 A portable collection of interlinked knowledge documents generated to make an application's architecture understandable to people and AI systems.
 _Avoid_: OKF package, metadata dump

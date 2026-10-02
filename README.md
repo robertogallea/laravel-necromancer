@@ -25,6 +25,7 @@ Laravel Necromancer scans your bootstrapped Laravel application and builds a str
   - [Step 3j — Generate an AI-Enriched Knowledge Bundle](#step-3j--generate-an-ai-enriched-knowledge-bundle)
   - [Step 3k — Visualize the Artifact Graph](#step-3k--visualize-the-artifact-graph)
   - [Step 3l — Analyze an artifact's Impact](#step-3l--analyze-an-artifacts-impact)
+  - [Step 3m — Find the tests affected by a change](#step-3m--find-the-tests-affected-by-a-change)
 - [Commands Reference](#commands-reference)
 - [Configuration](#configuration)
 - [Privacy & Exclusions](#privacy--exclusions)
@@ -1086,6 +1087,58 @@ A Domain, Flow, or ADR can be the start too. `necromancer:impact flow:checkout` 
 
 ---
 
+### Step 3m — Find the tests affected by a change
+
+List the tests to run for a changed artifact:
+
+```bash
+php artisan necromancer:affected-tests "App\Models\Order"
+```
+
+```text
+Affected tests for models:App\Models\Order, depth 2
+
+Directly affected
+  tests/Unit/OrderTest.php  ← via App\Models\Order
+
+Indirectly affected
+  tests/Unit/OrderPolicyTest.php  ← via App\Policies\OrderPolicy
+  tests/Unit/PoliciesTest.php  ← via App\Policies\OrderPolicy  (namespace match)
+```
+
+An **Affected Test** is a test reached by the [Impact](#step-3l--analyze-an-artifacts-impact) of the change, through a `tested_by` Relationship. It's **directly affected** when it tests the changed artifact itself (distance 1), and **indirectly affected** when it tests something further out (distance 2 or more). `← via` names the node the test was reached from. A test whose `subject` is a namespace rather than a class (e.g. `uses(App\Policies::class)`) is included and marked `(namespace match)`. A test reached from several changed artifacts is listed once, at its smallest distance.
+
+The walk is the one `necromancer:impact` does, so Domains, Flows, ADRs, middleware, and tests are never walked through: two artifacts sharing a flow don't pull in each other's tests.
+
+Instead of one artifact, pipe in the files a branch changed:
+
+```bash
+git diff --name-only main | php artisan necromancer:affected-tests --stdin --allow-stale
+```
+
+Each path (relative, `./`-prefixed, or absolute under the project) is matched exactly against every artifact's `source.file`. One file can match several artifacts: a controller file is also the source of its routes. A changed test file is directly affected on its own, shown as `(changed)`. Paths no artifact comes from, such as `routes/web.php`, migrations, config, or views, are listed under **Unmapped** and never fail the command.
+
+> **Note:** a git-diff workflow almost always runs against a manifest older than the changed files, which the command refuses as stale. Either run `php artisan necromancer:scan` first, or pass `--allow-stale` and accept that artifacts added by the change aren't known yet.
+
+To run the result directly, `--paths` prints only the test file paths to stdout, directly affected first. Unmapped paths go to stderr:
+
+```bash
+git diff --name-only main | php artisan necromancer:affected-tests --stdin --paths --allow-stale | xargs vendor/bin/pest
+```
+
+| Option | Description |
+|---|---|
+| `artifact` | An exact Artifact ID, a fully-qualified class name, or a `domain:<v>`, `flow:<v>`, or `adr:<path>` ID, resolved as `necromancer:impact` resolves it. A Domain, Flow, or ADR yields the tests of its members, as indirectly affected. Pass this or `--stdin`, not both. |
+| `--stdin` | Read changed file paths from stdin, one per line. Blank lines and duplicates are skipped. |
+| `--depth=N` | How many Relationships away to walk. Defaults to 2, must be at least 1. `--depth=1` returns only directly affected tests. |
+| `--json` | Output `{"directly_affected": [...], "indirectly_affected": [...], "unmapped": [...]}`. Each test is `{"file", "id", "distance", "match", "start", "via"}`: `start` is the changed artifact it was reached from, and `via` is the `{from, relationship, direction}` object `necromancer:impact --json` gives each node. A changed test has distance 0 and `match`/`via` set to `null`. |
+| `--paths` | Print only the deduplicated test file paths. Can't be combined with `--json`. |
+| `--allow-stale` / `--allow-partial` | Analyze a stale or partial-scope manifest, refused by default as in `necromancer:impact`. `--stdin` doesn't imply `--allow-stale`. |
+
+The command exits 0 whenever it can answer, including when no test is affected, and 1 on a missing, stale, or partial manifest, an unknown or ambiguous artifact, an invalid `--depth`, or conflicting inputs.
+
+---
+
 ## Commands Reference
 
 | Command | Purpose | Key options |
@@ -1105,6 +1158,7 @@ A Domain, Flow, or ADR can be the start too. `necromancer:impact flow:checkout` 
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
 | `necromancer:graph` | Build a deterministic Artifact Graph (artifacts and their Relationships) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:impact` | List the artifacts, Domains, Flows, and ADRs connected to an artifact, Domain, Flow, or ADR through its Relationships | `--depth=N`, `--type=TYPES`, `--json`, `--allow-stale`, `--allow-partial` |
+| `necromancer:affected-tests` | List the tests affected by a changed artifact, Domain, Flow, or ADR, or by changed files read from stdin | `--stdin`, `--depth=N`, `--json`, `--paths`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 
