@@ -84,6 +84,14 @@ _Avoid_: Fire, emit, send, trigger
 How Necromancer obtained the evidence for a relationship: from the application's runtime state, by reflecting on declared code structure, by reading source text, or from an artifact annotation. A relationship supported by several pieces of evidence carries each of their provenances.
 _Avoid_: Confidence, origin
 
+**Impact**:
+The artifacts, Domains, Flows, and ADRs reachable from a starting artifact by following relationships in either direction, each at its shortest distance from the start.
+_Avoid_: Blast radius, dependents
+
+**Boundary Node**:
+A Domain, Flow, ADR, middleware, or test reached while computing an Impact: it belongs to the Impact, but the relationships beyond it don't.
+_Avoid_: Hub, leaf
+
 **Knowledge Bundle**:
 A portable collection of interlinked knowledge documents generated to make an application's architecture understandable to people and AI systems.
 _Avoid_: OKF package, metadata dump
