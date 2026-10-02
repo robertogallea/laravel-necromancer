@@ -4,6 +4,23 @@ use LaravelNecromancer\Okf\ArtifactConcept;
 use LaravelNecromancer\Okf\ArtifactConceptBuilder;
 use LaravelNecromancer\Okf\ConceptEnrichment;
 use LaravelNecromancer\Okf\ConceptLink;
+use LaravelNecromancer\Relationships\Relationship;
+use LaravelNecromancer\Relationships\RelationshipResolver;
+
+/**
+ * Builds a concept for one artifact with the Relationships resolved from a
+ * manifest containing only that artifact.
+ *
+ * @param  array<string, mixed>  $artifact
+ * @param  array<string, ConceptLink>  $classIndex
+ */
+function buildConceptWithRelationships(string $type, array $artifact, array $classIndex = []): ArtifactConcept
+{
+    /** @var list<Relationship> $relationships */
+    $relationships = (new RelationshipResolver)->resolve(['artifacts' => [$type => [$artifact]]]);
+
+    return (new ArtifactConceptBuilder)->build($type, $artifact, '2026-08-07T12:00:00+02:00', $classIndex, relationships: $relationships);
+}
 
 function sampleEnrichment(array $overrides = []): ConceptEnrichment
 {
@@ -151,7 +168,7 @@ test('build() links a route controller present in the class index', function () 
     $artifact = ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null];
     $classIndex = ['App\\Http\\Controllers\\OrderController' => new ConceptLink('OrderController', '/artifacts/order-controller-abcd1234.md')];
 
-    $concept = (new ArtifactConceptBuilder)->build('routes', $artifact, '2026-08-07T12:00:00+02:00', $classIndex);
+    $concept = buildConceptWithRelationships('routes', $artifact, $classIndex);
 
     expect($concept->content)->toContain('## Relationships')
         ->and($concept->content)->toContain('- **controller**: [App\\Http\\Controllers\\OrderController](/artifacts/order-controller-abcd1234.md)');
@@ -160,7 +177,7 @@ test('build() links a route controller present in the class index', function () 
 test('build() renders an unresolved route controller as plain text', function () {
     $artifact = ['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null];
 
-    $concept = (new ArtifactConceptBuilder)->build('routes', $artifact, '2026-08-07T12:00:00+02:00');
+    $concept = buildConceptWithRelationships('routes', $artifact);
 
     expect($concept->content)->toContain('- **controller**: App\\Http\\Controllers\\OrderController')
         ->and($concept->content)->not->toContain('[App\\Http\\Controllers\\OrderController](');
@@ -185,7 +202,7 @@ test('build() links model relationships, policy, and observers when resolvable',
         'source' => null,
     ];
 
-    $concept = (new ArtifactConceptBuilder)->build('models', $artifact, '2026-08-07T12:00:00+02:00', $classIndex);
+    $concept = buildConceptWithRelationships('models', $artifact, $classIndex);
 
     expect($concept->content)->toContain('- **customer**: belongsTo → [App\\Models\\Customer](/artifacts/customer.md)')
         ->and($concept->content)->toContain('- **unknown**: belongsTo → App\\Models\\Unknown')
@@ -197,13 +214,13 @@ test('build() links event listeners and listener handled events', function () {
     $classIndex = ['App\\Listeners\\SendOrderConfirmation' => new ConceptLink('SendOrderConfirmation', '/artifacts/listener.md')];
 
     $event = ['id' => 'events:App\\Events\\OrderPlaced', 'class' => 'App\\Events\\OrderPlaced', 'listeners' => ['App\\Listeners\\SendOrderConfirmation'], 'source' => null];
-    $concept = (new ArtifactConceptBuilder)->build('events', $event, '2026-08-07T12:00:00+02:00', $classIndex);
+    $concept = buildConceptWithRelationships('events', $event, $classIndex);
 
     expect($concept->content)->toContain('- **listeners**: [App\\Listeners\\SendOrderConfirmation](/artifacts/listener.md)');
 
     $classIndex2 = ['App\\Events\\OrderPlaced' => new ConceptLink('OrderPlaced', '/artifacts/event.md')];
     $listener = ['id' => 'listeners:App\\Listeners\\SendOrderConfirmation', 'class' => 'App\\Listeners\\SendOrderConfirmation', 'handles' => ['App\\Events\\OrderPlaced'], 'source' => null];
-    $listenerConcept = (new ArtifactConceptBuilder)->build('listeners', $listener, '2026-08-07T12:00:00+02:00', $classIndex2);
+    $listenerConcept = buildConceptWithRelationships('listeners', $listener, $classIndex2);
 
     expect($listenerConcept->content)->toContain('- **handles**: [App\\Events\\OrderPlaced](/artifacts/event.md)');
 });
@@ -212,12 +229,12 @@ test('build() links a policy or observer model when resolvable', function () {
     $classIndex = ['App\\Models\\Order' => new ConceptLink('Order', '/artifacts/order.md')];
 
     $policy = ['id' => 'policies:App\\Policies\\OrderPolicy', 'class' => 'App\\Policies\\OrderPolicy', 'model' => 'App\\Models\\Order', 'source' => null];
-    $policyConcept = (new ArtifactConceptBuilder)->build('policies', $policy, '2026-08-07T12:00:00+02:00', $classIndex);
+    $policyConcept = buildConceptWithRelationships('policies', $policy, $classIndex);
 
     expect($policyConcept->content)->toContain('- **model**: [App\\Models\\Order](/artifacts/order.md)');
 
     $observer = ['id' => 'observers:App\\Observers\\OrderObserver', 'class' => 'App\\Observers\\OrderObserver', 'model' => 'App\\Models\\Order', 'source' => null];
-    $observerConcept = (new ArtifactConceptBuilder)->build('observers', $observer, '2026-08-07T12:00:00+02:00', $classIndex);
+    $observerConcept = buildConceptWithRelationships('observers', $observer, $classIndex);
 
     expect($observerConcept->content)->toContain('- **model**: [App\\Models\\Order](/artifacts/order.md)');
 });
@@ -310,4 +327,27 @@ test('build() links a locally resolvable declared ADR and renders external ADR U
     ], '2026-08-07T12:00:00+02:00', [], $adrIndex);
 
     expect($concept->content)->toContain('adrs: [docs/adr/0004-x.md](/artifacts/adr-0004-x.md), [https://example.com/adr/0005](https://example.com/adr/0005)');
+});
+
+test('build() lists a listener\'s handled events in its own declared order, even when the events were resolved first', function () {
+    $listener = ['id' => 'listeners:App\\Listeners\\Audit', 'class' => 'App\\Listeners\\Audit', 'handles' => ['App\\Events\\OrderShipped', 'App\\Events\\OrderPlaced'], 'source' => null];
+    $manifest = ['artifacts' => [
+        'events' => [
+            ['id' => 'events:App\\Events\\OrderPlaced', 'class' => 'App\\Events\\OrderPlaced', 'listeners' => ['App\\Listeners\\Audit']],
+            ['id' => 'events:App\\Events\\OrderShipped', 'class' => 'App\\Events\\OrderShipped', 'listeners' => ['App\\Listeners\\Audit']],
+        ],
+        'listeners' => [$listener],
+    ]];
+
+    $concept = (new ArtifactConceptBuilder)->build('listeners', $listener, '2026-08-07T12:00:00+02:00', relationships: (new RelationshipResolver)->resolve($manifest));
+
+    expect($concept->content)->toContain('- **handles**: App\\Events\\OrderShipped, App\\Events\\OrderPlaced');
+});
+
+test('build() keeps a value repeated in a relationship fact, as the fact declares it', function () {
+    $event = ['id' => 'events:App\\Events\\OrderPlaced', 'class' => 'App\\Events\\OrderPlaced', 'listeners' => ['App\\Listeners\\Audit', 'App\\Listeners\\Audit'], 'source' => null];
+
+    $concept = buildConceptWithRelationships('events', $event);
+
+    expect($concept->content)->toContain('- **listeners**: App\\Listeners\\Audit, App\\Listeners\\Audit');
 });

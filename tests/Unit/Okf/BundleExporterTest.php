@@ -527,3 +527,31 @@ test('export() treats an absolute ADR URI as an external link, never a local fil
     expect($result->successful)->toBeTrue()
         ->and(count(glob($output.'/artifacts/*.md')))->toBe(1);
 });
+
+/**
+ * Golden-file regression: the bundle for this fixture manifest was captured
+ * before relationships moved onto the shared Relationship primitive (#55),
+ * and must stay byte-identical. The fixture covers one-sided facts (a
+ * heuristic policy.model with no model.policy, an event listing an
+ * uncollected listener, a listener handling a vendor event), duplicate
+ * model→model relationships, and a vendor route controller.
+ */
+test('export() renders the relationship fixture byte-identically to the pre-#55 bundle', function () {
+    $fixtures = __DIR__.'/../../Fixtures/Okf';
+    $manifest = json_decode((string) file_get_contents("{$fixtures}/relationship-manifest.json"), true, flags: JSON_THROW_ON_ERROR);
+    $expected = json_decode((string) file_get_contents("{$fixtures}/relationship-bundle.json"), true, flags: JSON_THROW_ON_ERROR);
+    $output = okfTempDir().'/bundle';
+
+    $result = (new BundleExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($output, FilesystemIterator::SKIP_DOTS)) as $file) {
+        $files[substr($file->getPathname(), strlen($output) + 1)] = file_get_contents($file->getPathname());
+    }
+
+    ksort($files);
+
+    expect($result->successful)->toBeTrue()
+        ->and($files)->toBe($expected);
+});

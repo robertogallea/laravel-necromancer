@@ -807,6 +807,8 @@ When an artifact's already-collected fields name another artifact by class — a
 - **controller**: [App\Http\Controllers\OrderController](/artifacts/order-controller-9f21ab34.md)
 ```
 
+These lines are drawn from the same [Relationships](#relationships) the Artifact Graph uses, labelled by the fact that declares them. A concept only lists facts the artifact itself records — a model shows `policy` only when it declares one with `#[UsePolicy]`, even though the policy's own `model` also supports that Relationship. Relationship types beyond these (`uses_middleware`, `validates_with`, `tested_by`, a route's `authorized_by`) are in the graph but not yet rendered in the bundle.
+
 Every artifact tagged with the same `domain` or `flow` annotation value is also made navigable through a synthesized **Domain Concept** or **Flow Concept** — one file per distinct value, linking every member artifact:
 
 ```markdown
@@ -918,13 +920,46 @@ Project the manifest into a deterministic **Artifact Graph** — a node/edge vis
 php artisan necromancer:graph
 ```
 
-Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact plus their relationships, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. Every collected artifact appears as a node, colored by kind; three kinds of edges connect them:
+Writes two files to `necromancer-graph/` by default: `graph.json` (a standalone, independently useful node/edge list — one node per collected artifact plus their relationships, canonically ordered so an unchanged manifest always produces a byte-identical file) and `graph.html`, a self-contained static viewer with no CDN dependencies. Every collected artifact appears as a node, colored by kind, and every **Relationship** Necromancer derives from the manifest becomes an edge.
 
-- **structural** — the same relationship taxonomy the OKF Knowledge Bundle renders: a route's `controller`, a model's `relationships`/`policy`/`observers`, an event's `listeners`, a listener's `handles`, a policy's or observer's `model`, an action's `operates_on` (the class types its entrypoints accept).
-- **grouping** — an artifact declaring `domain` or `flow` connects to that group (e.g. every artifact tagged `domain: billing` links to `domain:billing`).
-- **reference** — an artifact declaring a local `adrs` entry connects to it (e.g. `adr:docs/adr/0004-x.md`); absolute-URI ADRs are skipped, the same way the OKF bundle leaves them as external links rather than copied concepts.
+#### Relationships
 
-An edge's target resolves to another node's canonical id when the target is itself a collected artifact (most structural edges, always for grouping/reference); otherwise it carries the raw declared value — a route's `controller`, for instance, resolves to the collected controller's node, but stays unresolved for a vendor controller (or one outside a `--only` scan's scope). `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an edge with an unresolved endpoint still exists in `graph.json`, just isn't drawn.
+A Relationship is a directed, typed link derived from facts and annotations the manifest already holds — it is never written to `necromancer.json`, so adding or changing one never changes `meta.content_hash`. Each type has one canonical direction, so a fact recorded on both ends (an event's `listeners` and a listener's `handles`) still yields a single Relationship:
+
+| Type | From → to | Derived from | Provenance | Metadata |
+|---|---|---|---|---|
+| `handled_by` | route → controller | the route's `controller` | runtime | `action` |
+| `uses_middleware` | route → middleware | the route's `middleware`; a group name expands to each of its collected members | runtime | `groups` (groups it was reached through), `direct` (also listed directly) |
+| `validates_with` | route → form request | form-request-typed parameters of the route's controller action | reflection | — |
+| `authorized_by` | route → policy | the route's `#[Authorize]` entries: the policy of each named model, else a gate for the ability | reflection | `ability`, `models` |
+| `authorized_by` | model → policy | the model's `policy` and/or the policy's `model` | reflection | `heuristic: true` when only the policy's guessed `model` supports it |
+| `relates_to` | model → model | the model's Eloquent `relationships` | runtime | `method`, `kind` (e.g. `belongsTo`) |
+| `observed_by` | model → observer | the model's `observers` and/or the observer's `model` | reflection | — |
+| `listened_by` | event → listener | the event's `listeners` and/or the listener's `handles` | runtime | — |
+| `operates_on` | action → class | class types the action's entrypoints accept | reflection | — |
+| `tested_by` | artifact → test | the test's `subject` — an exact class, or a namespace fanned out to every artifact under it | source | `match: exact\|namespace` |
+| `belongs_to_domain` / `belongs_to_flow` | artifact → `domain:<v>` / `flow:<v>` | the artifact's `domain`/`flow` annotation | annotation | — |
+| `references_adr` | artifact → `adr:<path>` | each local `adrs` annotation entry (absolute URIs skipped) | annotation | — |
+
+**Provenance** records how the evidence was obtained — `runtime` (the application's runtime state, e.g. the router or event dispatcher), `reflection` (declared code structure), `source` (source text, e.g. test files), or `annotation` (an Artifact Annotation). A Relationship supported by several facts carries each of their provenances.
+
+A Relationship whose end isn't a collected artifact — a vendor controller, a listener handling a framework event, a test subject that matches nothing — keeps the raw class or name for that end and is marked `resolved: false`.
+
+Each `graph.json` edge carries the full Relationship plus the `kind` its type renders as:
+
+```json
+{
+    "from": "routes:GET:orders",
+    "to": "controllers:App\\Http\\Controllers\\OrderController",
+    "type": "handled_by",
+    "kind": "structural",
+    "provenance": ["runtime"],
+    "resolved": true,
+    "metadata": { "action": "index" }
+}
+```
+
+`kind` is `grouping` for `belongs_to_domain`/`belongs_to_flow`, `reference` for `references_adr`, and `structural` for every other type. Edges are canonically ordered (artifact type, then manifest order), so an unchanged manifest always produces a byte-identical `graph.json`. `graph.html` only draws a line for an edge whose both ends resolve to a visible node, styled distinctly per kind (solid for structural, dashed for grouping, dotted for reference) — an unresolved edge still exists in `graph.json`, just isn't drawn.
 
 `graph.html` embeds the graph data directly in the page at write time — just open it in a browser, no local server required. (`graph.json` is still written alongside it as an independent artifact for other tooling to consume; the HTML viewer just doesn't depend on fetching it.)
 
@@ -934,7 +969,7 @@ The viewer is interactive:
 
 - **Sidebar** — one row per artifact kind present in the graph, doubling as both a color legend and a filter: unchecking a kind hides its nodes and every edge touching them. **Select all** / **Select none** buttons above the list toggle every kind at once.
 - **Edge key** — a small always-visible card showing the solid/dashed/dotted line style for structural/grouping/reference edges, each independently toggleable.
-- **Click-to-inspect** — click a node to open a panel with its canonical Artifact ID, kind, Architectural Context (resolved annotations), and Discovered Facts. Clicking a synthesized domain/flow/ADR node shows its member artifacts (or referencing artifacts, for an ADR) instead. Hiding a selected node's kind via the sidebar closes its panel automatically.
+- **Click-to-inspect** — click a node to open a panel with its canonical Artifact ID, kind, Architectural Context (resolved annotations), Relationships (each edge touching it, by type, outgoing as `type → target` and incoming as `source → type`, with unresolved ones marked), and Discovered Facts. Clicking a synthesized domain/flow/ADR node shows its member artifacts (or referencing artifacts, for an ADR) instead. Hiding a selected node's kind via the sidebar closes its panel automatically.
 - **Zoom & pan** — scroll to zoom toward the cursor, drag empty canvas to pan, drag a node to reposition it. **Zoom in** / **Zoom out** buttons in the header step the same zoom centered on the current viewport, and a **Reset view** button refits the camera to the currently visible nodes.
 
 Like `necromancer:okf`, the command never rescans the application, refuses a stale or partial-scope manifest by default, and writes atomically — a failed run never damages a previously-generated graph:
@@ -966,7 +1001,7 @@ php artisan necromancer:graph --output=dist/graph # write elsewhere
 | `necromancer:benchmark` | Benchmark AI context effectiveness (accuracy, hallucination rate, latency, token cost) | `--condition=`, `--type=`, `--no-judge`, `--model=`, `--judge=`, `--format=`, `--output=PATH` |
 | `necromancer:okf` | Export a deterministic OKF Knowledge Bundle (one Artifact Concept per artifact) | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 | `necromancer:okf-enrich` | Generate an AI-enriched sibling OKF bundle (privacy-bounded prose only) | `--output=PATH`, `--allow-stale`, `--allow-partial`, `--provider=`, `--model=`, `--temperature=`, `--refresh` |
-| `necromancer:graph` | Build a deterministic Artifact Graph (nodes only in this release) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
+| `necromancer:graph` | Build a deterministic Artifact Graph (artifacts and their Relationships) as `graph.json`/`graph.html` | `--output=PATH`, `--allow-stale`, `--allow-partial` |
 
 ## Configuration
 

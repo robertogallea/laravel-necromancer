@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Okf;
 
-use LaravelNecromancer\Relationships\RelationshipEdge;
-use LaravelNecromancer\Relationships\RelationshipResolver;
+use LaravelNecromancer\Relationships\Relationship;
 
 /**
  * Projects one serialized manifest artifact into a portable OKF 0.2 Artifact
@@ -17,10 +16,6 @@ use LaravelNecromancer\Relationships\RelationshipResolver;
  */
 final readonly class ArtifactConceptBuilder
 {
-    public function __construct(
-        private RelationshipResolver $relationships = new RelationshipResolver,
-    ) {}
-
     /**
      * The Discovered Facts exclusion list — also the privacy boundary
      * LaravelNecromancer\Okf\Enrichment\EnrichmentPromptBuilder reuses
@@ -30,6 +25,26 @@ final readonly class ArtifactConceptBuilder
      * @var list<string>
      */
     public const EXCLUDED_FACT_KEYS = ['id', 'annotations', 'source', 'route_metadata'];
+
+    /**
+     * The facts an Artifact Concept's Relationships section renders, keyed
+     * to the label each is shown under. Only facts the artifact itself
+     * holds are rendered (a model's `policy`, a policy's `model`), even
+     * though one Relationship merges evidence from both ends. `relationships`
+     * is labelled per Eloquent method instead. Entries are in render order.
+     *
+     * @var array<string, string>
+     */
+    private const RENDERED_FIELDS = [
+        'controller' => 'controller',
+        'relationships' => 'relationships',
+        'policy' => 'policy',
+        'observers' => 'observers',
+        'listeners' => 'listeners',
+        'handles' => 'handles',
+        'model' => 'model',
+        'entrypoints' => 'operates_on',
+    ];
 
     /**
      * Identity only — no facts/annotations rendering. Cheap enough to call
@@ -52,8 +67,9 @@ final readonly class ArtifactConceptBuilder
      * @param  array<string, ConceptLink>  $classIndex  FQCN/controller → link, for rendering relationship fields
      * @param  array<string, ConceptLink>  $adrIndex  local ADR path → link, for rendering declared adrs
      * @param  array<string, ConceptLink>  $groupIndex  "domain:value"/"flow:value" → link, for linking back to the synthesized group concept
+     * @param  list<Relationship>  $relationships  the manifest's Relationships (any not evidenced by this artifact are ignored)
      */
-    public function build(string $type, array $artifact, string $manifestGeneratedAt, array $classIndex = [], array $adrIndex = [], array $groupIndex = [], ?ConceptEnrichment $enrichment = null): ArtifactConcept
+    public function build(string $type, array $artifact, string $manifestGeneratedAt, array $classIndex = [], array $adrIndex = [], array $groupIndex = [], ?ConceptEnrichment $enrichment = null, array $relationships = []): ArtifactConcept
     {
         $identity = $this->identify($type, $artifact);
         $id = $identity['id'];
@@ -87,7 +103,7 @@ final readonly class ArtifactConceptBuilder
             ],
         ];
 
-        $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".$this->body($title, $type, $facts, $annotations, $classIndex, $adrIndex, $groupIndex, $enrichment);
+        $content = "---\n".FrontMatter::dump($frontMatter)."\n---\n\n".$this->body($title, $type, $facts, $annotations, $this->relationshipLines($id, $relationships, $classIndex), $adrIndex, $groupIndex, $enrichment);
 
         return new ArtifactConcept($id, $identity['filename'], $content);
     }
@@ -127,11 +143,11 @@ final readonly class ArtifactConceptBuilder
     /**
      * @param  array<string, mixed>  $facts
      * @param  array<string, mixed>  $annotations
-     * @param  array<string, ConceptLink>  $classIndex
+     * @param  list<string>  $relationshipLines
      * @param  array<string, ConceptLink>  $adrIndex
      * @param  array<string, ConceptLink>  $groupIndex
      */
-    private function body(string $title, string $type, array $facts, array $annotations, array $classIndex, array $adrIndex, array $groupIndex, ?ConceptEnrichment $enrichment): string
+    private function body(string $title, string $type, array $facts, array $annotations, array $relationshipLines, array $adrIndex, array $groupIndex, ?ConceptEnrichment $enrichment): string
     {
         $lines = ["# {$title}", '', "_{$type} artifact_", ''];
 
@@ -141,8 +157,6 @@ final readonly class ArtifactConceptBuilder
             $lines[] = $this->architecturalContext($annotations, $adrIndex, $groupIndex);
             $lines[] = '';
         }
-
-        $relationshipLines = $this->relationshipLines($type, $facts, $classIndex);
 
         if ($relationshipLines !== []) {
             $lines[] = '## Relationships';
@@ -256,37 +270,66 @@ final readonly class ArtifactConceptBuilder
     }
 
     /**
-     * Relationship fields already present in $facts, rendered as a
-     * dedicated section so declared structural links are as navigable as
-     * the synthesized Domain/Flow concepts. The taxonomy of which fields
-     * carry another artifact's identity lives in the shared
-     * RelationshipResolver — everything else stays plain Discovered Facts.
+     * One line per Eloquent relationship method, and one line per other
+     * rendered fact listing every value it names — each linked when the
+     * named class has a concept in the bundle, plain text otherwise. Lines
+     * follow RENDERED_FIELDS order and each fact's own value order, never
+     * the resolver's order, so they match the artifact's declared facts.
      *
-     * @param  array<string, mixed>  $facts
+     * @param  list<Relationship>  $relationships
      * @param  array<string, ConceptLink>  $classIndex
      * @return list<string>
      */
-    private function relationshipLines(string $type, array $facts, array $classIndex): array
+    private function relationshipLines(string $id, array $relationships, array $classIndex): array
     {
-        return array_map(
-            fn (RelationshipEdge $edge): string => $this->relationshipLine($edge, $classIndex),
-            $this->relationships->resolve($type, $facts),
-        );
+        if ($id === '') {
+            return [];
+        }
+
+        $rendered = [];
+
+        foreach ($relationships as $relationship) {
+            foreach ($relationship->evidence as $evidence) {
+                if ($evidence->artifact === $id && isset(self::RENDERED_FIELDS[$evidence->field])) {
+                    $rendered[] = [$evidence, $relationship];
+                }
+            }
+        }
+
+        $fieldOrder = array_flip(array_keys(self::RENDERED_FIELDS));
+
+        usort($rendered, fn (array $a, array $b): int => [$fieldOrder[$a[0]->field], $a[0]->position] <=> [$fieldOrder[$b[0]->field], $b[0]->position]);
+
+        $lines = [];
+
+        foreach ($rendered as [$evidence, $relationship]) {
+            if ($evidence->field === 'relationships') {
+                $lines[] = ['label' => (string) $relationship->metadata['method'], 'kind' => (string) $relationship->metadata['kind'], 'values' => [$evidence->value]];
+
+                continue;
+            }
+
+            $lines[$evidence->field] ??= ['label' => self::RENDERED_FIELDS[$evidence->field], 'kind' => null, 'values' => []];
+            $lines[$evidence->field]['values'][] = $evidence->value;
+        }
+
+        return array_values(array_map(fn (array $line): string => $this->relationshipLine($line, $classIndex), $lines));
     }
 
     /**
+     * @param  array{label: string, kind: string|null, values: list<string>}  $line
      * @param  array<string, ConceptLink>  $classIndex
      */
-    private function relationshipLine(RelationshipEdge $edge, array $classIndex): string
+    private function relationshipLine(array $line, array $classIndex): string
     {
         $targets = implode(', ', array_map(
             fn (string $target): string => $this->linkOrText($target, $classIndex),
-            $edge->targets,
+            $line['values'],
         ));
 
-        $value = $edge->relatedType !== null ? "{$edge->relatedType} → {$targets}" : $targets;
+        $value = $line['kind'] !== null ? "{$line['kind']} → {$targets}" : $targets;
 
-        return "- **{$edge->label}**: {$value}";
+        return "- **{$line['label']}**: {$value}";
     }
 
     /**

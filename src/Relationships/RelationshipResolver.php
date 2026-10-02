@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Relationships;
 
+use LaravelNecromancer\Manifest\ArtifactId;
+use LaravelNecromancer\Okf\UriReference;
+
 /**
- * The relationship taxonomy Necromancer already models as artifact fields —
- * route→controller, model→relationships/policy/observers, event→listeners,
- * listener→handles, policy→model, observer→model — expressed as structured
- * data rather than rendered Markdown. Framework-free and pure so both
- * LaravelNecromancer\Okf\ArtifactConceptBuilder (Markdown links) and a
- * future graph builder (structured edges) can consume the exact same
- * taxonomy without either duplicating it or parsing it back out of the
- * other's rendered output.
+ * Derives every Relationship a manifest implies, in memory. The single
+ * source of the relationship vocabulary for every consumer (Artifact Graph,
+ * Knowledge Bundle, ...).
  */
-final readonly class RelationshipResolver
+final class RelationshipResolver
 {
     /**
      * @var list<string>
@@ -25,108 +23,225 @@ final readonly class RelationshipResolver
     ];
 
     /**
-     * @param  array<string, mixed>  $facts
-     * @return list<RelationshipEdge>
-     */
-    public function resolve(string $type, array $facts): array
-    {
-        return match ($type) {
-            'routes' => $this->scalarEdges(['controller' => $facts['controller'] ?? null]),
-            'models' => [
-                ...$this->modelRelationshipEdges($facts['relationships'] ?? []),
-                ...$this->scalarEdges(['policy' => $facts['policy'] ?? null]),
-                ...$this->listEdges(['observers' => $facts['observers'] ?? []]),
-            ],
-            'events' => $this->listEdges(['listeners' => $facts['listeners'] ?? []]),
-            'listeners' => $this->listEdges(['handles' => $facts['handles'] ?? []]),
-            'policies' => $this->scalarEdges(['model' => $facts['model'] ?? null]),
-            'observers' => $this->scalarEdges(['model' => $facts['model'] ?? null]),
-            'actions' => $this->listEdges(['operates_on' => $this->entrypointParameterClasses($facts['entrypoints'] ?? [])]),
-            default => [],
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $fields  label => single target value
-     * @return list<RelationshipEdge>
-     */
-    private function scalarEdges(array $fields): array
-    {
-        $edges = [];
-
-        foreach ($fields as $label => $value) {
-            if (! is_string($value) || $value === '') {
-                continue;
-            }
-
-            $edges[] = new RelationshipEdge($label, [$value]);
-        }
-
-        return $edges;
-    }
-
-    /**
-     * @param  array<string, mixed>  $fields  label => list of target values
-     * @return list<RelationshipEdge>
-     */
-    private function listEdges(array $fields): array
-    {
-        $edges = [];
-
-        foreach ($fields as $label => $values) {
-            $targets = array_values(array_filter(
-                (array) $values,
-                fn (mixed $v): bool => is_string($v) && $v !== '',
-            ));
-
-            if ($targets === []) {
-                continue;
-            }
-
-            $edges[] = new RelationshipEdge($label, $targets);
-        }
-
-        return $edges;
-    }
-
-    /**
-     * @return list<RelationshipEdge>
-     */
-    private function modelRelationshipEdges(mixed $relationships): array
-    {
-        $edges = [];
-
-        foreach ((array) $relationships as $relationship) {
-            if (! is_array($relationship)) {
-                continue;
-            }
-
-            $method = (string) ($relationship['method'] ?? '');
-            $relatedType = (string) ($relationship['type'] ?? '');
-            $related = $relationship['related'] ?? null;
-
-            if ($method === '' || ! is_string($related) || $related === '') {
-                continue;
-            }
-
-            $edges[] = new RelationshipEdge($method, [$related], $relatedType);
-        }
-
-        return $edges;
-    }
-
-    /**
-     * Class types an action's entrypoints accept, deduplicated in first-seen
-     * order. Nullable, union, and intersection types are split into their parts
-     * and built-in types are dropped, since only classes can be other artifacts.
+     * Class name → Artifact ID for every class-backed artifact.
      *
-     * @return list<string>
+     * @var array<string, string>
      */
-    private function entrypointParameterClasses(mixed $entrypoints): array
+    private array $classIndex = [];
+
+    /**
+     * Middleware registrations, for resolving a route's middleware names.
+     *
+     * @var list<array{id: string, class: string, scope: string, alias: string, group: string}>
+     */
+    private array $middleware = [];
+
+    /**
+     * Controller class → action name → that action's declared parameters.
+     *
+     * @var array<string, array<string, list<mixed>>>
+     */
+    private array $controllerActions = [];
+
+    /**
+     * Model class → the policy class governing it, from either end.
+     *
+     * @var array<string, string>
+     */
+    private array $policyByModel = [];
+
+    /**
+     * Gate ability → its Artifact ID.
+     *
+     * @var array<string, string>
+     */
+    private array $gates = [];
+
+    /**
+     * Relationships keyed by identity, in first-seen order.
+     *
+     * @var array<string, Relationship>
+     */
+    private array $relationships = [];
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return list<Relationship>
+     */
+    public function resolve(array $manifest): array
+    {
+        $artifacts = (array) ($manifest['artifacts'] ?? []);
+        $this->classIndex = $this->buildClassIndex($artifacts);
+        $this->middleware = $this->buildMiddlewareIndex($artifacts);
+        $this->controllerActions = $this->buildControllerActionIndex($artifacts);
+        $this->policyByModel = $this->buildPolicyIndex($artifacts);
+        $this->gates = $this->buildGateIndex($artifacts);
+        $this->relationships = [];
+
+        foreach (ArtifactId::supportedTypes() as $type) {
+            foreach ((array) ($artifacts[$type] ?? []) as $artifact) {
+                if (! is_array($artifact) || ! is_string($artifact['id'] ?? null) || $artifact['id'] === '') {
+                    continue;
+                }
+
+                match ($type) {
+                    'routes' => $this->routeRelationships($artifact),
+                    'models' => $this->modelRelationships($artifact),
+                    'actions' => $this->actionRelationships($artifact),
+                    'events' => $this->classListRelationships($artifact, 'listeners', RelationshipType::ListenedBy, Provenance::Runtime),
+                    'listeners' => $this->pairRelationship($artifact, 'handles', RelationshipType::ListenedBy, Provenance::Runtime),
+                    'policies' => $this->pairRelationship($artifact, 'model', RelationshipType::AuthorizedBy, Provenance::Reflection, ['heuristic' => true]),
+                    'observers' => $this->pairRelationship($artifact, 'model', RelationshipType::ObservedBy, Provenance::Reflection),
+                    'tests' => $this->testRelationships($artifact),
+                    default => null,
+                };
+
+                $this->annotationRelationships($artifact);
+            }
+        }
+
+        return array_values($this->relationships);
+    }
+
+    /**
+     * @param  array<string, mixed>  $route
+     */
+    private function routeRelationships(array $route): void
+    {
+        $controller = $route['controller'] ?? null;
+
+        if (is_string($controller) && $controller !== '') {
+            $action = $route['action'] ?? null;
+
+            $this->addToClass($route['id'], RelationshipType::HandledBy, $controller, Provenance::Runtime, 'controller', is_string($action) && $action !== '' ? ['action' => $action] : []);
+        }
+
+        $this->middlewareRelationships($route);
+        $this->formRequestRelationships($route);
+        $this->routeAuthorizationRelationships($route);
+    }
+
+    /**
+     * Only parameters typed with a collected form request count — a class
+     * Necromancer didn't collect can't be known to be a FormRequest.
+     *
+     * @param  array<string, mixed>  $route
+     */
+    private function formRequestRelationships(array $route): void
+    {
+        $controller = $route['controller'] ?? null;
+        $action = $route['action'] ?? null;
+
+        if (! is_string($controller) || ! is_string($action)) {
+            return;
+        }
+
+        foreach ($this->controllerActions[$controller][$action] ?? [] as $parameter) {
+            $class = is_array($parameter) ? ($parameter['type'] ?? null) : null;
+            $to = is_string($class) ? ($this->classIndex[ltrim($class, '?')] ?? null) : null;
+
+            if ($to !== null && str_starts_with($to, 'form_requests:')) {
+                $this->add(new Relationship($route['id'], RelationshipType::ValidatesWith, $to, [Provenance::Reflection], true, [], [
+                    new RelationshipEvidence($this->classIndex[$controller] ?? $controller, 'actions', ltrim((string) $class, '?')),
+                ]));
+            }
+        }
+    }
+
+    /**
+     * Each `#[Authorize]` entry targets the policy of every model it names.
+     * When it names no model, or a model with no known policy, it also
+     * falls back to a gate registered for the ability, and otherwise stays
+     * unresolved under the ability name.
+     *
+     * @param  array<string, mixed>  $route
+     */
+    private function routeAuthorizationRelationships(array $route): void
+    {
+        foreach ((array) ($route['authorization'] ?? []) as $entry) {
+            $ability = is_array($entry) ? ($entry['ability'] ?? null) : null;
+
+            if (! is_string($ability) || $ability === '') {
+                continue;
+            }
+
+            $models = array_values(array_filter((array) ($entry['models'] ?? []), 'is_string'));
+            $metadata = ['ability' => $ability, 'models' => $models];
+            $evidence = [new RelationshipEvidence($route['id'], 'authorization', $ability)];
+            $needsFallback = $models === [];
+
+            foreach ($models as $model) {
+                $policy = $this->policyByModel[$model] ?? null;
+
+                if ($policy === null) {
+                    $needsFallback = true;
+
+                    continue;
+                }
+
+                $to = $this->classIndex[$policy] ?? null;
+                $this->add(new Relationship($route['id'], RelationshipType::AuthorizedBy, $to ?? $policy, [Provenance::Reflection], $to !== null, $metadata, $evidence));
+            }
+
+            if ($needsFallback) {
+                $gate = $this->gates[$ability] ?? null;
+                $this->add(new Relationship($route['id'], RelationshipType::AuthorizedBy, $gate ?? $ability, [Provenance::Reflection], $gate !== null, $metadata, $evidence));
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $model
+     */
+    private function modelRelationships(array $model): void
+    {
+        foreach (array_values((array) ($model['relationships'] ?? [])) as $position => $relationship) {
+            $method = is_array($relationship) ? ($relationship['method'] ?? null) : null;
+            $related = is_array($relationship) ? ($relationship['related'] ?? null) : null;
+
+            if (! is_string($method) || $method === '' || ! is_string($related) || $related === '') {
+                continue;
+            }
+
+            $this->addToClass($model['id'], RelationshipType::RelatesTo, $related, Provenance::Runtime, 'relationships', [
+                'method' => $method,
+                'kind' => (string) ($relationship['type'] ?? ''),
+            ], $position);
+        }
+
+        $policy = $model['policy'] ?? null;
+
+        if (is_string($policy) && $policy !== '') {
+            $this->addToClass($model['id'], RelationshipType::AuthorizedBy, $policy, Provenance::Reflection, 'policy');
+        }
+
+        $this->classListRelationships($model, 'observers', RelationshipType::ObservedBy, Provenance::Reflection);
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifact
+     */
+    private function classListRelationships(array $artifact, string $field, RelationshipType $type, Provenance $provenance): void
+    {
+        foreach (array_values((array) ($artifact[$field] ?? [])) as $position => $class) {
+            if (is_string($class) && $class !== '') {
+                $this->addToClass($artifact['id'], $type, $class, $provenance, $field, position: $position);
+            }
+        }
+    }
+
+    /**
+     * Class types an action's entrypoints accept. Nullable, union, and
+     * intersection types are split into their parts and built-in types are
+     * dropped, since only classes can be other artifacts.
+     *
+     * @param  array<string, mixed>  $action
+     */
+    private function actionRelationships(array $action): void
     {
         $classes = [];
 
-        foreach ((array) $entrypoints as $entrypoint) {
+        foreach ((array) ($action['entrypoints'] ?? []) as $entrypoint) {
             foreach ((array) (is_array($entrypoint) ? ($entrypoint['parameters'] ?? []) : []) as $parameter) {
                 $type = is_array($parameter) ? ($parameter['type'] ?? null) : null;
 
@@ -142,6 +257,385 @@ final readonly class RelationshipResolver
             }
         }
 
-        return array_keys($classes);
+        foreach (array_keys($classes) as $position => $class) {
+            $this->addToClass($action['id'], RelationshipType::OperatesOn, (string) $class, Provenance::Reflection, 'entrypoints', position: $position);
+        }
+    }
+
+    /**
+     * The far end of a pair whose canonical direction points at this
+     * artifact (policy.model → model authorized_by policy, observer.model →
+     * model observed_by observer): the relationship starts at the class the
+     * field names, which stays raw when that class wasn't collected.
+     *
+     * @param  array<string, mixed>  $artifact
+     * @param  array<string, mixed>  $metadata
+     */
+    private function pairRelationship(array $artifact, string $field, RelationshipType $type, Provenance $provenance, array $metadata = []): void
+    {
+        foreach (array_values((array) ($artifact[$field] ?? [])) as $position => $class) {
+            if (! is_string($class) || $class === '') {
+                continue;
+            }
+
+            $from = $this->classIndex[$class] ?? null;
+
+            $this->add(new Relationship($from ?? $class, $type, $artifact['id'], [$provenance], $from !== null, $metadata, [
+                new RelationshipEvidence($artifact['id'], $field, $class, $position),
+            ]));
+        }
+    }
+
+    /**
+     * Same matching as TestSubjectMatcher: a subject naming a class exactly
+     * covers that artifact; a subject naming a namespace covers every
+     * collected artifact under it. A subject matching nothing collected
+     * stays an unresolved relationship from the raw subject.
+     *
+     * @param  array<string, mixed>  $test
+     */
+    private function testRelationships(array $test): void
+    {
+        $subject = $test['subject'] ?? null;
+
+        if (! is_string($subject) || $subject === '') {
+            return;
+        }
+
+        $evidence = [new RelationshipEvidence($test['id'], 'subject', $subject)];
+        $matched = false;
+
+        foreach ($this->classIndex as $class => $id) {
+            $match = match (true) {
+                $class === $subject => 'exact',
+                str_starts_with($class, $subject.'\\') => 'namespace',
+                default => null,
+            };
+
+            if ($match !== null) {
+                $matched = true;
+                $this->add(new Relationship($id, RelationshipType::TestedBy, $test['id'], [Provenance::Source], true, ['match' => $match], $evidence));
+            }
+        }
+
+        if (! $matched) {
+            $this->add(new Relationship($subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], false, ['match' => 'exact'], $evidence));
+        }
+    }
+
+    /**
+     * Domain/Flow/ADR ends are synthesized concepts rather than collected
+     * artifacts, but always exist, so these relationships are resolved.
+     * Absolute-URI ADRs are external links, not ADR concepts, and skipped.
+     *
+     * @param  array<string, mixed>  $artifact
+     */
+    private function annotationRelationships(array $artifact): void
+    {
+        $annotations = is_array($artifact['annotations'] ?? null) ? $artifact['annotations'] : [];
+
+        foreach (['domain' => RelationshipType::BelongsToDomain, 'flow' => RelationshipType::BelongsToFlow] as $field => $type) {
+            $value = $annotations[$field] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                $this->addAnnotation($artifact['id'], $type, "{$field}:{$value}", $field, $value);
+            }
+        }
+
+        foreach ((array) ($annotations['adrs'] ?? []) as $adr) {
+            if (is_string($adr) && $adr !== '' && ! UriReference::isAbsolute($adr)) {
+                $this->addAnnotation($artifact['id'], RelationshipType::ReferencesAdr, "adr:{$adr}", 'adrs', $adr);
+            }
+        }
+    }
+
+    private function addAnnotation(string $from, RelationshipType $type, string $to, string $field, string $value): void
+    {
+        $this->add(new Relationship($from, $type, $to, [Provenance::Annotation], true, [], [new RelationshipEvidence($from, $field, $value)]));
+    }
+
+    /**
+     * A group name expands to one relationship per collected member; an
+     * alias resolves to its alias registration; a class resolves to its
+     * registration in one of the route's own groups when there is one (so a
+     * middleware reached both directly and through a group stays a single
+     * relationship), then its alias registration, then any registration.
+     * Anything else (vendor middleware, a group with no collected member)
+     * stays unresolved under its raw name.
+     *
+     * @param  array<string, mixed>  $route
+     */
+    private function middlewareRelationships(array $route): void
+    {
+        $entries = array_values(array_filter((array) ($route['middleware'] ?? []), fn (mixed $entry): bool => is_string($entry) && $entry !== ''));
+        $routeGroups = [];
+
+        foreach ($entries as $entry) {
+            $members = array_filter($this->middleware, fn (array $registration): bool => $registration['scope'] === 'group' && $registration['group'] === $entry);
+
+            if ($members !== []) {
+                $routeGroups[] = $entry;
+            }
+
+            foreach ($members as $member) {
+                $this->addMiddleware($route['id'], $member['id'], $entry, ['groups' => [$entry], 'direct' => false]);
+            }
+        }
+
+        foreach ($entries as $entry) {
+            if (in_array($entry, $routeGroups, true)) {
+                continue;
+            }
+
+            $this->addMiddleware($route['id'], $this->directMiddlewareTarget(explode(':', $entry)[0], $routeGroups), $entry, ['groups' => [], 'direct' => true]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $routeGroups
+     */
+    private function directMiddlewareTarget(string $name, array $routeGroups): ?string
+    {
+        foreach ($this->middleware as $registration) {
+            if ($registration['scope'] === 'alias' && $registration['alias'] === $name) {
+                return $registration['id'];
+            }
+        }
+
+        $registrations = array_values(array_filter($this->middleware, fn (array $registration): bool => $registration['class'] === $name));
+
+        foreach ($registrations as $registration) {
+            if ($registration['scope'] === 'group' && in_array($registration['group'], $routeGroups, true)) {
+                return $registration['id'];
+            }
+        }
+
+        foreach ($registrations as $registration) {
+            if ($registration['scope'] === 'alias') {
+                return $registration['id'];
+            }
+        }
+
+        return $registrations[0]['id'] ?? null;
+    }
+
+    /**
+     * @param  array{groups: list<string>, direct: bool}  $metadata
+     */
+    private function addMiddleware(string $routeId, ?string $target, string $entry, array $metadata): void
+    {
+        $this->add(new Relationship(
+            $routeId,
+            RelationshipType::UsesMiddleware,
+            $target ?? $entry,
+            [Provenance::Runtime],
+            $target !== null,
+            $metadata,
+            [new RelationshipEvidence($routeId, 'middleware', $entry)],
+        ));
+    }
+
+    /**
+     * Adds a relationship from an artifact to whatever artifact a class
+     * name resolves to, or to the raw class when it isn't collected.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    private function addToClass(string $from, RelationshipType $type, string $class, Provenance $provenance, string $field, array $metadata = [], int $position = 0): void
+    {
+        $to = $this->classIndex[$class] ?? null;
+
+        $this->add(new Relationship($from, $type, $to ?? $class, [$provenance], $to !== null, $metadata, [new RelationshipEvidence($from, $field, $class, $position)]));
+    }
+
+    /**
+     * Records a relationship, merging it into an existing one with the same
+     * identity — (from, type, to, discriminator) — by unioning provenance,
+     * evidence, and middleware paths. A heuristic relationship stops being
+     * one as soon as any non-heuristic fact supports it.
+     */
+    private function add(Relationship $relationship): void
+    {
+        $key = implode("\0", [$relationship->from, $relationship->type->value, $relationship->to, $this->discriminator($relationship)]);
+        $existing = $this->relationships[$key] ?? null;
+
+        if ($existing === null) {
+            $this->relationships[$key] = $relationship;
+
+            return;
+        }
+
+        $metadata = $existing->metadata;
+
+        if (isset($metadata['groups'], $relationship->metadata['groups'])) {
+            $metadata['groups'] = array_values(array_unique([...$metadata['groups'], ...$relationship->metadata['groups']]));
+            $metadata['direct'] = $metadata['direct'] || $relationship->metadata['direct'];
+        }
+
+        if (! isset($relationship->metadata['heuristic'])) {
+            unset($metadata['heuristic']);
+        }
+
+        $this->relationships[$key] = new Relationship(
+            $existing->from,
+            $existing->type,
+            $existing->to,
+            $this->union($existing->provenance, $relationship->provenance),
+            $existing->resolved,
+            $metadata,
+            $this->union($existing->evidence, $relationship->evidence),
+        );
+    }
+
+    /**
+     * Order-preserving union, comparing by value (enum cases, evidence objects).
+     *
+     * @template T
+     *
+     * @param  list<T>  $existing
+     * @param  list<T>  $additional
+     * @return list<T>
+     */
+    private function union(array $existing, array $additional): array
+    {
+        foreach ($additional as $item) {
+            if (! in_array($item, $existing)) {
+                $existing[] = $item;
+            }
+        }
+
+        return $existing;
+    }
+
+    private function discriminator(Relationship $relationship): string
+    {
+        return match ($relationship->type) {
+            RelationshipType::RelatesTo => (string) ($relationship->metadata['method'] ?? ''),
+            RelationshipType::AuthorizedBy => (string) ($relationship->metadata['ability'] ?? ''),
+            default => '',
+        };
+    }
+
+    /**
+     * Middleware is excluded: one class can register globally, in a group,
+     * and under an alias, so a class name alone is ambiguous there. Routes
+     * have no `class`.
+     *
+     * @param  array<string, mixed>  $artifacts
+     * @return array<string, string>
+     */
+    private function buildClassIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach (ArtifactId::supportedTypes() as $type) {
+            if ($type === 'middleware' || $type === 'routes') {
+                continue;
+            }
+
+            foreach ((array) ($artifacts[$type] ?? []) as $artifact) {
+                $id = is_array($artifact) ? ($artifact['id'] ?? null) : null;
+                $class = is_array($artifact) ? ($artifact['class'] ?? null) : null;
+
+                if (is_string($id) && $id !== '' && is_string($class) && $class !== '' && ! isset($index[$class])) {
+                    $index[$class] = $id;
+                }
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifacts
+     * @return array<string, array<string, list<mixed>>>
+     */
+    private function buildControllerActionIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach ((array) ($artifacts['controllers'] ?? []) as $controller) {
+            $class = is_array($controller) ? ($controller['class'] ?? null) : null;
+
+            if (! is_string($class)) {
+                continue;
+            }
+
+            foreach ((array) ($controller['actions'] ?? []) as $action) {
+                if (is_array($action) && is_string($action['name'] ?? null)) {
+                    $index[$class][$action['name']] = array_values((array) ($action['parameters'] ?? []));
+                }
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * A model's own `policy` (`#[UsePolicy]`) wins over a policy's guessed
+     * `model`.
+     *
+     * @param  array<string, mixed>  $artifacts
+     * @return array<string, string>
+     */
+    private function buildPolicyIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach ((array) ($artifacts['models'] ?? []) as $model) {
+            if (is_array($model) && is_string($model['class'] ?? null) && is_string($model['policy'] ?? null) && $model['policy'] !== '') {
+                $index[$model['class']] ??= $model['policy'];
+            }
+        }
+
+        foreach ((array) ($artifacts['policies'] ?? []) as $policy) {
+            if (is_array($policy) && is_string($policy['class'] ?? null) && is_string($policy['model'] ?? null) && $policy['model'] !== '') {
+                $index[$policy['model']] ??= $policy['class'];
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifacts
+     * @return array<string, string>
+     */
+    private function buildGateIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach ((array) ($artifacts['gates'] ?? []) as $gate) {
+            if (is_array($gate) && is_string($gate['ability'] ?? null) && is_string($gate['id'] ?? null) && ! isset($index[$gate['ability']])) {
+                $index[$gate['ability']] = $gate['id'];
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifacts
+     * @return list<array{id: string, class: string, scope: string, alias: string, group: string}>
+     */
+    private function buildMiddlewareIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach ((array) ($artifacts['middleware'] ?? []) as $artifact) {
+            if (! is_array($artifact) || ! is_string($artifact['id'] ?? null) || $artifact['id'] === '') {
+                continue;
+            }
+
+            $index[] = [
+                'id' => $artifact['id'],
+                'class' => (string) ($artifact['class'] ?? ''),
+                'scope' => (string) ($artifact['scope'] ?? ''),
+                'alias' => (string) ($artifact['alias'] ?? ''),
+                'group' => (string) ($artifact['group'] ?? ''),
+            ];
+        }
+
+        return $index;
     }
 }

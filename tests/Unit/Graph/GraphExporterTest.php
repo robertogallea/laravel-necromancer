@@ -100,6 +100,23 @@ test('export() embeds Select all / Select none controls that toggle every sideba
         ->and($html)->toContain('hiddenKinds[entry.kind] = true;');
 });
 
+test('export() embeds an inspect-panel Relationships section listing each edge type touching the selected node', function () {
+    $output = graphTempDir().'/graph';
+
+    $manifest = completeGraphManifest([
+        'jobs' => [['id' => 'jobs:App\\Jobs\\SendInvoice', 'class' => 'App\\Jobs\\SendInvoice', 'source' => null]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $output, stale: false, allowStale: false, allowPartial: false);
+
+    $html = file_get_contents($output.'/graph.html');
+
+    expect($html)->toContain('id="inspect-relationships"')
+        ->and($html)->toContain('<h3>Relationships</h3>')
+        ->and($html)->toContain('function relationshipLines(n)')
+        ->and($html)->toContain('e.type');
+});
+
 test('export() embeds Zoom in / Zoom out controls wired to the shared zoom helper', function () {
     $output = graphTempDir().'/graph';
 
@@ -135,8 +152,24 @@ test('export() writes derived edges to graph.json for an annotated manifest', fu
     $decoded = json_decode(file_get_contents($output.'/graph.json'), true, 512, JSON_THROW_ON_ERROR);
 
     expect($decoded['edges'])->toBe([
-        ['from' => 'jobs:App\\Jobs\\SendInvoice', 'to' => 'domain:billing', 'kind' => 'grouping'],
+        ['from' => 'jobs:App\\Jobs\\SendInvoice', 'to' => 'domain:billing', 'type' => 'belongs_to_domain', 'kind' => 'grouping', 'provenance' => ['annotation'], 'resolved' => true, 'metadata' => []],
     ]);
+});
+
+test('export() writes a byte-identical graph.json when re-run on an unchanged manifest', function () {
+    $first = graphTempDir().'/graph';
+    $second = graphTempDir().'/graph';
+    $manifest = completeGraphManifest([
+        'routes' => [['id' => 'routes:GET:orders', 'method' => 'GET', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'action' => 'index', 'middleware' => ['web', 'auth'], 'source' => null]],
+        'models' => [['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order', 'policy' => 'App\\Policies\\OrderPolicy', 'annotations' => ['domain' => 'orders'], 'source' => null]],
+        'policies' => [['id' => 'policies:App\\Policies\\OrderPolicy', 'class' => 'App\\Policies\\OrderPolicy', 'model' => 'App\\Models\\Order', 'source' => null]],
+    ]);
+
+    (new GraphExporter)->export($manifest, $first, stale: false, allowStale: false, allowPartial: false);
+    (new GraphExporter)->export($manifest, $second, stale: false, allowStale: false, allowPartial: false);
+
+    expect(file_get_contents($second.'/graph.json'))->toBe(file_get_contents($first.'/graph.json'))
+        ->and(file_get_contents($first.'/graph.json'))->toContain('"metadata": {}');
 });
 
 test('export() refuses a stale manifest by default', function () {

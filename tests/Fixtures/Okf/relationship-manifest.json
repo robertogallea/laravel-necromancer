@@ -1,0 +1,47 @@
+{
+    "meta": {
+        "generated_at": "2026-10-02T09:00:00+02:00",
+        "scope": {"complete": true, "artifact_types": ["routes", "controllers", "models", "actions", "events", "listeners", "policies", "observers", "middleware", "tests", "gates"]},
+        "content_hash": "fixture-hash"
+    },
+    "artifacts": {
+        "routes": [
+            {"id": "routes:GET:orders", "name": "orders.index", "method": "GET|HEAD", "uri": "orders", "controller": "App\\Http\\Controllers\\OrderController", "action": "index", "middleware": ["web", "auth"], "authorization": [{"ability": "viewAny", "models": ["App\\Models\\Order"]}], "annotations": {"domain": "orders", "flow": "checkout", "adrs": ["https://example.com/adr/1"]}, "source": null},
+            {"id": "routes:POST:orders", "name": "orders.store", "method": "POST", "uri": "orders", "controller": "App\\Http\\Controllers\\OrderController", "action": "store", "middleware": ["web"], "authorization": [], "annotations": {"domain": "orders", "flow": "checkout"}, "source": null},
+            {"id": "routes:GET:redirect", "method": "GET|HEAD", "uri": "redirect", "controller": "Illuminate\\Routing\\RedirectController", "action": "__invoke", "middleware": [], "source": null}
+        ],
+        "controllers": [
+            {"id": "controllers:App\\Http\\Controllers\\OrderController", "class": "App\\Http\\Controllers\\OrderController", "actions": [{"name": "index", "parameters": [], "return_type": null, "middleware": [], "routes": ["routes:GET:orders"]}, {"name": "store", "parameters": [{"name": "request", "type": "App\\Http\\Requests\\StoreOrderRequest"}], "return_type": null, "middleware": [], "routes": ["routes:POST:orders"]}], "source": null}
+        ],
+        "models": [
+            {"id": "models:App\\Models\\Order", "class": "App\\Models\\Order", "table": "orders", "relationships": [{"type": "belongsTo", "related": "App\\Models\\User", "method": "customer"}, {"type": "belongsTo", "related": "App\\Models\\User", "method": "approver"}, {"type": "hasMany", "related": "App\\Models\\OrderLine", "method": "lines"}], "observers": ["App\\Observers\\OrderObserver"], "policy": "App\\Policies\\OrderPolicy", "annotations": {"domain": "orders"}, "source": null},
+            {"id": "models:App\\Models\\User", "class": "App\\Models\\User", "table": "users", "relationships": [], "observers": [], "policy": null, "source": null}
+        ],
+        "actions": [
+            {"id": "actions:App\\Actions\\CancelOrder", "class": "App\\Actions\\CancelOrder", "entrypoints": [{"name": "handle", "parameters": [{"name": "order", "type": "App\\Models\\Order"}, {"name": "reason", "type": "?string"}, {"name": "actor", "type": "App\\Models\\User|App\\Models\\Admin"}], "return_type": "void"}], "source": null}
+        ],
+        "events": [
+            {"id": "events:App\\Events\\OrderPlaced", "class": "App\\Events\\OrderPlaced", "listeners": ["App\\Listeners\\NotifyWarehouse", "App\\Listeners\\SendOrderConfirmation"], "source": null}
+        ],
+        "listeners": [
+            {"id": "listeners:App\\Listeners\\LogLogin", "class": "App\\Listeners\\LogLogin", "handles": ["Illuminate\\Auth\\Events\\Login"], "queued": false, "source": null},
+            {"id": "listeners:App\\Listeners\\SendOrderConfirmation", "class": "App\\Listeners\\SendOrderConfirmation", "handles": ["App\\Events\\OrderPlaced"], "queued": true, "source": null}
+        ],
+        "policies": [
+            {"id": "policies:App\\Policies\\OrderPolicy", "class": "App\\Policies\\OrderPolicy", "model": "App\\Models\\Order", "source": null},
+            {"id": "policies:App\\Policies\\UserPolicy", "class": "App\\Policies\\UserPolicy", "model": "App\\Models\\User", "source": null}
+        ],
+        "observers": [
+            {"id": "observers:App\\Observers\\OrderObserver", "class": "App\\Observers\\OrderObserver", "model": "App\\Models\\Order", "hooks": ["created"], "queued": false, "source": null}
+        ],
+        "middleware": [
+            {"id": "middleware:group:web:App\\Http\\Middleware\\EncryptCookies", "alias": "EncryptCookies", "class": "App\\Http\\Middleware\\EncryptCookies", "scope": "group", "group": "web", "source": null}
+        ],
+        "tests": [
+            {"id": "tests:tests/Feature/OrderTest.php", "file": "tests/Feature/OrderTest.php", "type": "feature", "subject": "App\\Models\\Order", "methods": ["it places an order"], "source": null}
+        ],
+        "gates": [
+            {"id": "gates:ability:viewAny", "ability": "viewAny", "kind": "closure", "parameters": [], "source": null}
+        ]
+    }
+}
