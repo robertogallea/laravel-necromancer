@@ -1176,6 +1176,8 @@ Both accept a plural `adrs` array parameter (added in 1.5.0 alongside `adr`) —
 
 Bug reports and pull requests are welcome on the [GitHub repository](https://github.com/robertogallea/laravel-necromancer).
 
+The package's architectural decisions — and why they were made — are recorded as ADRs in [`docs/adr/`](docs/adr). Read the ones covering the area you're changing before "fixing" something that looks odd; it may be deliberate.
+
 ## License
 
 MIT

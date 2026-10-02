@@ -4,6 +4,26 @@ Laravel Necromancer represents Laravel applications in forms optimized for compr
 
 ## Language
 
+**Manifest**:
+The machine-readable inventory of an application's artifacts that a scan produces and every other output is rendered from.
+_Avoid_: Index, cache, context file
+
+**Scan**:
+The single inspection of a running application that produces the manifest.
+_Avoid_: Parse, crawl
+
+**Content Hash**:
+A fingerprint of a manifest's artifact content that stays the same across scans of an unchanged application, regardless of when they ran.
+_Avoid_: Checksum of the file, timestamp
+
+**Drift**:
+A difference between the committed manifest and what a fresh scan would produce, detected by comparing content hashes.
+_Avoid_: Staleness
+
+**Stale Manifest**:
+A manifest whose application source appears to have changed since it was scanned, judged without rescanning. A hint that drift is likely, not proof of it.
+_Avoid_: Drift, outdated
+
 **Discovered Fact**:
 Information about an artifact that Necromancer observes from the application rather than receiving as an explicit statement of intent.
 _Avoid_: Inferred metadata, annotation

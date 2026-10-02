@@ -9,7 +9,7 @@ use JsonSerializable;
 /**
  * A directed, typed link from an artifact to another artifact, a Domain, a
  * Flow, or an ADR, derived from Discovered Facts and Artifact Annotations
- * (never stored in the manifest — see docs/adr/0001).
+ * (never stored in the manifest — see docs/adr/0018).
  *
  * `from`/`to` are Artifact IDs (or `domain:<v>`/`flow:<v>`/`adr:<path>`).
  * An end that names something Necromancer did not collect keeps the raw
