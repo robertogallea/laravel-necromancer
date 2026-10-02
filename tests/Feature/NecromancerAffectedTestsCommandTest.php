@@ -159,6 +159,27 @@ test('a fully-qualified class name resolves, an ambiguous one lists candidates, 
         ->assertFailed();
 });
 
+test('a feature test referencing a route name in its source is directly affected by that route, marked as a reference', function () {
+    $artifacts = affectedTestsCommandArtifacts();
+    $artifacts['routes'][0]['name'] = 'orders.index';
+    $artifacts['tests'][] = [
+        'id' => 'tests:tests/Feature/Orders/ListOrdersTest.php',
+        'file' => 'tests/Feature/Orders/ListOrdersTest.php',
+        'subject' => 'App\\Orders\\ListOrders',
+        'references' => [['kind' => 'route', 'target' => 'orders.index']],
+        'source' => ['file' => 'tests/Feature/Orders/ListOrdersTest.php'],
+    ];
+    writeAffectedTestsManifest($artifacts);
+
+    expect(affectedTestsOutput(['artifact' => 'routes:GET:orders', '--depth' => 1]))->toBe(<<<'TEXT'
+        Affected tests for routes:GET:orders, depth 1
+
+        Directly affected
+          tests/Feature/Orders/ListOrdersTest.php  ← via GET orders  (reference)
+
+        TEXT);
+});
+
 test('a flow start lists the tests of its members', function () {
     $artifacts = affectedTestsCommandArtifacts();
     $artifacts['jobs'][0]['annotations'] = ['flow' => 'shipping'];

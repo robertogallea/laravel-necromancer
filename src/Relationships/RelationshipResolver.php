@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelNecromancer\Relationships;
 
+use LaravelNecromancer\Collection\TestReferenceFactResolver;
 use LaravelNecromancer\Manifest\ArtifactId;
 use LaravelNecromancer\Okf\UriReference;
 
@@ -58,6 +59,13 @@ final class RelationshipResolver
     private array $gates = [];
 
     /**
+     * Route name → its Artifact ID.
+     *
+     * @var array<string, string>
+     */
+    private array $routeNames = [];
+
+    /**
      * Relationships keyed by identity, in first-seen order.
      *
      * @var array<string, Relationship>
@@ -76,6 +84,7 @@ final class RelationshipResolver
         $this->controllerActions = $this->buildControllerActionIndex($artifacts);
         $this->policyByModel = $this->buildPolicyIndex($artifacts);
         $this->gates = $this->buildGateIndex($artifacts);
+        $this->routeNames = $this->buildRouteNameIndex($artifacts);
         $this->relationships = [];
 
         foreach (ArtifactId::supportedTypes() as $type) {
@@ -288,6 +297,33 @@ final class RelationshipResolver
     }
 
     /**
+     * Subject relationships first, then one per class or route name the
+     * test's source references (`match: reference`); a reference merged
+     * into a subject relationship keeps the subject's match.
+     *
+     * @param  array<string, mixed>  $test
+     */
+    private function testRelationships(array $test): void
+    {
+        $this->testSubjectRelationships($test);
+
+        foreach (array_values((array) ($test['references'] ?? [])) as $position => $reference) {
+            $kind = is_array($reference) ? ($reference['kind'] ?? null) : null;
+            $target = is_array($reference) ? ($reference['target'] ?? null) : null;
+
+            if (! is_string($target) || $target === '' || ! in_array($kind, [TestReferenceFactResolver::CLASS_REFERENCE, TestReferenceFactResolver::ROUTE_REFERENCE], true)) {
+                continue;
+            }
+
+            $from = $kind === TestReferenceFactResolver::CLASS_REFERENCE ? ($this->classIndex[$target] ?? null) : ($this->routeNames[$target] ?? null);
+
+            $this->add(new Relationship($from ?? $target, RelationshipType::TestedBy, $test['id'], [Provenance::Source], $from !== null, ['match' => TestMatch::Reference->value], [
+                new RelationshipEvidence($test['id'], 'references', $target, $position),
+            ]));
+        }
+    }
+
+    /**
      * Same matching as TestSubjectMatcher: a subject naming a class exactly
      * covers that artifact; a subject naming a namespace covers every
      * collected artifact under it. A subject matching nothing collected
@@ -295,7 +331,7 @@ final class RelationshipResolver
      *
      * @param  array<string, mixed>  $test
      */
-    private function testRelationships(array $test): void
+    private function testSubjectRelationships(array $test): void
     {
         $subject = $test['subject'] ?? null;
 
@@ -308,8 +344,8 @@ final class RelationshipResolver
 
         foreach ($this->classIndex as $class => $id) {
             $match = match (true) {
-                $class === $subject => 'exact',
-                str_starts_with($class, $subject.'\\') => 'namespace',
+                $class === $subject => TestMatch::Exact->value,
+                str_starts_with($class, $subject.'\\') => TestMatch::Namespace->value,
                 default => null,
             };
 
@@ -320,7 +356,7 @@ final class RelationshipResolver
         }
 
         if (! $matched) {
-            $this->add(new Relationship($subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], false, ['match' => 'exact'], $evidence));
+            $this->add(new Relationship($subject, RelationshipType::TestedBy, $test['id'], [Provenance::Source], false, ['match' => TestMatch::Exact->value], $evidence));
         }
     }
 
@@ -640,6 +676,23 @@ final class RelationshipResolver
         foreach ((array) ($artifacts['gates'] ?? []) as $gate) {
             if (is_array($gate) && is_string($gate['ability'] ?? null) && is_string($gate['id'] ?? null) && ! isset($index[$gate['ability']])) {
                 $index[$gate['ability']] = $gate['id'];
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifacts
+     * @return array<string, string>
+     */
+    private function buildRouteNameIndex(array $artifacts): array
+    {
+        $index = [];
+
+        foreach ((array) ($artifacts['routes'] ?? []) as $route) {
+            if (is_array($route) && is_string($route['name'] ?? null) && $route['name'] !== '' && is_string($route['id'] ?? null) && ! isset($index[$route['name']])) {
+                $index[$route['name']] = $route['id'];
             }
         }
 

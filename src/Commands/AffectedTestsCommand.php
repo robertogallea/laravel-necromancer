@@ -13,6 +13,7 @@ use LaravelNecromancer\Manifest\ManifestScopeGuard;
 use LaravelNecromancer\Relationships\AffectedTest;
 use LaravelNecromancer\Relationships\AffectedTestFinder;
 use LaravelNecromancer\Relationships\ImpactAnalyzer;
+use LaravelNecromancer\Relationships\TestMatch;
 use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -133,7 +134,9 @@ final class AffectedTestsCommand extends Command
             return "{$test->file}  (changed)";
         }
 
-        return "{$test->file}  ← via {$test->viaLabel}".($test->match() === 'namespace' ? '  (namespace match)' : '');
+        $qualifier = TestMatch::qualifierFor($test->match());
+
+        return "{$test->file}  ← via {$test->viaLabel}".($qualifier !== '' ? "  ({$qualifier})" : '');
     }
 
     /**

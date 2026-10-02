@@ -17,10 +17,6 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\Parser;
-use PhpParser\ParserFactory;
 
 /**
  * Adds the `dispatches` Discovered Fact to already-collected class-backed
@@ -45,8 +41,6 @@ final class DispatchFactResolver
         'mailables', 'validation_rules', 'service_providers',
     ];
 
-    private Parser $parser;
-
     /**
      * Name-resolved statements per source path, so middleware registered
      * several times is parsed once; `null` marks a file that failed to parse.
@@ -55,10 +49,7 @@ final class DispatchFactResolver
      */
     private array $parsed = [];
 
-    public function __construct()
-    {
-        $this->parser = (new ParserFactory)->createForHostVersion();
-    }
+    public function __construct(private readonly SourceFileParser $sources = new SourceFileParser) {}
 
     /**
      * @param  array<string, list<array<string, mixed>>>  $artifacts
@@ -99,23 +90,17 @@ final class DispatchFactResolver
      */
     private function statements(string $file, string $artifactLabel, array &$diagnostics): ?array
     {
-        $path = str_starts_with($file, DIRECTORY_SEPARATOR) ? $file : base_path($file);
-
-        if (! array_key_exists($path, $this->parsed)) {
-            $source = is_file($path) ? file_get_contents($path) : false;
-
+        if (! array_key_exists($file, $this->parsed)) {
             try {
-                $this->parsed[$path] = $source === false
-                    ? null
-                    : (new NodeTraverser(new NameResolver))->traverse($this->parser->parse($source) ?? []);
+                $this->parsed[$file] = $this->sources->parse($file);
             } catch (Error $error) {
-                $this->parsed[$path] = null;
+                $this->parsed[$file] = null;
                 $diagnostics[] = "DS_PARSE_FAILED: {$artifactLabel} source '{$file}' could not be parsed "
                     ."({$error->getMessage()}); its dispatches were not collected.";
             }
         }
 
-        return $this->parsed[$path];
+        return $this->parsed[$file];
     }
 
     /**

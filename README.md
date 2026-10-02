@@ -53,7 +53,7 @@ The manifest covers 20 artifact types across the full Laravel application struct
 | `actions` | Entrypoint methods with parameter and return types (classes under `app/Actions`) |
 | `policies` | Model, policy methods |
 | `enums` | Backing type, cases |
-| `tests` | File, type (unit/feature), subject class, test methods |
+| `tests` | File, type (unit/feature), subject class, test methods, referenced app classes and route names |
 | `observers` | Model, lifecycle hooks, queued status |
 | `scheduled_tasks` | Command, cron expression, human-readable schedule, flags |
 | `middleware` | Alias, class, scope (global/group/alias), group name |
@@ -112,6 +112,27 @@ php artisan necromancer:scan --only=observers,scheduled_tasks,gates
 Necromancer reads PHP attributes (`#[ObservedBy]`, `#[Queue]`, `#[Aliases]`, `#[Authorize]`, etc.) as primary sources alongside class properties. Codebases using the attribute-based API introduced in Laravel 11+ are fully supported — jobs configured via `#[Queue]`/`#[Tries]`/`#[Timeout]`, models with `#[ObservedBy]`/`#[ScopedBy]`, and commands with `#[Aliases]` all appear correctly in the manifest.
 
 Test files in `tests/Unit/` and `tests/Feature/` are scanned and included as a `tests` artifact type. Both Pest functional-style files (`test()`/`it()` calls) and class-based PHPUnit tests are supported. Subject classes are inferred from `uses()` declarations and filename convention (`OrderTest.php` → `App\Models\Order`).
+
+Each test also records what its source references, so a feature test whose filename matches no class still connects to what it exercises:
+
+```php
+use App\Models\Order;
+
+it('creates an order', function () {
+    $this->post(route('orders.store'))->assertCreated();
+
+    expect(Order::query()->count())->toBe(1);
+});
+```
+
+```json
+"references": [
+    { "kind": "class", "target": "App\\Models\\Order" },
+    { "kind": "route", "target": "orders.store" }
+]
+```
+
+A `class` reference is an application-namespace class the test uses in code — `X::class`, `new X(...)`, or `X::method(...)`, resolved through the file's imports. An import the code never uses doesn't count, and neither do framework or vendor classes such as `Mail`. A `route` reference is a literal name passed to `route()`; `route($name)` and URIs passed to `$this->get('/orders')` are not seen. Entries are deduplicated and sorted by kind, then target, and a test referencing nothing has no `references` key. Each reference becomes a `tested_by` [Relationship](#relationships) marked `match: reference`. A test file that can't be parsed gets no `references`, and the scan prints a non-fatal `TR_PARSE_FAILED` diagnostic.
 
 Action classes — single-purpose classes that encapsulate one business operation — are collected from `app/Actions` (including subfolders) as an `actions` artifact type. Any concrete class there with at least one **entrypoint** (a public, non-static method declared on the class itself; `__invoke` counts, other magic methods and inherited methods don't) is included, with its entrypoints' parameter names/types and return type:
 
@@ -857,7 +878,7 @@ When an artifact's already-collected fields name another artifact by class — a
 
 These lines are drawn from the same [Relationships](#relationships) the Artifact Graph uses, labelled by the fact that declares them. A concept only lists facts the artifact itself records — a model shows `policy` only when it declares one with `#[UsePolicy]`, even though the policy's own `model` also supports that Relationship.
 
-After those lines, a concept lists five more Relationship types, one line per type in this order: `uses_middleware`, `validates_with`, a route's `authorized_by`, `dispatches`, and `tested_by`. These appear on the artifact the Relationship starts from, even when another artifact records the fact: a route lists the form request its controller action accepts, and a model lists the tests whose `subject` covers it. Each line is labelled by its type name. Each target links to its concept by Artifact ID, or stays plain text when it wasn't collected, and may carry a short qualifier: the group a middleware was reached through, the ability a route authorizes, the dispatch modes, or a namespace-matched test:
+After those lines, a concept lists five more Relationship types, one line per type in this order: `uses_middleware`, `validates_with`, a route's `authorized_by`, `dispatches`, and `tested_by`. These appear on the artifact the Relationship starts from, even when another artifact records the fact: a route lists the form request its controller action accepts, and a model lists the tests whose `subject` covers it. Each line is labelled by its type name. Each target links to its concept by Artifact ID, or stays plain text when it wasn't collected, and may carry a short qualifier: the group a middleware was reached through, the ability a route authorizes, the dispatch modes, or a test matched by namespace (`namespace match`) or by a source reference (`reference`):
 
 ```markdown
 ## Relationships
@@ -1000,7 +1021,7 @@ A Relationship is a directed, typed link derived from facts and annotations the 
 | `listened_by` | event → listener | the event's `listeners` and/or the listener's `handles` | runtime | — |
 | `operates_on` | action → class | class types the action's entrypoints accept | reflection | — |
 | `dispatches` | artifact → job, event, or mailable | the artifact's `dispatches` (one Relationship per target, however many methods dispatch it) | source | `methods`, `modes` (deduplicated, `null` excluded) |
-| `tested_by` | artifact → test | the test's `subject` — an exact class, or a namespace fanned out to every artifact under it | source | `match: exact\|namespace` |
+| `tested_by` | artifact → test | the test's `subject` — an exact class, or a namespace fanned out to every artifact under it — and each class or route name in the test's `references` | source | `match: exact\|namespace\|reference` (a subject match wins when both link the same pair) |
 | `belongs_to_domain` / `belongs_to_flow` | artifact → `domain:<v>` / `flow:<v>` | the artifact's `domain`/`flow` annotation | annotation | — |
 | `references_adr` | artifact → `adr:<path>` | each local `adrs` annotation entry (absolute URIs skipped) | annotation | — |
 
@@ -1106,7 +1127,7 @@ Indirectly affected
   tests/Unit/PoliciesTest.php  ← via App\Policies\OrderPolicy  (namespace match)
 ```
 
-An **Affected Test** is a test reached by the [Impact](#step-3l--analyze-an-artifacts-impact) of the change, through a `tested_by` Relationship. It's **directly affected** when it tests the changed artifact itself (distance 1), and **indirectly affected** when it tests something further out (distance 2 or more). `← via` names the node the test was reached from. A test whose `subject` is a namespace rather than a class (e.g. `uses(App\Policies::class)`) is included and marked `(namespace match)`. A test reached from several changed artifacts is listed once, at its smallest distance.
+An **Affected Test** is a test reached by the [Impact](#step-3l--analyze-an-artifacts-impact) of the change, through a `tested_by` Relationship. It's **directly affected** when it tests the changed artifact itself (distance 1), and **indirectly affected** when it tests something further out (distance 2 or more). `← via` names the node the test was reached from. A test whose `subject` is a namespace rather than a class (e.g. `uses(App\Policies::class)`) is included and marked `(namespace match)`. A test linked only because its source references the artifact's class or route name (see the `references` fact under [Step 1](#step-1--scan)) is marked `(reference)`, so a feature test calling `route('orders.store')` is directly affected by that route. A test reached from several changed artifacts is listed once, at its smallest distance.
 
 The walk is the one `necromancer:impact` does, so Domains, Flows, ADRs, middleware, and tests are never walked through: two artifacts sharing a flow don't pull in each other's tests.
 

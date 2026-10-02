@@ -448,6 +448,18 @@ test('build() renders tests on one tested_by line, marking namespace matches', f
     expect($concept->content)->toContain('- **tested_by**: [tests/Unit/Models/OrderTest.php](/artifacts/order-test.md), [tests/Feature/ModelsTest.php](/artifacts/models-test.md) (namespace match)'."\n");
 });
 
+test('build() marks tests linked by a source reference', function () {
+    $model = ['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order', 'source' => null];
+    $relationships = [
+        new Relationship('models:App\\Models\\Order', RelationshipType::TestedBy, 'tests:tests/Feature/CheckoutTest.php', [Provenance::Source], true, ['match' => 'reference']),
+    ];
+    $idIndex = ['tests:tests/Feature/CheckoutTest.php' => new ConceptLink('tests/Feature/CheckoutTest.php', '/artifacts/checkout-test.md')];
+
+    $concept = buildConceptFromRelationships('models', $model, $relationships, $idIndex);
+
+    expect($concept->content)->toContain('- **tested_by**: [tests/Feature/CheckoutTest.php](/artifacts/checkout-test.md) (reference)'."\n");
+});
+
 test('build() renders source-side lines after every legacy line, in uses_middleware, validates_with, authorized_by, dispatches, tested_by order', function () {
     $route = ['id' => 'routes:POST:orders', 'method' => 'POST', 'uri' => 'orders', 'controller' => 'App\\Http\\Controllers\\OrderController', 'source' => null];
     $relationships = [

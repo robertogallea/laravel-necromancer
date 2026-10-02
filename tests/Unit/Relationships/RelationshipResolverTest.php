@@ -347,6 +347,41 @@ test('an artifact is tested_by a test naming it exactly, or by a namespace subje
     ]);
 });
 
+test('an artifact is tested_by a test whose source references its class or route name, and a subject match wins the merge', function () {
+    $relationships = (new RelationshipResolver)->resolve(['artifacts' => [
+        'routes' => [['id' => 'routes:POST:orders', 'method' => 'POST', 'uri' => 'orders', 'name' => 'orders.store']],
+        'models' => [
+            ['id' => 'models:App\\Models\\Order', 'class' => 'App\\Models\\Order'],
+            ['id' => 'models:App\\Models\\User', 'class' => 'App\\Models\\User'],
+        ],
+        'tests' => [[
+            'id' => 'tests:tests/Feature/Orders/CreateOrderTest.php',
+            'file' => 'tests/Feature/Orders/CreateOrderTest.php',
+            'subject' => 'App\\Models\\User',
+            'references' => [
+                ['kind' => 'class', 'target' => 'App\\Models\\Order'],
+                ['kind' => 'class', 'target' => 'App\\Models\\User'],
+                ['kind' => 'class', 'target' => 'App\\Services\\Ghost'],
+                ['kind' => 'route', 'target' => 'orders.missing'],
+                ['kind' => 'route', 'target' => 'orders.store'],
+            ],
+        ]],
+    ]]);
+    $testedBy = array_values(array_filter($relationships, fn (Relationship $r): bool => $r->type->value === 'tested_by'));
+    $test = 'tests:tests/Feature/Orders/CreateOrderTest.php';
+
+    expect(array_map(fn (Relationship $r): array => $r->jsonSerialize(), $testedBy))->toBe([
+        ['from' => 'models:App\\Models\\User', 'type' => 'tested_by', 'to' => $test, 'provenance' => ['source'], 'resolved' => true, 'metadata' => ['match' => 'exact']],
+        ['from' => 'models:App\\Models\\Order', 'type' => 'tested_by', 'to' => $test, 'provenance' => ['source'], 'resolved' => true, 'metadata' => ['match' => 'reference']],
+        ['from' => 'App\\Services\\Ghost', 'type' => 'tested_by', 'to' => $test, 'provenance' => ['source'], 'resolved' => false, 'metadata' => ['match' => 'reference']],
+        ['from' => 'orders.missing', 'type' => 'tested_by', 'to' => $test, 'provenance' => ['source'], 'resolved' => false, 'metadata' => ['match' => 'reference']],
+        ['from' => 'routes:POST:orders', 'type' => 'tested_by', 'to' => $test, 'provenance' => ['source'], 'resolved' => true, 'metadata' => ['match' => 'reference']],
+    ])->and(array_map(fn ($e): array => [$e->field, $e->value], $testedBy[0]->evidence))->toBe([
+        ['subject', 'App\\Models\\User'],
+        ['references', 'App\\Models\\User'],
+    ]);
+});
+
 test('an artifact belongs_to_domain, belongs_to_flow, and references_adr from its annotations', function () {
     $relationships = relationshipsOf([
         'jobs' => [[
