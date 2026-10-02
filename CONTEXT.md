@@ -52,6 +52,14 @@ _Avoid_: Handler, endpoint
 A public controller method that handles HTTP requests routed to it. Distinct from an **Action**, which is not tied to HTTP routing.
 _Avoid_: Endpoint, route action, entrypoint
 
+**Relationship**:
+A directed, typed link from an artifact to another artifact, a Domain, a Flow, or an ADR, derived from the artifact's discovered facts and annotations rather than recorded separately. A relationship whose target is not a collected artifact is still a relationship, marked unresolved.
+_Avoid_: Edge (a graph rendering of a relationship), dependency
+
+**Provenance**:
+How Necromancer obtained the evidence for a relationship: from the application's runtime state, by reflecting on declared code structure, by reading source text, or from an artifact annotation. A relationship supported by several pieces of evidence carries each of their provenances.
+_Avoid_: Confidence, origin
+
 **Knowledge Bundle**:
 A portable collection of interlinked knowledge documents generated to make an application's architecture understandable to people and AI systems.
 _Avoid_: OKF package, metadata dump
