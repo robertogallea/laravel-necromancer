@@ -12,7 +12,7 @@ namespace LaravelNecromancer\Okf\Enrichment;
  * cannot change, caching, privacy, provider/model) instead.
  *
  * The mention of the deterministic `okf/` sibling is deliberately static
- * prose, not an existence check — see ADR 0001: this bundle's own atomic
+ * prose, not an existence check — see ADR 0015: this bundle's own atomic
  * swap only runs when necromancer:okf-enrich runs, so it has no way to
  * know whether the deterministic sibling currently exists.
  */
